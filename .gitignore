@@ -1,0 +1,8 @@
+# IDE / tooling
+.vscode/
+.idea/
+.trae-html-share-packages/
+.screenshots/
+
+# macOS
+.DS_Store
