@@ -1,0 +1,105 @@
+{
+  "title": "Agent Orchestration",
+  "uid": "agent-orchestration",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Agent execution time (avg by agent)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(agent_execution_duration_seconds_sum[5m])) by (agent)",
+          "legendFormat": "{{agent}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Agent execution time p95",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(agent_execution_duration_seconds_bucket[5m])) by (le, agent))",
+          "legendFormat": "{{agent}} p95"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Agent failures (5m)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 9 },
+      "targets": [
+        {
+          "expr": "sum(increase(agent_execution_duration_seconds_count{outcome=\"failure\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Run duration p95 (by template/mode)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(orchestrator_run_duration_seconds_bucket[5m])) by (le, template, mode))",
+          "legendFormat": "{{template}}/{{mode}} p95"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Run throughput by mode",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(orchestrator_runs_started_total[5m])) by (mode)",
+          "legendFormat": "{{mode}} starts"
+        },
+        {
+          "expr": "sum(rate(orchestrator_runs_completed_total[5m])) by (mode)",
+          "legendFormat": "{{mode}} completed"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Stage failures (5m)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 23 },
+      "targets": [
+        {
+          "expr": "sum(increase(orchestrator_stage_failed_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Retained run timelines",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 23 },
+      "targets": [
+        {
+          "expr": "orchestrator_observability_retained_runs"
+        }
+      ]
+    }
+  ]
+}
