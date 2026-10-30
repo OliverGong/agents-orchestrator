@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.model.ResearchResponse;
 import com.oli.orchestrator_demo.model.TripRequest;
@@ -24,8 +25,8 @@ import com.oli.orchestrator_demo.model.TripRequest;
 @Component
 public class ResearchAgent extends AbstractContextAgent<ResearchResponse> {
 
-  public ResearchAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore) {
-    super("research", chatModel, runtimeStore);
+  public ResearchAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore, McpConnectionRegistry mcpRegistry) {
+    super("research", chatModel, runtimeStore, mcpRegistry);
   }
 
   @Override

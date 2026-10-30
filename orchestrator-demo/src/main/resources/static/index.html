@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Orchestrator Demo — 多 Agent 旅行规划控制台</title>
-<link rel="stylesheet" href="app.css?v=6">
+<link rel="stylesheet" href="app.css?v=7">
 </head>
 <body>
 <header>
@@ -140,7 +140,7 @@
 
     <div class="card">
       <h2>MCP 服务器</h2>
-      <p class="hint">v1 为配置录入与 agent 映射（校准/引用校验即时生效）；MCP 客户端传输接线与工具调用详情展示在下一迭代接入。</p>
+      <p class="hint">连接由后端注册表动态维护：Streamable HTTP 为默认传输（SSE 已弃用、STDIO 启动本地子进程并继承当前环境变量），保存后自动按配置差异重建连接；映射到 Agent 的服务器，其工具会注入该 Agent 的每次模型调用，调用详情（服务器/工具/耗时/结果）可在「运行记录」详情中查看。状态 15s 自动重试，失败可手动重连。</p>
       <div id="mcp-panel"></div>
     </div>
   </section>
@@ -148,6 +148,6 @@
 
 <footer>Spring Boot 4 · Spring AI 2.0 · Micrometer/OTel — 前端为应用内静态资源（static/），与 REST API 同源直连。</footer>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

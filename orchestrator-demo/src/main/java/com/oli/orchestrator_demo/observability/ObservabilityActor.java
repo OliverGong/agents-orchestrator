@@ -119,7 +119,7 @@ public class ObservabilityActor {
     }
     return switch (event.type()) {
       case RUN_STARTED -> timeline; // duplicate start: keep the first
-      case STAGE_COMPLETED, STAGE_FAILED -> timeline.withEvent(event);
+      case TOOL_CALLED, STAGE_COMPLETED, STAGE_FAILED -> timeline.withEvent(event);
       case RUN_COMPLETED -> timeline.withEvent(event).completed(event.timestamp(), event.outputContextJson());
       case RUN_FAILED -> timeline.withEvent(event).failed(event.timestamp());
     };

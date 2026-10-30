@@ -40,10 +40,13 @@ import com.oli.orchestrator_demo.agent.ItineraryAgent;
 import com.oli.orchestrator_demo.agent.ResearchAgent;
 import com.oli.orchestrator_demo.agent.ReviewAgent;
 import com.oli.orchestrator_demo.config.AgentModelProperties;
+import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
+import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.workflow.WorkflowProperties;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import tools.jackson.databind.json.JsonMapper;
 
 class ControlPlaneControllerTest {
@@ -63,8 +66,8 @@ class ControlPlaneControllerTest {
     // The agent beans back the self-declared slot contracts.
     ChatModel model = Mockito.mock(ChatModel.class);
     registry.attachDescriptors(new AgentDescriptorRegistry(List.of(
-        new ResearchAgent(model, registry), new BudgetAgent(model, registry),
-        new ItineraryAgent(model, registry), new ReviewAgent(model, registry)),
+        new ResearchAgent(model, registry, null), new BudgetAgent(model, registry, null),
+        new ItineraryAgent(model, registry, null), new ReviewAgent(model, registry, null)),
         new AgentModelProperties(), null));
 
     Environment environment = Mockito.mock(Environment.class);
@@ -72,8 +75,14 @@ class ControlPlaneControllerTest {
     // configuration fallback (deterministic, no network in tests).
     when(environment.getProperty("spring.ai.model.chat", "ollama")).thenReturn("stub");
 
+    // Inert MCP registry: no lifecycle start, no connection attempts in tests.
+    McpConnectionRegistry mcpRegistry = new McpConnectionRegistry(registry,
+        Mockito.mock(ObservabilityActor.class), new SimpleMeterRegistry(),
+        config -> { throw new IllegalStateException("no MCP in tests"); });
+
     mockMvc = MockMvcBuilders.standaloneSetup(
-        new ControlPlaneController(registry, environment, RestClient.builder(), JsonMapper.builder().build()))
+        new ControlPlaneController(registry, mcpRegistry, environment, RestClient.builder(),
+            JsonMapper.builder().build()))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
   }

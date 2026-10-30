@@ -27,16 +27,21 @@
  */
 package com.oli.orchestrator_demo.agent;
 
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.ai.tool.ToolCallback;
 
 import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import tools.jackson.core.JacksonException;
 
@@ -55,10 +60,21 @@ public abstract class AbstractContextAgent<R> implements Agent<OrchestratorConte
   private final String name;
   protected final ChatClient chatClient;
   private final AgentRuntimeStore runtimeStore;
+  /**
+   * Null only in template-method tests: production agents get the registry
+   * injected by Spring and expose the tools of their mapped MCP servers.
+   */
+  private final McpConnectionRegistry mcpRegistry;
 
   protected AbstractContextAgent(String name, ChatModel chatModel, AgentRuntimeStore runtimeStore) {
+    this(name, chatModel, runtimeStore, null);
+  }
+
+  protected AbstractContextAgent(String name, ChatModel chatModel, AgentRuntimeStore runtimeStore,
+      McpConnectionRegistry mcpRegistry) {
     this.name = name;
     this.runtimeStore = runtimeStore;
+    this.mcpRegistry = mcpRegistry;
     // Null model only occurs in template-method tests that override respond();
     // the builder would reject it, so the client stays unused there anyway.
     this.chatClient = chatModel == null ? null : ChatClient.builder(chatModel)
@@ -117,16 +133,36 @@ public abstract class AbstractContextAgent<R> implements Agent<OrchestratorConte
     return runtimeStore.agent(name);
   }
 
-  /** Chat options builder from the runtime configuration; null values inherit the backend defaults. */
+  /**
+   * Chat options builder from the runtime configuration plus the tool
+   * callbacks of the MCP servers this agent is mapped to (agents without MCP
+   * mappings keep the plain builder, so they are unaffected); null values
+   * inherit the backend defaults. The tools are resolved per call, so
+   * control-plane MCP edits and reconnects hot-apply to the very next model
+   * call.
+   */
   protected ChatOptions.Builder<?> chatOptions(AgentRuntimeConfig config) {
-    ChatOptions.Builder<?> options = ChatOptions.builder();
-    if (config.model() != null && !config.model().isBlank()) {
-      options = options.model(config.model());
+    String model = config.model() != null && !config.model().isBlank() ? config.model() : null;
+    Double temperature = config.temperature();
+    List<ToolCallback> tools = mcpRegistry == null ? List.of() : mcpRegistry.callbacksFor(name);
+    if (tools.isEmpty()) {
+      ChatOptions.Builder<?> options = ChatOptions.builder();
+      if (model != null) {
+        options = options.model(model);
+      }
+      if (temperature != null) {
+        options = options.temperature(temperature);
+      }
+      return options;
     }
-    if (config.temperature() != null) {
-      options = options.temperature(config.temperature());
+    ToolCallingChatOptions.Builder<?> options = ToolCallingChatOptions.builder();
+    if (model != null) {
+      options = options.model(model);
     }
-    return options;
+    if (temperature != null) {
+      options = options.temperature(temperature);
+    }
+    return options.toolCallbacks(tools);
   }
 
   /** Produces the agent specific structured response from the current workflow state. */

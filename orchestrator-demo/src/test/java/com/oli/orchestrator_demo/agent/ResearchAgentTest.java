@@ -30,7 +30,7 @@ class ResearchAgentTest {
          "travelTips":["Buy a Suica card"],
          "foodOptions":["Ramen","Sushi"]}
         """);
-    ResearchAgent agent = new ResearchAgent(stub.model(), stub.store());
+    ResearchAgent agent = new ResearchAgent(stub.model(), stub.store(), null);
 
     OrchestratorContext result = agent.execute(
         OrchestratorContext.start(new TripRequest("Tokyo", 5, new BigDecimal("15000"), "food and culture")));

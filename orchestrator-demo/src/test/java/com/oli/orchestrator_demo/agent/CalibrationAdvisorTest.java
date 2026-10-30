@@ -45,7 +45,7 @@ class CalibrationAdvisorTest {
         null, null,
         List.of(new CalibrationRule("\"  (Senso-ji)  \"", "\"$1\"", "trim padded attraction")),
         List.of());
-    ResearchAgent agent = new ResearchAgent(stub.model(), store);
+    ResearchAgent agent = new ResearchAgent(stub.model(), store, null);
 
     OrchestratorContext result = agent.execute(OrchestratorContext.start(request));
 
@@ -58,7 +58,7 @@ class CalibrationAdvisorTest {
     var stub = ChatClientStubs.modelReturning("""
         {"attractions":["Senso-ji"],"travelTips":[],"foodOptions":["Ramen"]}
         """);
-    ResearchAgent agent = new ResearchAgent(stub.model(), AgentRuntimeStore.fixed());
+    ResearchAgent agent = new ResearchAgent(stub.model(), AgentRuntimeStore.fixed(), null);
 
     OrchestratorContext result = agent.execute(OrchestratorContext.start(request));
 

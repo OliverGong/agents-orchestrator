@@ -244,6 +244,14 @@ async function showRunDetail(runId) {
               ${s.parallelPeers && s.parallelPeers.length ? '· 同波: ' + esc(s.parallelPeers.join(', ')) : ''}</span>
             ${s.errorMessage ? `<span class="meta" style="color:var(--err)">${esc(s.errorMessage)}</span>` : ''}
           </div>
+          ${(s.toolCalls || []).map((t) => `
+            <div class="tool-line">
+              <span class="badge ${t.outcome === 'OK' ? 'badge-ok' : 'badge-failed'}">🔧</span>
+              <span>MCP <b>${esc(t.serverName)}</b> · ${esc(t.toolName)}</span>
+              <span class="meta">${esc(t.durationMs)} ms</span>
+              ${t.errorMessage ? `<span class="meta" style="color:var(--err)">${esc(t.errorMessage)}</span>` : ''}
+              ${t.resultSummary ? jsonDetails('工具结果', t.resultSummary) : ''}
+            </div>`).join('')}
           ${jsonDetails('输入黑板快照', s.inputContext)}
           ${jsonDetails('输出黑板快照', s.outputContext)}`).join('')}`).join('')}
       ${final ? `<h3>最终上下文（黑板终态）</h3>
@@ -612,27 +620,34 @@ async function saveWorkflow() {
 }
 
 function renderMcp() {
-  mcpServers = cpState.mcpServers.map((s) => ({ ...s }));
+  mcpServers = cpState.mcpServers.map((s) => ({ ...s, args: s.args || [], env: s.env || {} }));
   drawMcp();
+  refreshMcpStatus();
 }
 
 function drawMcp() {
   $('#mcp-panel').innerHTML = `
     <table class="data-table" id="mcp-table">
-      <thead><tr><th>名称</th><th>传输</th><th>端点 / 命令</th><th>启用</th><th>说明</th><th></th></tr></thead>
+      <thead><tr><th>名称</th><th>传输</th><th>端点 / 命令</th><th>启用</th><th>说明</th><th>连接状态</th><th></th></tr></thead>
       <tbody>
         ${mcpServers.map((s, i) => `
-          <tr>
+          <tr data-i="${i}">
             <td><input class="mcp-name" value="${esc(s.name)}"></td>
             <td><select class="mcp-transport">
-              <option value="SSE" ${s.transport === 'SSE' ? 'selected' : ''}>SSE</option>
+              <option value="STREAMABLE_HTTP" ${s.transport === 'STREAMABLE_HTTP' ? 'selected' : ''}>Streamable HTTP</option>
+              <option value="SSE" ${s.transport === 'SSE' ? 'selected' : ''}>SSE（弃用）</option>
               <option value="STDIO" ${s.transport === 'STDIO' ? 'selected' : ''}>STDIO</option>
             </select></td>
-            <td><input class="mcp-endpoint" value="${esc(s.endpoint)}"></td>
+            <td class="mcp-location">${s.transport === 'STDIO'
+              ? `<input class="mcp-command" placeholder="npx" value="${esc(s.command || '')}">
+                 <input class="mcp-args" placeholder="参数（空格分隔）" value="${esc((s.args || []).join(' '))}">
+                 <input class="mcp-env" placeholder="KEY=VAL,KEY=VAL（可空）" value="${esc(Object.entries(s.env || {}).map(([k, v]) => k + '=' + v).join(','))}">`
+              : `<input class="mcp-endpoint" placeholder="http://localhost:3002/mcp" value="${esc(s.endpoint || '')}">`}</td>
             <td><input type="checkbox" class="mcp-enabled" ${s.enabled ? 'checked' : ''}></td>
-            <td><input class="mcp-desc" value="${esc(s.description)}"></td>
+            <td><input class="mcp-desc" value="${esc(s.description || '')}"></td>
+            <td class="mcp-status" data-server="${esc(s.name)}"><span class="hint">…</span></td>
             <td><button class="del mcp-del" data-i="${i}" type="button">✕</button></td>
-          </tr>`).join('') || '<tr><td colspan="6" class="hint">尚未录入 MCP 服务器。</td></tr>'}
+          </tr>`).join('') || '<tr><td colspan="7" class="hint">尚未录入 MCP 服务器。</td></tr>'}
       </tbody>
     </table>
     <button class="mcp-add" type="button" id="mcp-add">+ 添加服务器</button>
@@ -640,29 +655,92 @@ function drawMcp() {
     <span id="mcp-msg" class="hint"></span>`;
   $('#mcp-panel').querySelectorAll('.mcp-del').forEach((btn) =>
     btn.addEventListener('click', () => { mcpServers.splice(Number(btn.dataset.i), 1); drawMcp(); }));
+  $('#mcp-panel').querySelectorAll('.mcp-transport').forEach((sel) =>
+    sel.addEventListener('change', () => {
+      syncMcpRows();
+      mcpServers[Number(sel.closest('tr').dataset.i)].transport = sel.value;
+      drawMcp();
+      refreshMcpStatus();
+    }));
   $('#mcp-add').addEventListener('click', () => {
-    mcpServers.push({ name: 'mcp-server-' + (mcpServers.length + 1), transport: 'SSE',
-      endpoint: 'http://localhost:3001/sse', enabled: false, description: '' });
+    mcpServers.push({ name: 'mcp-server-' + (mcpServers.length + 1), transport: 'STREAMABLE_HTTP',
+      endpoint: 'http://localhost:3002/mcp', command: '', args: [], env: {}, enabled: false, description: '' });
     drawMcp();
+    refreshMcpStatus();
   });
   $('#mcp-save').addEventListener('click', saveMcp);
+}
+
+/** Reads the current table edits back into mcpServers (row order = array order). */
+function syncMcpRows() {
+  const rows = [...$('#mcp-panel').querySelectorAll('#mcp-table tbody tr[data-i]')];
+  if (!rows.length) return;
+  mcpServers = rows.map((tr) => {
+    const transport = tr.querySelector('.mcp-transport').value;
+    const row = {
+      name: tr.querySelector('.mcp-name').value.trim(),
+      transport,
+      enabled: tr.querySelector('.mcp-enabled').checked,
+      description: tr.querySelector('.mcp-desc').value,
+    };
+    if (transport === 'STDIO') {
+      row.endpoint = '';
+      row.command = tr.querySelector('.mcp-command').value.trim();
+      row.args = tr.querySelector('.mcp-args').value.trim() ? tr.querySelector('.mcp-args').value.trim().split(/\s+/) : [];
+      row.env = parseEnvPairs(tr.querySelector('.mcp-env').value);
+    } else {
+      row.endpoint = tr.querySelector('.mcp-endpoint').value.trim();
+      row.command = '';
+      row.args = [];
+      row.env = {};
+    }
+    return row;
+  });
+}
+
+function parseEnvPairs(text) {
+  const env = {};
+  (text || '').split(',').forEach((pair) => {
+    const idx = pair.indexOf('=');
+    if (idx > 0) env[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
+  });
+  return env;
+}
+
+/** Live connection states from the MCP registry (badges + tools + reconnect). */
+async function refreshMcpStatus() {
+  let statuses;
+  try { statuses = await getJson('/api/v1/control/mcp/status'); } catch { return; }
+  statuses.forEach((st) => {
+    const cell = document.querySelector(`.mcp-status[data-server="${CSS.escape(st.name)}"]`);
+    if (!cell) return;
+    const badgeClass = st.state === 'CONNECTED' ? 'badge-ok' : st.state === 'FAILED' ? 'badge-failed' : 'badge-running';
+    cell.innerHTML = `
+      <span class="badge ${badgeClass}">${esc(st.state)}</span>
+      ${st.state === 'CONNECTED' && st.toolNames.length ? `<span class="hint" title="${esc(st.toolNames.join(', '))}">工具 ×${st.toolNames.length}</span>` : ''}
+      ${st.error ? `<span class="hint" style="color:var(--err)">${esc(st.error)}</span>` : ''}
+      ${st.enabled ? `<button class="mcp-reconnect" data-server="${esc(st.name)}" type="button">重连</button>` : ''}`;
+    const btn = cell.querySelector('.mcp-reconnect');
+    if (btn) btn.addEventListener('click', async () => {
+      btn.disabled = true; btn.textContent = '重连中…';
+      try { await postJson(`/api/v1/control/mcp/servers/${encodeURIComponent(btn.dataset.server)}/reconnect`, {}); }
+      catch { /* the refreshed status shows the failure */ }
+      refreshMcpStatus();
+    });
+  });
 }
 
 async function saveMcp() {
   const msg = $('#mcp-msg');
   msg.textContent = '保存中…'; msg.className = 'hint';
-  const body = [...$('#mcp-panel').querySelectorAll('#mcp-table tbody tr')].map((tr) => ({
-    name: tr.querySelector('.mcp-name').value.trim(),
-    transport: tr.querySelector('.mcp-transport').value,
-    endpoint: tr.querySelector('.mcp-endpoint').value.trim(),
-    enabled: tr.querySelector('.mcp-enabled').checked,
-    description: tr.querySelector('.mcp-desc').value,
-  })).filter((s) => s.name);
+  syncMcpRows();
+  const body = mcpServers.filter((s) => s.name);
   try {
     const st = await putJson('/api/v1/control/mcp/servers', body);
     cpState = st;
     $('#cp-version').textContent = 'version ' + st.version;
-    msg.textContent = `已保存（version ${st.version}）`; msg.className = 'hint ok';
+    msg.textContent = `已保存（version ${st.version}），连接由后台自动重建`; msg.className = 'hint ok';
+    renderMcp();
   } catch (e) {
     msg.textContent = '保存失败: ' + e.message; msg.className = 'hint';
   }
@@ -678,8 +756,16 @@ async function getJson(url) {
 }
 
 async function putJson(url, body) {
+  return sendJson('PUT', url, body);
+}
+
+async function postJson(url, body) {
+  return sendJson('POST', url, body);
+}
+
+async function sendJson(method, url, body) {
   const res = await fetch(url, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    method, headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!res.ok) {

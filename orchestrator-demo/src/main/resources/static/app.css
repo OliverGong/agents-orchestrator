@@ -178,6 +178,23 @@ footer { color: var(--muted); text-align: center; font-size: 12px; padding: 18px
 #workflow-editor .wf-mode-sel { width: 240px; }
 .cp-msg.ok, .cp-msg.ok, #wf-msg.ok, #mcp-msg.ok { color: var(--ok); }
 
+/* ============ v1.1: MCP dynamic connections & tool-call observability ============ */
+.mcp-location input + input { margin-top: 4px; }
+#mcp-panel input[type="checkbox"] { display: inline-block; width: auto; }
+.mcp-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.mcp-status .badge { font-family: var(--mono); }
+.mcp-reconnect {
+  background: var(--panel-2); color: var(--accent); border: 1px solid var(--border);
+  border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 11px;
+}
+.mcp-reconnect:disabled { opacity: .5; cursor: not-allowed; }
+.tool-line {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: -2px 0 2px 28px; padding: 4px 10px;
+  background: var(--bg); border: 1px dashed var(--border); border-radius: 6px; font-size: 12px;
+}
+.tool-line details.json-details { margin: 0 0 0 4px; }
+
 /* slot contract chips (control plane: agent self-declared descriptors) */
 .slot-contract {
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;

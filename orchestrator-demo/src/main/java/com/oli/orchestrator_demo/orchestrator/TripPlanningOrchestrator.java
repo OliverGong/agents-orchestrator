@@ -48,6 +48,7 @@ import com.oli.orchestrator_demo.model.TripRequest;
 import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.observability.OrchestratorMetrics;
+import com.oli.orchestrator_demo.observability.RunContext;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.workflow.StageSpec;
 import com.oli.orchestrator_demo.workflow.WorkflowTemplate;
@@ -210,6 +211,10 @@ public class TripPlanningOrchestrator {
     log.info("Executing stage '{}' -> agent '{}'", stage.name(), agent.name());
     long startTime = System.currentTimeMillis();
     String threadName = Thread.currentThread().getName();
+    // Attribution for components inside the agent call (MCP tool callbacks):
+    // the thread-local is set/cleared around the stage, on whichever thread
+    // (request or virtual) happens to execute it.
+    RunContext.set(new RunContext.Attribution(runId, stage.name(), agent.name(), waveIndex));
     try {
       OrchestratorContext output = agent.execute(context);
       observability.tell(AgentObservabilityEvent.stageCompleted(runId, stage.name(), agent.name(), waveIndex,
@@ -224,6 +229,9 @@ public class TripPlanningOrchestrator {
           describe(ex), toJson(context)));
       orchestratorMetrics.stageFailed(agent.name(), mode.name());
       throw ex;
+    }
+    finally {
+      RunContext.clear();
     }
   }
 

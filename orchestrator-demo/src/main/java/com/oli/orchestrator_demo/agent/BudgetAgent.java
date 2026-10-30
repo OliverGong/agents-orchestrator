@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.model.BudgetResponse;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.model.TripRequest;
@@ -24,8 +25,8 @@ import com.oli.orchestrator_demo.model.TripRequest;
 @Component
 public class BudgetAgent extends AbstractContextAgent<BudgetResponse> {
 
-  public BudgetAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore) {
-    super("budget", chatModel, runtimeStore);
+  public BudgetAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore, McpConnectionRegistry mcpRegistry) {
+    super("budget", chatModel, runtimeStore, mcpRegistry);
   }
 
   @Override

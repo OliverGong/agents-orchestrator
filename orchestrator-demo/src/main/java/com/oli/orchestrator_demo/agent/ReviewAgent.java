@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.model.ReviewResponse;
 import com.oli.orchestrator_demo.model.TripRequest;
@@ -33,8 +34,8 @@ public class ReviewAgent extends AbstractContextAgent<ReviewResponse> {
       (not yet available - the contributing stage has not merged its result \
       into the blackboard; flag it as missing information instead of inventing it)""";
 
-  public ReviewAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore) {
-    super("review", chatModel, runtimeStore);
+  public ReviewAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore, McpConnectionRegistry mcpRegistry) {
+    super("review", chatModel, runtimeStore, mcpRegistry);
   }
 
   @Override

@@ -43,10 +43,10 @@ class AgentDescriptorRegistryTest {
 
     ChatModel model = Mockito.mock(ChatModel.class);
     registry = new AgentDescriptorRegistry(List.of(
-        new ResearchAgent(model, AgentRuntimeStore.fixed()),
-        new BudgetAgent(model, AgentRuntimeStore.fixed()),
-        new ItineraryAgent(model, AgentRuntimeStore.fixed()),
-        new ReviewAgent(model, AgentRuntimeStore.fixed())), modelProperties, null);
+        new ResearchAgent(model, AgentRuntimeStore.fixed(), null),
+        new BudgetAgent(model, AgentRuntimeStore.fixed(), null),
+        new ItineraryAgent(model, AgentRuntimeStore.fixed(), null),
+        new ReviewAgent(model, AgentRuntimeStore.fixed(), null)), modelProperties, null);
   }
 
   @Test
@@ -69,8 +69,8 @@ class AgentDescriptorRegistryTest {
   void rejectsDuplicateAgentNames() {
     ChatModel model = Mockito.mock(ChatModel.class);
     assertThatThrownBy(() -> new AgentDescriptorRegistry(List.of(
-        new ResearchAgent(model, AgentRuntimeStore.fixed()),
-        new ResearchAgent(model, AgentRuntimeStore.fixed())), modelProperties, null))
+        new ResearchAgent(model, AgentRuntimeStore.fixed(), null),
+        new ResearchAgent(model, AgentRuntimeStore.fixed(), null)), modelProperties, null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("research");
   }

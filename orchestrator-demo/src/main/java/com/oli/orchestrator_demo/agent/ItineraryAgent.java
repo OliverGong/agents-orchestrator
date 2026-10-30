@@ -25,6 +25,7 @@ import org.springframework.stereotype.Component;
 import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.model.ItineraryResponse;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.model.TripRequest;
@@ -37,8 +38,8 @@ public class ItineraryAgent extends AbstractContextAgent<ItineraryResponse> {
       (the budget agent is running in parallel and its breakdown is not on the \
       blackboard yet - plan against the user's budget alone and stay conservative)""";
 
-  public ItineraryAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore) {
-    super("itinerary", chatModel, runtimeStore);
+  public ItineraryAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore, McpConnectionRegistry mcpRegistry) {
+    super("itinerary", chatModel, runtimeStore, mcpRegistry);
   }
 
   @Override

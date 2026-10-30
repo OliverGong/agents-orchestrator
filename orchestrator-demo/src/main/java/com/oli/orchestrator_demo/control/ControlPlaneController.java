@@ -26,11 +26,15 @@ import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
+
+import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
+import com.oli.orchestrator_demo.mcp.McpServerStatus;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -42,13 +46,15 @@ public class ControlPlaneController {
   private static final Logger log = LoggerFactory.getLogger(ControlPlaneController.class);
 
   private final AgentConfigRegistry registry;
+  private final McpConnectionRegistry mcpRegistry;
   private final Environment environment;
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
 
-  public ControlPlaneController(AgentConfigRegistry registry, Environment environment,
-      RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
+  public ControlPlaneController(AgentConfigRegistry registry, McpConnectionRegistry mcpRegistry,
+      Environment environment, RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
     this.registry = registry;
+    this.mcpRegistry = mcpRegistry;
     this.environment = environment;
     this.restClient = restClientBuilder.build();
     this.objectMapper = objectMapper;
@@ -120,6 +126,18 @@ public class ControlPlaneController {
   @PutMapping("/mcp/servers")
   public ControlPlaneState updateMcpServers(@RequestBody List<McpServerConfig> servers) {
     return registry.updateMcpServers(servers);
+  }
+
+  /** Live connection state (and discovered tools) of every recorded MCP server. */
+  @GetMapping("/mcp/status")
+  public List<McpServerStatus> mcpStatus() {
+    return mcpRegistry.status();
+  }
+
+  /** Manual reconnect of one MCP server, bypassing the failure cooldown. */
+  @PostMapping("/mcp/servers/{name}/reconnect")
+  public McpServerStatus reconnectMcpServer(@PathVariable String name) {
+    return mcpRegistry.reconnect(name);
   }
 
   /**

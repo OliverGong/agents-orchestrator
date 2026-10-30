@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -188,11 +189,23 @@ class AgentConfigRegistryTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("endpoint");
 
+    // STDIO servers need a command (the endpoint field is HTTP-only).
+    assertThatThrownBy(() -> registry.updateMcpServers(List.of(
+        new McpServerConfig("shell", "STDIO", "", " ", List.of(), Map.of(), false, "local tools"))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("command");
+    // Names become tool-name prefixes, so they must stay identifier-safe.
+    assertThatThrownBy(() -> registry.updateMcpServers(List.of(
+        new McpServerConfig("bad name!", "SSE", "http://a", true, ""))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("bad name!");
+
     registry.updateMcpServers(List.of(
         new McpServerConfig("weather", "SSE", "http://localhost:3001/sse", true, "demo"),
-        new McpServerConfig("shell", "STDIO", "npx -y server", false, "local tools")));
+        new McpServerConfig("shell", "STDIO", "", "npx", List.of("-y", "server"), Map.of(), false, "local tools")));
     assertThat(registry.state().mcpServers()).hasSize(2);
     assertThat(registry.state().mcpServers().get(1).transport()).isEqualTo("STDIO");
+    assertThat(registry.state().mcpServers().get(1).command()).isEqualTo("npx");
   }
 
   // ---- agent descriptors (slot contracts) -----------------------------------
@@ -201,10 +214,10 @@ class AgentConfigRegistryTest {
   private AgentDescriptorRegistry descriptorRegistry() {
     ChatModel model = Mockito.mock(ChatModel.class);
     return new AgentDescriptorRegistry(List.of(
-        new ResearchAgent(model, AgentRuntimeStore.fixed()),
-        new BudgetAgent(model, AgentRuntimeStore.fixed()),
-        new ItineraryAgent(model, AgentRuntimeStore.fixed()),
-        new ReviewAgent(model, AgentRuntimeStore.fixed())), modelProperties, null);
+        new ResearchAgent(model, AgentRuntimeStore.fixed(), null),
+        new BudgetAgent(model, AgentRuntimeStore.fixed(), null),
+        new ItineraryAgent(model, AgentRuntimeStore.fixed(), null),
+        new ReviewAgent(model, AgentRuntimeStore.fixed(), null)), modelProperties, null);
   }
 
   @Test

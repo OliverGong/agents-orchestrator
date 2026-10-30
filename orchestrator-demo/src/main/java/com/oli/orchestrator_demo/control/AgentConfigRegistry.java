@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +50,9 @@ import tools.jackson.databind.ObjectMapper;
 public class AgentConfigRegistry implements AgentRuntimeStore {
 
   private static final Logger log = LoggerFactory.getLogger(AgentConfigRegistry.class);
+
+  /** MCP server names become tool-name prefixes, so they must stay identifier-safe. */
+  private static final Pattern MCP_SERVER_NAME = Pattern.compile("[A-Za-z0-9_.-]+");
 
   private final AgentModelProperties modelProperties;
   private final WorkflowProperties workflowProperties;
@@ -83,8 +87,9 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
     this.configFile = configFile;
   }
 
+  /** Public for tests outside the package; Spring invokes it as {@code @PostConstruct}. */
   @PostConstruct
-  void initialize() throws IOException {
+  public void initialize() throws IOException {
     if (Files.exists(configFile)) {
       state = objectMapper.readValue(configFile, ControlPlaneState.class);
       WorkflowTemplate persisted = toTemplate(state.workflow());
@@ -247,24 +252,40 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
         state.agents().keySet(), state.descriptors());
   }
 
-  /** Replaces the recorded MCP servers; names must be unique and transports known. */
+  /**
+   * Replaces the recorded MCP servers: names must be unique, URL-safe and
+   * become the tool-name prefix; HTTP transports (STREAMABLE_HTTP, the
+   * deprecated SSE) require an endpoint, STDIO requires a command. The MCP
+   * registry picks the change up on its next reconcile pass.
+   */
   public synchronized ControlPlaneState updateMcpServers(List<McpServerConfig> servers) {
     Set<String> names = new HashSet<>();
     for (McpServerConfig server : servers) {
       if (server.name().isBlank()) {
         throw new IllegalArgumentException("MCP server name must not be blank");
       }
+      if (!MCP_SERVER_NAME.matcher(server.name()).matches()) {
+        throw new IllegalArgumentException("MCP server name '%s' may only contain letters, digits, '_', '.' and '-'"
+            .formatted(server.name()));
+      }
       if (!names.add(server.name())) {
         throw new IllegalArgumentException("Duplicate MCP server name '%s'".formatted(server.name()));
       }
-      if (!McpServerConfig.TRANSPORT_SSE.equals(server.transport())
-          && !McpServerConfig.TRANSPORT_STDIO.equals(server.transport())) {
-        throw new IllegalArgumentException(
-            "MCP server '%s' has unknown transport '%s' (expected %s or %s)".formatted(
-                server.name(), server.transport(), McpServerConfig.TRANSPORT_SSE, McpServerConfig.TRANSPORT_STDIO));
+      boolean http = server.httpTransport();
+      if (!http && !McpServerConfig.TRANSPORT_STDIO.equals(server.transport())) {
+        throw new IllegalArgumentException("MCP server '%s' has unknown transport '%s' (expected %s, %s or %s)"
+            .formatted(server.name(), server.transport(), McpServerConfig.TRANSPORT_STREAMABLE_HTTP,
+                McpServerConfig.TRANSPORT_SSE, McpServerConfig.TRANSPORT_STDIO));
       }
-      if (server.endpoint().isBlank()) {
+      if (McpServerConfig.TRANSPORT_SSE.equals(server.transport())) {
+        log.warn("MCP server '{}' uses the deprecated SSE transport; prefer STREAMABLE_HTTP", server.name());
+      }
+      if (http && server.endpoint().isBlank()) {
         throw new IllegalArgumentException("MCP server '%s' must declare an endpoint".formatted(server.name()));
+      }
+      if (!http && server.command().isBlank()) {
+        throw new IllegalArgumentException("MCP server '%s' with STDIO transport must declare a command"
+            .formatted(server.name()));
       }
     }
     state = new ControlPlaneState(state.version() + 1, Instant.now(), state.agents(), state.workflow(), servers,

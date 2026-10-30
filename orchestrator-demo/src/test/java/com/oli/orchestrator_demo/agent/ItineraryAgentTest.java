@@ -33,7 +33,7 @@ class ItineraryAgentTest {
           {"day":2,"morning":"Tsukiji market","afternoon":"Akihabara","evening":"Izakaya","estimatedCost":300.00}
         ]}
         """);
-    ItineraryAgent agent = new ItineraryAgent(stub.model(), stub.store());
+    ItineraryAgent agent = new ItineraryAgent(stub.model(), stub.store(), null);
 
     OrchestratorContext context = OrchestratorContext
         .start(new TripRequest("Tokyo", 5, new BigDecimal("15000"), "food and culture"))
@@ -65,7 +65,7 @@ class ItineraryAgentTest {
           {"day":1,"morning":"Senso-ji","afternoon":"Ueno Park","evening":"Ramen tasting","estimatedCost":250.00}
         ]}
         """);
-    ItineraryAgent agent = new ItineraryAgent(stub.model(), stub.store());
+    ItineraryAgent agent = new ItineraryAgent(stub.model(), stub.store(), null);
 
     // Parallel template: budget and itinerary start from the same snapshot,
     // so the budget breakdown is not on the blackboard yet.
