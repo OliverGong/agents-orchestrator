@@ -177,3 +177,22 @@ footer { color: var(--muted); text-align: center; font-size: 12px; padding: 18px
 #workflow-editor label:first-child { display: block; color: var(--muted); font-size: 12px; }
 #workflow-editor .wf-mode-sel { width: 240px; }
 .cp-msg.ok, .cp-msg.ok, #wf-msg.ok, #mcp-msg.ok { color: var(--ok); }
+
+/* slot contract chips (control plane: agent self-declared descriptors) */
+.slot-contract {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin: 2px 0 12px; padding: 8px 10px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+}
+.slot-label { font-size: 11px; color: var(--muted); margin-left: 8px; }
+.slot-label:first-child { margin-left: 0; }
+.slot-chip {
+  font-family: var(--mono); font-size: 11px; padding: 2px 9px;
+  border-radius: 10px; border: 1px solid var(--border); color: var(--text);
+  background: var(--bg);
+}
+.slot-chip.out { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.slot-chip.in { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.slot-chip.pending { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
+.slot-chip.model { color: #d2a8ff; border-color: color-mix(in srgb, #d2a8ff 45%, transparent); }
+.slot-contract .hint { margin: 0; }

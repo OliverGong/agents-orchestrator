@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
+import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.model.ResearchResponse;
 import com.oli.orchestrator_demo.model.TripRequest;
@@ -36,6 +37,12 @@ class AbstractContextAgentTest {
     FlakyResearchAgent(int failuresBeforeSuccess) {
       super("Flaky-Research-Agent", null, null);
       this.failuresBeforeSuccess = failuresBeforeSuccess;
+    }
+
+    @Override
+    public AgentDescriptor descriptor() {
+      return new AgentDescriptor(name(), "Flaky Research", "",
+          List.of("researchResponse"), List.of(), List.of(), null, null);
     }
 
     @Override

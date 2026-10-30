@@ -76,6 +76,25 @@ public class ControlPlaneController {
     return registry.updateAgent(name, update);
   }
 
+  /** The effective slot-contract descriptor of the agent (persisted override or built-in). */
+  @GetMapping("/agents/{name}/descriptor")
+  public ResponseEntity<AgentDescriptor> descriptor(@PathVariable String name) {
+    AgentDescriptor descriptor = registry.descriptor(name);
+    return descriptor == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(descriptor);
+  }
+
+  @PutMapping("/agents/{name}/descriptor")
+  public ControlPlaneState updateDescriptor(@PathVariable String name, @RequestBody AgentDescriptor update) {
+    try {
+      return registry.updateDescriptor(name, update);
+    }
+    catch (IllegalStateException ex) {
+      // Slot-closure violations of the active template are configuration
+      // mistakes -> 400, not a 500.
+      throw new IllegalArgumentException(ex.getMessage());
+    }
+  }
+
   @GetMapping("/workflow")
   public WorkflowControlState workflow() {
     return registry.state().workflow();

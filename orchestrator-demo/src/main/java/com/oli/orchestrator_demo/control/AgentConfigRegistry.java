@@ -57,6 +57,14 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
   private final Set<String> knownAgents;
   private final Path configFile;
 
+  /**
+   * Attached after construction by {@link AgentDescriptorRegistry} (setter
+   * injection: the agents need this registry as their runtime store, so a
+   * constructor dependency would create a bean cycle). Null until then —
+   * validation then falls back to the structural checks only.
+   */
+  private AgentDescriptorRegistry descriptorRegistry;
+
   /** Guarded by this; readers get immutable record snapshots. */
   private ControlPlaneState state;
 
@@ -91,7 +99,7 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
         agents.put(name, AgentDefaults.defaultConfig(name, modelProperties));
       }
       state = new ControlPlaneState(1, Instant.now(), agents,
-          fromTemplate(workflowProperties.toTemplate()), List.of());
+          fromTemplate(workflowProperties.toTemplate()), List.of(), Map.of());
       save();
       log.info("Control plane state seeded to {} (template '{}')",
           configFile, workflowProperties.toTemplate().name());
@@ -135,7 +143,8 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
     Map<String, AgentRuntimeConfig> agents = new LinkedHashMap<>(state.agents());
     agents.put(name, new AgentRuntimeConfig(name, update.systemPrompt(), emptyToNull(update.model()),
         update.temperature(), update.calibrationRules(), update.mcpRefs()));
-    state = new ControlPlaneState(state.version() + 1, Instant.now(), agents, state.workflow(), state.mcpServers());
+    state = new ControlPlaneState(state.version() + 1, Instant.now(), agents, state.workflow(), state.mcpServers(),
+        state.descriptors());
     save();
     log.info("Control plane: agent '{}' updated (version {})", name, state.version());
     return state;
@@ -143,18 +152,99 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
 
   /**
    * Hot-applies a new collaboration template: validates it against the
-   * registered agents (unknown references, dependency order, cycles) and
+   * registered agents (unknown references, dependency order, cycles and —
+   * when agent descriptors are attached — the slot-contract closure) and
    * swaps it into the running orchestrator before persisting.
    */
   public synchronized ControlPlaneState updateWorkflow(WorkflowControlState workflow) {
     WorkflowTemplate template = toTemplate(workflow);
-    template.validate(knownAgents);
+    template.validate(knownAgents, effectiveDescriptors());
     templateHolder.replace(template);
-    state = new ControlPlaneState(state.version() + 1, Instant.now(), state.agents(), workflow, state.mcpServers());
+    state = new ControlPlaneState(state.version() + 1, Instant.now(), state.agents(), workflow, state.mcpServers(),
+        state.descriptors());
     save();
     log.info("Control plane: workflow template replaced with '{}' ({}) (version {})",
         template.name(), template.mode(), state.version());
     return state;
+  }
+
+  /**
+   * Attaches the descriptor registry after construction and seeds the
+   * built-in slot contracts into the state for agents without a persisted
+   * descriptor (seeding is not a user edit: the version stays untouched).
+   * The active template is then re-checked against the contracts — warn
+   * only, because a stale persisted descriptor must not prevent booting.
+   */
+  public synchronized void attachDescriptors(AgentDescriptorRegistry registry) {
+    this.descriptorRegistry = registry;
+    Map<String, AgentDescriptor> descriptors = new LinkedHashMap<>(state.descriptors());
+    boolean seeded = false;
+    for (Map.Entry<String, AgentDescriptor> entry : registry.builtIns().entrySet()) {
+      if (state.agents().containsKey(entry.getKey()) && !descriptors.containsKey(entry.getKey())) {
+        descriptors.put(entry.getKey(), entry.getValue());
+        seeded = true;
+      }
+    }
+    if (seeded) {
+      state = new ControlPlaneState(state.version(), state.updatedAt(), state.agents(), state.workflow(),
+          state.mcpServers(), descriptors);
+      save();
+      log.info("Control plane: seeded {} agent descriptor(s) from the agent beans", descriptors.size());
+    }
+    try {
+      toTemplate(state.workflow()).validate(knownAgents, effectiveDescriptors());
+    }
+    catch (IllegalStateException ex) {
+      log.warn("Control plane: the active workflow template violates the agent slot contracts: {}", ex.getMessage());
+    }
+  }
+
+  /**
+   * Hot-applies a new slot-contract descriptor for one agent: blank model
+   * defaults fall back to the built-in persona, and the active template is
+   * re-validated against the new contract before committing — a descriptor
+   * edit that would break the running workflow is rejected.
+   */
+  public synchronized ControlPlaneState updateDescriptor(String name, AgentDescriptor update) {
+    if (!state.agents().containsKey(name)) {
+      throw new IllegalArgumentException(
+          "Unknown agent '%s'. Known agents: %s".formatted(name, state.agents().keySet()));
+    }
+    if (update == null || !name.equals(update.name())) {
+      throw new IllegalArgumentException("Descriptor name '%s' does not match the agent '%s'"
+          .formatted(update == null ? null : update.name(), name));
+    }
+    for (List<String> slotGroup : List.of(update.outputSlots(), update.inputSlots(), update.pendingSafeSlots())) {
+      for (String slot : slotGroup) {
+        if (slot == null || slot.isBlank()) {
+          throw new IllegalArgumentException("Slot names of the descriptor of agent '%s' must not be blank"
+              .formatted(name));
+        }
+      }
+    }
+    AgentDescriptor merged = descriptorRegistry == null ? update : descriptorRegistry.enrich(update);
+    Map<String, AgentDescriptor> descriptors = new LinkedHashMap<>(state.descriptors());
+    descriptors.put(name, merged);
+    toTemplate(state.workflow()).validate(knownAgents,
+        descriptorRegistry == null ? Map.of() : descriptorRegistry.effectiveDescriptors(
+            state.agents().keySet(), descriptors));
+    state = new ControlPlaneState(state.version() + 1, Instant.now(), state.agents(), state.workflow(),
+        state.mcpServers(), descriptors);
+    save();
+    log.info("Control plane: descriptor of agent '{}' updated (version {})", name, state.version());
+    return state;
+  }
+
+  /** The effective descriptor of the agent, or null when it has none. */
+  public AgentDescriptor descriptor(String name) {
+    return descriptorRegistry == null ? null
+        : descriptorRegistry.effective(state.agents().keySet(), state.descriptors(), name);
+  }
+
+  /** The descriptors workflow validation runs against (empty when not attached yet). */
+  private Map<String, AgentDescriptor> effectiveDescriptors() {
+    return descriptorRegistry == null ? Map.of() : descriptorRegistry.effectiveDescriptors(
+        state.agents().keySet(), state.descriptors());
   }
 
   /** Replaces the recorded MCP servers; names must be unique and transports known. */
@@ -177,7 +267,8 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
         throw new IllegalArgumentException("MCP server '%s' must declare an endpoint".formatted(server.name()));
       }
     }
-    state = new ControlPlaneState(state.version() + 1, Instant.now(), state.agents(), state.workflow(), servers);
+    state = new ControlPlaneState(state.version() + 1, Instant.now(), state.agents(), state.workflow(), servers,
+        state.descriptors());
     save();
     log.info("Control plane: {} MCP server(s) recorded (version {})", servers.size(), state.version());
     return state;

@@ -9,9 +9,12 @@
  */
 package com.oli.orchestrator_demo.agent;
 
+import java.util.List;
+
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
+import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
@@ -23,6 +26,13 @@ public class ResearchAgent extends AbstractContextAgent<ResearchResponse> {
 
   public ResearchAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore) {
     super("research", chatModel, runtimeStore);
+  }
+
+  @Override
+  public AgentDescriptor descriptor() {
+    return new AgentDescriptor(name(), "Travel Research",
+        "Gathers attractions, food options and practical travel tips for the destination.",
+        List.of("researchResponse"), List.of(), List.of(), null, null);
   }
 
   @Override

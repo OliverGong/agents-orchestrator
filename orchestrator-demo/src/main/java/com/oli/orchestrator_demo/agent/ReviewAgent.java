@@ -14,9 +14,12 @@
  */
 package com.oli.orchestrator_demo.agent;
 
+import java.util.List;
+
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
+import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
@@ -32,6 +35,16 @@ public class ReviewAgent extends AbstractContextAgent<ReviewResponse> {
 
   public ReviewAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore) {
     super("review", chatModel, runtimeStore);
+  }
+
+  @Override
+  public AgentDescriptor descriptor() {
+    // Budget and itinerary are reconciled when present and explicitly flagged
+    // when absent (PENDING placeholders), so both slots are pending-safe.
+    return new AgentDescriptor(name(), "Final Review",
+        "Reconciles research, budget and itinerary, corrects inconsistencies and produces the final answer.",
+        List.of("reviewResponse"), List.of("researchResponse", "budgetResponse", "itineraryResponse"),
+        List.of("budgetResponse", "itineraryResponse"), null, null);
   }
 
   @Override

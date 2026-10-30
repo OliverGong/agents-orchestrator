@@ -34,6 +34,7 @@ import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.ChatOptions;
 
+import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
@@ -76,6 +77,16 @@ public abstract class AbstractContextAgent<R> implements Agent<OrchestratorConte
   public String name() {
     return name;
   }
+
+  /**
+   * The agent's self-declared slot contract (title, human description, and
+   * which {@link com.oli.orchestrator_demo.model.OrchestratorContext} slots it
+   * produces, consumes and tolerates to be missing). Collected at startup by
+   * the control plane and used for the logical-closure validation of
+   * collaboration templates. Deliberately not final: like {@link #name()},
+   * it is read through the CGLIB proxy created for {@code AgentExecutionAspect}.
+   */
+  public abstract AgentDescriptor descriptor();
 
   @Override
   public OrchestratorContext execute(OrchestratorContext context) {

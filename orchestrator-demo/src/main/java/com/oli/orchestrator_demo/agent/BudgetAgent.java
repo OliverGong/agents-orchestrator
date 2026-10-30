@@ -9,9 +9,12 @@
  */
 package com.oli.orchestrator_demo.agent;
 
+import java.util.List;
+
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
+import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.model.BudgetResponse;
@@ -23,6 +26,13 @@ public class BudgetAgent extends AbstractContextAgent<BudgetResponse> {
 
   public BudgetAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore) {
     super("budget", chatModel, runtimeStore);
+  }
+
+  @Override
+  public AgentDescriptor descriptor() {
+    return new AgentDescriptor(name(), "Budget Estimation",
+        "Estimates realistic costs from the research findings and checks them against the user's budget.",
+        List.of("budgetResponse"), List.of("researchResponse"), List.of(), null, null);
   }
 
   @Override

@@ -14,10 +14,14 @@
 package com.oli.orchestrator_demo.workflow;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+
+import com.oli.orchestrator_demo.control.AgentDescriptor;
 
 public record WorkflowTemplate(String name, ExecutionMode mode, List<StageSpec> stages) {
 
@@ -65,6 +69,23 @@ public record WorkflowTemplate(String name, ExecutionMode mode, List<StageSpec> 
    * fast with a descriptive message.
    */
   public void validate(Set<String> availableAgents) {
+    validate(availableAgents, Map.of());
+  }
+
+  /**
+   * Validates the template structurally (see {@link #validate(Set)}) and —
+   * when the agents declare slot contracts — for logical closure: every
+   * consumed input slot must be on the blackboard when the consuming stage
+   * starts. That is guaranteed either by a producing stage that completes
+   * beforehand (a preceding stage under SEQUENTIAL execution, a member of an
+   * earlier dependency wave under CONCURRENT execution) or by the consuming
+   * agent declaring the slot pending-safe (it explicitly tolerates the
+   * absence and says so in its prompt). The wave rule is what keeps
+   * same-wave parallel siblings from consuming each other's outputs, and the
+   * closure rule rejects templates with unfilled gaps. An empty descriptor
+   * map skips the slot checks (agents without a contract).
+   */
+  public void validate(Set<String> availableAgents, Map<String, AgentDescriptor> descriptors) {
     if (stages.isEmpty()) {
       throw new IllegalStateException("Workflow template '%s' declares no stages".formatted(name));
     }
@@ -87,6 +108,63 @@ public record WorkflowTemplate(String name, ExecutionMode mode, List<StageSpec> 
         }
       }
     }
+    if (descriptors.isEmpty()) {
+      return;
+    }
+    Map<String, Integer> waveIndex = new HashMap<>();
+    if (mode == ExecutionMode.CONCURRENT) {
+      List<List<StageSpec>> waves = waves();
+      for (int wave = 0; wave < waves.size(); wave++) {
+        final int waveNumber = wave;
+        waves.get(wave).forEach(stage -> waveIndex.put(stage.name(), waveNumber));
+      }
+    }
+    for (int position = 0; position < stages.size(); position++) {
+      StageSpec stage = stages.get(position);
+      AgentDescriptor descriptor = descriptors.get(stage.agent());
+      if (descriptor == null) {
+        continue;
+      }
+      for (String slot : descriptor.inputSlots()) {
+        if (descriptor.pendingSafeSlots().contains(slot)) {
+          continue;
+        }
+        assertSlotAvailable(stage, descriptor, slot, position, waveIndex, descriptors);
+      }
+    }
+  }
+
+  /**
+   * Fails fast when {@code slot} is not on the blackboard when {@code stage}
+   * starts: no stage produces it, or the only producers run later (or —
+   * concurrently — in the same wave).
+   */
+  private void assertSlotAvailable(StageSpec stage, AgentDescriptor descriptor, String slot, int position,
+      Map<String, Integer> waveIndex, Map<String, AgentDescriptor> descriptors) {
+    List<String> producers = new ArrayList<>();
+    for (int candidate = 0; candidate < stages.size(); candidate++) {
+      StageSpec producerStage = stages.get(candidate);
+      AgentDescriptor producer = descriptors.get(producerStage.agent());
+      if (producer == null || !producer.outputSlots().contains(slot)) {
+        continue;
+      }
+      producers.add(producerStage.name());
+      boolean completedBefore = mode == ExecutionMode.SEQUENTIAL
+          ? candidate < position
+          : waveIndex.get(producerStage.name()) < waveIndex.get(stage.name());
+      if (completedBefore) {
+        return;
+      }
+    }
+    String cause = producers.isEmpty()
+        ? "no stage of the template produces it"
+        : "its only producer stage(s) %s %s".formatted(producers,
+            mode == ExecutionMode.SEQUENTIAL
+                ? "run later in the template"
+                : "run in the same wave or later");
+    throw new IllegalStateException(("Stage '%s' of workflow template '%s' consumes slot '%s' via agent '%s', "
+        + "but %s. Declare the slot pending-safe for agent '%s' or reorder the stages.")
+            .formatted(stage.name(), name, slot, stage.agent(), cause, stage.agent()));
   }
 
   /**

@@ -441,6 +441,7 @@ function renderAgentConfigs() {
     <div class="card agent-card" data-agent="${esc(a.name)}">
       <h2>Agent: ${esc(a.name)}
         <span class="badge">${a.mcpRefs.length ? 'MCP ×' + a.mcpRefs.length : '无 MCP 映射'}</span></h2>
+      ${slotContractHtml(cpState.descriptors && cpState.descriptors[a.name])}
       <label>System Prompt（每次模型调用即时读取）
         <textarea class="cp-prompt" rows="8">${esc(a.systemPrompt)}</textarea></label>
       <div class="row">
@@ -482,6 +483,26 @@ function ruleRow(rule) {
       <input class="cp-rule-pattern" placeholder="正则 pattern" value="${esc(rule.pattern)}">
       <input class="cp-rule-replacement" placeholder="替换为（可空=删除匹配）" value="${esc(rule.replacement)}">
       <button class="del cp-rule-del" type="button" title="删除该规则">✕</button>
+    </div>`;
+}
+
+/* Slot contract of an agent, seeded from its self-declared descriptor:
+   output slots are written to the blackboard, input slots are read when the
+   stage starts, and pending-safe inputs may be absent (the agent then says
+   so explicitly instead of failing — that is what legalizes same-wave
+   parallel consumption in the workflow editor). */
+function slotContractHtml(d) {
+  if (!d) return '';
+  const chip = (slot, cls, title) =>
+    `<span class="slot-chip ${cls}"${title ? ` title="${esc(title)}"` : ''}>${esc(slot)}</span>`;
+  const pendingTitle = 'pending-safe：该输入缺失时 agent 显式声明等待而非失败，因此允许同波并行消费';
+  return `
+    <div class="slot-contract">
+      <span class="slot-label">输出</span>${d.outputSlots.map((s) => chip(s, 'out')).join('') || '<span class="hint">—</span>'}
+      <span class="slot-label">输入</span>${d.inputSlots.map((s) => d.pendingSafeSlots.includes(s)
+        ? chip(s + ' ⟂', 'pending', pendingTitle)
+        : chip(s, 'in')).join('') || '<span class="hint">—</span>'}
+      ${d.defaultModel ? `<span class="slot-label">默认模型</span>${chip(d.defaultModel, 'model')}` : ''}
     </div>`;
 }
 

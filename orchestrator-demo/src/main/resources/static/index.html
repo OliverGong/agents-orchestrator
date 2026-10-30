@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Orchestrator Demo — 多 Agent 旅行规划控制台</title>
-<link rel="stylesheet" href="app.css?v=4">
+<link rel="stylesheet" href="app.css?v=6">
 </head>
 <body>
 <header>
@@ -133,7 +133,8 @@
 
     <div class="card">
       <h2>工作流编排（模板热切换）</h2>
-      <p class="hint">阶段按声明顺序执行/校验（依赖必须位于其前）；同一依赖波次内的阶段在 CONCURRENT 模式下并行执行并合并结果。</p>
+      <p class="hint">阶段按声明顺序执行/校验（依赖必须位于其前）；同一依赖波次内的阶段在 CONCURRENT 模式下并行执行并合并结果。
+          保存时后端按各 Agent 的<b>槽位契约</b>校验逻辑闭环：输入槽位必须由前置阶段/更早波次产出，或被该 Agent 声明为 pending-safe（卡片中 ⟂ 标注），否则返回 400。</p>
       <div id="workflow-editor"></div>
     </div>
 
@@ -147,6 +148,6 @@
 
 <footer>Spring Boot 4 · Spring AI 2.0 · Micrometer/OTel — 前端为应用内静态资源（static/），与 REST API 同源直连。</footer>
 
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

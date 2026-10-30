@@ -27,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.core.env.Environment;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,6 +35,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.client.RestClient;
 
 import com.oli.orchestrator_demo.api.GlobalExceptionHandler;
+import com.oli.orchestrator_demo.agent.BudgetAgent;
+import com.oli.orchestrator_demo.agent.ItineraryAgent;
+import com.oli.orchestrator_demo.agent.ResearchAgent;
+import com.oli.orchestrator_demo.agent.ReviewAgent;
 import com.oli.orchestrator_demo.config.AgentModelProperties;
 import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
@@ -55,6 +60,12 @@ class ControlPlaneControllerTest {
     registry = new AgentConfigRegistry(new AgentModelProperties(), new WorkflowProperties(), holder,
         JsonMapper.builder().build(), tempDir.resolve("control-plane.json"));
     registry.initialize();
+    // The agent beans back the self-declared slot contracts.
+    ChatModel model = Mockito.mock(ChatModel.class);
+    registry.attachDescriptors(new AgentDescriptorRegistry(List.of(
+        new ResearchAgent(model, registry), new BudgetAgent(model, registry),
+        new ItineraryAgent(model, registry), new ReviewAgent(model, registry)),
+        new AgentModelProperties(), null));
 
     Environment environment = Mockito.mock(Environment.class);
     // Not "ollama": the model listing then skips the HTTP lookup and uses the
@@ -169,6 +180,65 @@ class ControlPlaneControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value(
             org.hamcrest.Matchers.containsString("Duplicate")));
+  }
+
+  @Test
+  void exposesAndUpdatesAgentDescriptors() throws Exception {
+    mockMvc.perform(get("/api/v1/control/agents/itinerary/descriptor"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.name").value("itinerary"))
+        .andExpect(jsonPath("$.inputSlots.length()").value(2))
+        .andExpect(jsonPath("$.pendingSafeSlots[0]").value("budgetResponse"));
+
+    mockMvc.perform(get("/api/v1/control/agents/ghost/descriptor"))
+        .andExpect(status().isNotFound());
+
+    mockMvc.perform(put("/api/v1/control/agents/itinerary/descriptor")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"name":"itinerary","title":"Day Planner","description":"",
+                 "outputSlots":["itineraryResponse"],
+                 "inputSlots":["researchResponse","budgetResponse"],
+                 "pendingSafeSlots":["budgetResponse"]}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.version").value(2))
+        .andExpect(jsonPath("$.descriptors.itinerary.title").value("Day Planner"));
+
+    // A descriptor whose name does not match the agent is rejected.
+    mockMvc.perform(put("/api/v1/control/agents/itinerary/descriptor")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"name":"research","title":"x","description":"","outputSlots":[],
+                 "inputSlots":[],"pendingSafeSlots":[]}
+                """))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void descriptorEditsThatBreakTheActiveTemplateAreRejected() throws Exception {
+    // research -> review is closed only because the review agent declares the
+    // budget/itinerary slots pending-safe.
+    mockMvc.perform(put("/api/v1/control/workflow")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"mode":"SEQUENTIAL","stages":[
+                  {"name":"research","agent":"research","dependsOn":[]},
+                  {"name":"review","agent":"review","dependsOn":["research"]}]}
+                """))
+        .andExpect(status().isOk());
+
+    mockMvc.perform(put("/api/v1/control/agents/review/descriptor")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"name":"review","title":"Strict","description":"",
+                 "outputSlots":["reviewResponse"],
+                 "inputSlots":["researchResponse","budgetResponse","itineraryResponse"],
+                 "pendingSafeSlots":[]}
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value(
+            org.hamcrest.Matchers.containsString("budgetResponse")));
   }
 
   @Test

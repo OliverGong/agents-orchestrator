@@ -17,9 +17,12 @@
  */
 package com.oli.orchestrator_demo.agent;
 
+import java.util.List;
+
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
+import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.model.ItineraryResponse;
@@ -36,6 +39,16 @@ public class ItineraryAgent extends AbstractContextAgent<ItineraryResponse> {
 
   public ItineraryAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore) {
     super("itinerary", chatModel, runtimeStore);
+  }
+
+  @Override
+  public AgentDescriptor descriptor() {
+    // The budget breakdown is optional by design: in the parallel template the
+    // budget stage runs as a same-wave sibling, so the slot is pending-safe.
+    return new AgentDescriptor(name(), "Itinerary Planning",
+        "Creates a realistic day-by-day plan from the research (and the budget breakdown, when available).",
+        List.of("itineraryResponse"), List.of("researchResponse", "budgetResponse"),
+        List.of("budgetResponse"), null, null);
   }
 
   @Override

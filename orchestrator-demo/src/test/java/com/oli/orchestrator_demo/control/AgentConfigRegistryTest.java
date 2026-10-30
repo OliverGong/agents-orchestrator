@@ -25,7 +25,13 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
+import org.springframework.ai.chat.model.ChatModel;
 
+import com.oli.orchestrator_demo.agent.BudgetAgent;
+import com.oli.orchestrator_demo.agent.ItineraryAgent;
+import com.oli.orchestrator_demo.agent.ResearchAgent;
+import com.oli.orchestrator_demo.agent.ReviewAgent;
 import com.oli.orchestrator_demo.config.AgentModelProperties;
 import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
@@ -187,5 +193,139 @@ class AgentConfigRegistryTest {
         new McpServerConfig("shell", "STDIO", "npx -y server", false, "local tools")));
     assertThat(registry.state().mcpServers()).hasSize(2);
     assertThat(registry.state().mcpServers().get(1).transport()).isEqualTo("STDIO");
+  }
+
+  // ---- agent descriptors (slot contracts) -----------------------------------
+
+  /** A descriptor registry over the real agent beans (mocked model, fixed store). */
+  private AgentDescriptorRegistry descriptorRegistry() {
+    ChatModel model = Mockito.mock(ChatModel.class);
+    return new AgentDescriptorRegistry(List.of(
+        new ResearchAgent(model, AgentRuntimeStore.fixed()),
+        new BudgetAgent(model, AgentRuntimeStore.fixed()),
+        new ItineraryAgent(model, AgentRuntimeStore.fixed()),
+        new ReviewAgent(model, AgentRuntimeStore.fixed())), modelProperties, null);
+  }
+
+  @Test
+  void attachDescriptorsSeedsTheBuiltInContractsWithoutBumpingTheVersion() throws IOException {
+    AgentConfigRegistry registry = freshRegistry();
+    long version = registry.state().version();
+
+    registry.attachDescriptors(descriptorRegistry());
+
+    assertThat(registry.state().version()).isEqualTo(version);
+    assertThat(registry.state().descriptors()).containsOnlyKeys("research", "budget", "itinerary", "review");
+    // The default model/temperature of the persona are enriched from the
+    // `orchestrator.agents.*` configuration.
+    assertThat(registry.descriptor("research").defaultModel()).isEqualTo("qwen:7b");
+    assertThat(registry.descriptor("research").defaultTemperature()).isEqualTo(0.7);
+    assertThat(registry.descriptor("itinerary").pendingSafeSlots()).containsExactly("budgetResponse");
+    // Seeding survived the (simulated) restart.
+    AgentConfigRegistry reloaded = freshRegistry();
+    reloaded.attachDescriptors(descriptorRegistry());
+    assertThat(reloaded.state().descriptors()).containsOnlyKeys("research", "budget", "itinerary", "review");
+  }
+
+  @Test
+  void updateDescriptorMergesDefaultsValidatesAndPersists() throws IOException {
+    modelProperties.getAgents().get("itinerary").setModel("qwen3:4b");
+    modelProperties.getAgents().get("itinerary").setTemperature(0.3);
+    AgentConfigRegistry registry = freshRegistry();
+    registry.attachDescriptors(descriptorRegistry());
+    long before = registry.state().version();
+
+    ControlPlaneState state = registry.updateDescriptor("itinerary", new AgentDescriptor("itinerary",
+        "Day Planner", "Plans the days.", List.of("itineraryResponse"),
+        List.of("researchResponse", "budgetResponse"), List.of("budgetResponse"), null, null));
+
+    assertThat(state.version()).isEqualTo(before + 1);
+    AgentDescriptor effective = registry.descriptor("itinerary");
+    assertThat(effective.title()).isEqualTo("Day Planner");
+    assertThat(effective.defaultModel()).isEqualTo("qwen3:4b"); // merged from the built-in defaults
+    assertThat(effective.defaultTemperature()).isEqualTo(0.3);
+    assertThat(registry.state().descriptors().get("itinerary").title()).isEqualTo("Day Planner");
+
+    assertThatThrownBy(() -> registry.updateDescriptor("ghost",
+        new AgentDescriptor("ghost", "x", "", List.of(), List.of(), List.of(), null, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("ghost");
+    assertThatThrownBy(() -> registry.updateDescriptor("research",
+        new AgentDescriptor("budget", "x", "", List.of(), List.of(), List.of(), null, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("does not match");
+    assertThatThrownBy(() -> registry.updateDescriptor("research",
+        new AgentDescriptor("research", "x", "", List.of(" "), List.of(), List.of(), null, null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("blank");
+  }
+
+  @Test
+  void updateDescriptorRejectsEditsThatBreakTheActiveTemplate() throws IOException {
+    AgentConfigRegistry registry = freshRegistry();
+    registry.attachDescriptors(descriptorRegistry());
+    // research -> review is closed because the review agent declares the
+    // budget/itinerary slots pending-safe.
+    registry.updateWorkflow(new WorkflowControlState("SEQUENTIAL", List.of(
+        new WorkflowControlState.StageControlState("research", "research", List.of()),
+        new WorkflowControlState.StageControlState("review", "review", List.of("research")))));
+    long before = registry.state().version();
+
+    // Removing the pending-safe declaration would break the active template.
+    assertThatThrownBy(() -> registry.updateDescriptor("review", new AgentDescriptor("review", "Review", "",
+        List.of("reviewResponse"), List.of("researchResponse", "budgetResponse", "itineraryResponse"),
+        List.of(), null, null)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("review")
+        .hasMessageContaining("budgetResponse");
+    assertThat(registry.state().version()).isEqualTo(before); // rejected edits do not bump
+    assertThat(registry.descriptor("review").pendingSafeSlots()).isNotEmpty();
+
+    // Keeping the declaration is accepted.
+    registry.updateDescriptor("review", new AgentDescriptor("review", "Strict Reviewer", "",
+        List.of("reviewResponse"), List.of("researchResponse", "budgetResponse", "itineraryResponse"),
+        List.of("budgetResponse", "itineraryResponse"), null, null));
+    assertThat(registry.descriptor("review").title()).isEqualTo("Strict Reviewer");
+  }
+
+  @Test
+  void updateWorkflowValidatesTheSlotClosureWhenDescriptorsAreAttached() throws IOException {
+    AgentConfigRegistry registry = freshRegistry();
+    registry.attachDescriptors(descriptorRegistry());
+
+    // The parallel template is closed (pending-safe itinerary).
+    registry.updateWorkflow(new WorkflowControlState("CONCURRENT", List.of(
+        new WorkflowControlState.StageControlState("research", "research", List.of()),
+        new WorkflowControlState.StageControlState("budget", "budget", List.of("research")),
+        new WorkflowControlState.StageControlState("itinerary", "itinerary", List.of("research")),
+        new WorkflowControlState.StageControlState("review", "review", List.of("research", "budget", "itinerary")))));
+
+    // Without a research stage the budget stage's input slot is unfilled.
+    assertThatThrownBy(() -> registry.updateWorkflow(new WorkflowControlState("SEQUENTIAL", List.of(
+        new WorkflowControlState.StageControlState("budget", "budget", List.of())))))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("budget")
+        .hasMessageContaining("researchResponse")
+        .hasMessageContaining("no stage of the template produces it");
+
+    // Back to a sequential template so the itinerary's pending-safe
+    // declaration can be dropped (its producer then runs strictly earlier).
+    registry.updateWorkflow(new WorkflowControlState("SEQUENTIAL", List.of(
+        new WorkflowControlState.StageControlState("research", "research", List.of()),
+        new WorkflowControlState.StageControlState("budget", "budget", List.of("research")),
+        new WorkflowControlState.StageControlState("itinerary", "itinerary", List.of("research", "budget")),
+        new WorkflowControlState.StageControlState("review", "review", List.of("research", "budget", "itinerary")))));
+    registry.updateDescriptor("itinerary", new AgentDescriptor("itinerary", "Itinerary", "",
+        List.of("itineraryResponse"), List.of("researchResponse", "budgetResponse"), List.of(), null, null));
+
+    // With the strict itinerary the parallel template (same-wave sibling
+    // consumption) is rejected, while it was closed before the edit.
+    assertThatThrownBy(() -> registry.updateWorkflow(new WorkflowControlState("CONCURRENT", List.of(
+        new WorkflowControlState.StageControlState("research", "research", List.of()),
+        new WorkflowControlState.StageControlState("budget", "budget", List.of("research")),
+        new WorkflowControlState.StageControlState("itinerary", "itinerary", List.of("research")),
+        new WorkflowControlState.StageControlState("review", "review", List.of("research", "budget", "itinerary"))))))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("same wave");
   }
 }
