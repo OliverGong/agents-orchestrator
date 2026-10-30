@@ -1,8 +1,10 @@
-# syntax=docker/dockerfile:1
 #
 # Multi-stage build for orchestrator-demo: the Maven build runs inside the
 # same JDK 25 toolchain the project targets, and the runtime image ships only
 # the JRE plus the Spring Boot fat jar produced by `./mvnw package`.
+# NOTE: no `# syntax=` directive on purpose — the builtin BuildKit frontend
+# of modern Docker already supports cache mounts, and pulling the external
+# frontend image from Docker Hub is unnecessary (and often unreachable).
 
 # ---- build stage: Maven wrapper build inside JDK 25 ----
 FROM eclipse-temurin:25-jdk AS build
@@ -23,7 +25,8 @@ WORKDIR /app
 
 # Run as a non-root user; /app/config holds the control-plane state file and
 # is meant to be mounted as a named volume for persistence across restarts.
-RUN useradd --system --uid 1000 app \
+# UID 10001 (not 1000): the temurin base image already ships `ubuntu` at 1000.
+RUN useradd --system --uid 10001 app \
     && mkdir -p /app/config \
     && chown -R app:app /app
 USER app
