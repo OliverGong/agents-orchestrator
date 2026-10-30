@@ -22,13 +22,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.observability.RunTimeline.RunStatus;
 
 class RunObservabilityControllerTest {
 
-  private final ObservabilityActor observability = new ObservabilityActor();
+  private final ObservabilityActor observability = ChatClientStubs.actor();
   private MockMvc mockMvc;
 
   @BeforeEach

@@ -5,6 +5,10 @@
 并引入**协作模板（WorkflowTemplate）**、**AOP 横切切面**与**全链路可观测性**
 （Actor 事件时间线 + OpenTelemetry 追踪 + Prometheus 指标 + Grafana 可视化）。
 
+**v1** 在 v0 控制台基础上解耦升级：**Docker 化部署**（多阶段构建，jar 封装为容器服务）、
+**内置并行模板示例**、**控制平面（Control Plane）**——前端可视化配置 Agent 人格/
+模型/校准规则/MCP 服务与工作流拓扑并热生效、**SSE 实时事件流**（详见第 9 节）。
+
 ## 1. 总体架构
 
 ```
@@ -77,6 +81,8 @@ com.oli.orchestrator_demo
 ├── api                          # REST 层
 │   ├── TripPlanningController   # REST 入口：POST /api/trips/plan
 │   ├── RunObservabilityController # GET /api/trips/runs[/id]：运行时间线与上下文回放
+│   ├── ControlPlaneController   # GET/PUT /api/v1/control/*：控制平面读写（v1，见 9.3）
+│   ├── ObservabilitySseController # GET /api/v1/events/stream：SSE 实时事件流（v1，见 9.5）
 │   └── GlobalExceptionHandler   # 异常 → 400/502/503/500 结构化映射
 ├── agent                        # Agent SPI 与实现
 │   ├── Agent<I, O>              # Agent SPI：name() + execute(I)
@@ -85,9 +91,11 @@ com.oli.orchestrator_demo
 │   ├── BudgetAgent              # Step2：调研结果 → 成本估算
 │   ├── ItineraryAgent           # Step3：调研+预算 → 逐日行程
 │   ├── ReviewAgent              # Step4：全量审查 → 最终结论
-│   └── ResponseSanitizerAdvisor # LLM 输出净化（剥围栏/提 JSON/修形状）
+│   ├── ResponseSanitizerAdvisor # LLM 输出净化（剥围栏/提 JSON/修形状）
+│   └── CalibrationAdvisor       # 控制平面校准规则套用（v1，见 9.4）
 ├── orchestrator                 # 编排者（执行引擎）
-│   └── TripPlanningOrchestrator # 按协作模板波次执行，串行或并发
+│   ├── TripPlanningOrchestrator # 按协作模板波次执行，串行或并发
+│   └── WorkflowTemplateHolder   # 模板热切换单点：volatile 引用（v1，见 9.3）
 ├── workflow                     # 协作模板（与 orchestrator 平级）
 │   ├── ExecutionMode            # SEQUENTIAL | CONCURRENT
 │   ├── StageSpec                # 阶段定义：name + agent + dependsOn
@@ -97,13 +105,23 @@ com.oli.orchestrator_demo
 │   ├── AgentObservabilityEvent  # 事件：run/stage 边界 + mode/wave/peers + 上下文 JSON
 │   ├── RunTimeline              # 单次运行的时间线投影（不可变，fold-only）
 │   ├── ObservabilityActor       # 有界邮箱 + 单消费者线程折叠事件（容量/保留上限）
+│   ├── ObservabilitySsePublisher  # 事件广播到 SSE 订阅者（虚拟线程 per-emitter，v1）
 │   ├── OrchestratorMetrics      # run/stage 过程指标（计数器 + 时长 Timer + 保留数 Gauge）
 │   ├── OrchestratorHealthIndicator  # /actuator/health 的 orchestrator 组件
 │   └── OrchestratorInfoContributor  # /actuator/info 的 workflow 配置
 ├── aop                          # 横切关注点
 │   └── AgentExecutionAspect     # @Around：Agent 耗时日志 + span + Timer 指标
+├── control                      # 控制平面（v1，见第 9 节）
+│   ├── AgentRuntimeConfig       # Agent 运行时配置：prompt/model/温度/校准规则/MCP 引用
+│   ├── CalibrationRule          # 校准规则：正则 pattern → replacement
+│   ├── McpServerConfig          # MCP 服务记录：名称/传输(SSE|STDIO)/端点/启停
+│   ├── WorkflowControlState     # 工作流控制态：mode + 阶段列表（前端编辑形态）
+│   ├── ControlPlaneState        # 全量状态快照（version 单调递增，JSON 持久化）
+│   ├── AgentDefaults            # 内置人格（状态文件种子）+ 已知 Agent 花名册
+│   ├── AgentRuntimeStore        # Agent 读取运行时配置的 SPI
+│   └── AgentConfigRegistry      # 生产实现：文件持久化 + 校验 + 热应用 + 原子写
 ├── config                       # 配置
-│   ├── AgentConfiguration       # 4 个 ChatClient Bean（人格 + Advisor 链）
+│   ├── AgentConfiguration       # @EnableConfigurationProperties 激活（人格已迁控制平面）
 │   ├── ModelHttpClientConfig    # 模型后端 HTTP 超时（connect 5s / read 5min）
 │   └── AgentModelProperties     # `orchestrator.agents.*` 逐 Agent 模型/温度
 └── model                        # 数据模型（黑板 + DTO，均为 record）
@@ -378,9 +396,10 @@ curl http://localhost:8080/api/trips/runs/{runId}    # 完整时间线：波次 
 
 | Tab | 内容 | 依赖端点 |
 |---|---|---|
-| 规划工作台 | 用户请求表单（工作流入口）→「本次请求」回显 → **实时执行进度**（轮询运行时间线，逐阶段显示完成/失败徽章与耗时）→ 四张结果卡片（行程结论/逐日行程/预算核算/景点调研），失败时渲染结构化错误卡（400/404/502/503/500） | `POST /api/trips/plan`、`GET /api/trips/runs[/{id}]` |
+| 规划工作台 | 用户请求表单（工作流入口）→「本次请求」回显 → **实时执行进度**（轮询运行时间线，逐阶段显示完成/失败徽章与耗时；v1 另有 SSE 实时黑板卡，见 9.5）→ 四张结果卡片（行程结论/逐日行程/预算核算/景点调研），失败时渲染结构化错误卡（400/404/502/503/500） | `POST /api/trips/plan`、`GET /api/trips/runs[/{id}]` |
 | 运行回放 | 运行列表（状态/耗时/阶段数）→ 点开单次运行：**用户最初提出的请求** + 依赖波次与每阶段输入/输出黑板快照（折叠 JSON）+ 终态上下文 | `GET /api/trips/runs[/{id}]` |
 | 系统观测 | 过程指标卡片（运行发起/成功/失败、阶段计数、运行总时长、保留时间线）、Agent 维度表格（`agent.execution.duration` 按标签查询）、健康检查与工作流配置 JSON 面板、Grafana/Tempo/Prometheus 链接 | `/actuator/health`、`/actuator/info`、`/actuator/metrics/{name}?tag=…` |
+| 控制平面（v1） | Agent 卡片编辑（system prompt/模型/温度/校准规则/MCP 引用）+ 工作流编辑器（mode/阶段/agent/依赖，增删行）+ MCP 服务面板 + 版本徽章与刷新 | `/api/v1/control/*` |
 
 实现要点（改错即复发）：
 
@@ -490,28 +509,32 @@ management.metrics.distribution.percentiles-histogram.orchestrator.run.duration=
 
 ## 7. 测试体系
 
-共 58 个用例，全部离线运行（不依赖本地 Ollama），`mvn test` 数秒完成。
+共 83 个用例，全部离线运行（不依赖本地 Ollama），`mvn test` 数秒完成。
 
 | 测试类 | 层次 | 验证点 |
 |---|---|---|
 | `OrchestratorContextTest`（6 例） | model | start 仅含请求；with\* 逐步追加；原状态不可变；mergeFrom 补齐 null 槽位/保留已有贡献；end() 终态 |
 | `AgentModelPropertiesTest`（3 例） | config | 逐 agent 模型/温度绑定；未配置项继承后端默认；未知 agent 名 fail-fast |
-| `WorkflowTemplateTest`（6 例） | workflow | 内置模板校验通过且分解为 4 个单阶段波次；独立阶段同波；未知 agent/依赖后置/依赖环/空模板 fail-fast |
-| `WorkflowPropertiesTest`（2 例） | workflow | 缺省回落内置模板（SEQUENTIAL）；mode + 自定义 stages 列表绑定（agent 缺省=阶段名、可覆写） |
-| `TripPlanningOrchestratorTest`（5 例） | orchestrator | 串行：模板定义顺序（Bean 乱序注入仍按模板执行）+ 上下文逐级累积 + 事件时间线（mode/waveIndex/peers/上下文 JSON）；并发：虚拟线程并行（latch 会合验证真并行）+ 快照一致 + 贡献合并 + 并发事件（wave 0 两阶段互为 peers）；阶段失败 → STAGE_FAILED + RUN_FAILED；未知 agent 启动 fail-fast；**并发波次失败**：`shutdownNow` 中断 straggler，错误即刻返回（<5s，实测 47ms）；**过程指标**：runs.started/completed/failed（template/mode 标签）、stage.completed/failed（agent/mode 标签）、run.duration（success/failure Timer）、retained-runs Gauge |
+| `WorkflowTemplateTest`（7 例） | workflow | 内置模板校验通过且分解为 4 个单阶段波次；独立阶段同波；未知 agent/依赖后置/依赖环/空模板 fail-fast；**内置 parallel 模板**：budget/itinerary 同波、review 汇聚的三波分解 |
+| `WorkflowPropertiesTest`（5 例） | workflow | 缺省回落内置模板（SEQUENTIAL）；mode + 自定义 stages 列表绑定（agent 缺省=阶段名、可覆写）；内置 parallel 模板可选；custom stages 优先于内置模板开关；未知内置模板 fail-fast |
+| `TripPlanningOrchestratorTest`（6 例） | orchestrator | 串行：模板定义顺序（Bean 乱序注入仍按模板执行）+ 上下文逐级累积 + 事件时间线（mode/waveIndex/peers/上下文 JSON）；并发：虚拟线程并行（latch 会合验证真并行）+ 快照一致 + 贡献合并 + 并发事件（wave 0 两阶段互为 peers）；**并行模板**：budget/itinerary 同快照并行（互为 peers）、review 汇聚两者、timeline 模板名 parallel-trip-planning；阶段失败 → STAGE_FAILED + RUN_FAILED；未知 agent 启动 fail-fast；**并发波次失败**：`shutdownNow` 中断 straggler，错误即刻返回（<5s，实测 47ms）；**过程指标**：runs.started/completed/failed（template/mode 标签）、stage.completed/failed（agent/mode 标签）、run.duration（success/failure Timer）、retained-runs Gauge |
 | `ObservabilityActorTest`（4 例） | observability | 事件折叠为 RunTimeline（RUN_STARTED→stage→RUN_COMPLETED）；失败运行标记 FAILED 且保留错误信息；未知运行的事件被丢弃；超出 100 个运行按插入序淘汰最旧 |
 | `OrchestratorHealthIndicatorTest` | observability | /actuator/health 的 orchestrator 组件：UP + template/mode/stages/agents/retainedRuns 详情 |
 | `OrchestratorInfoContributorTest` | observability | /actuator/info 贡献 workflow 键：模板名/mode/"阶段 -> agent(依赖)"/Agent 名单 |
 | `AgentExecutionAspectTest`（3 例） | aop | AspectJProxyFactory 织入：成功透传并记录耗时（INFO）；失败记录并原样重抛（WARN）+ failure Timer；成功执行产出 `agent.execute` Observation（tag agent）+ success Timer |
 | `ResearchAgentTest` | agent | prompt 含全部需求字段；JSON → record；写入正确槽位 |
 | `BudgetAgentTest` | agent | 消费上游调研结果；成本解析与 isBudgetMet；prompt 含调研内容 |
-| `ItineraryAgentTest` | agent | 消费调研+预算；DayPlan 列表解析；prompt 含双上游 |
+| `ItineraryAgentTest`（2 例） | agent | 消费调研+预算；DayPlan 列表解析；prompt 含双上游；**并行模板**：预算未就绪时 prompt 注入 "not on the blackboard yet / stay conservative" 提示 |
 | `ReviewAgentTest` | agent | 消费全部三类上游；最终结论；prompt 含行程 |
 | `AbstractContextAgentTest`（3 例） | agent | 首次解析失败重试成功；重试耗尽后抛 `JacksonException`；首次成功不重试 |
 | `TripPlanningControllerTest` | api | POST JSON → 200；入参绑定；全量上下文序列化 |
 | `RunObservabilityControllerTest`（2 例） | api | GET /api/trips/runs[/id]：时间线按波次分组 + parallel 标记 + 上下文 JSON；未知 runId → 404 |
 | `ResponseSanitizerAdvisorTest`（10 例） | agent | 纯 JSON 透传；剥 Markdown 围栏；prose 中提取 JSON；纯文本不动；null/blank 容错；**回归**：围栏输出 → `entity()` 成功；裸数组按 Schema 单数组字段包装；多属性 Schema 与无 Schema 时不动；真实链路裸数组 → `ItineraryResponse` 解析成功 |
 | `GlobalExceptionHandlerTest`（6 例） | api | 校验失败 → 400；畸形 body → 400；`JacksonException` → 502；`RestClientException`/`ResourceAccessException` → 503；未知路由 → 404 |
+| `AgentConfigRegistryTest`（6 例） | control | 播种默认态并持久化；重启重载并重新热应用模板；updateAgent 校验（未知 agent/空 prompt/悬空 MCP 引用）+ 版本单调 + 持久化跨"重启"保留；updateWorkflow 校验失败不 bump 版本、成功热切换；MCP 记录唯一名/传输/端点校验 |
+| `ControlPlaneControllerTest`（7 例） | control | REST 契约：GET 播种态；PUT agent 热生效 + 版本 +1；未知 agent 404 / 非法更新 400；PUT workflow 热切换 + 非法模板 400；PUT mcp 全量替换；模型列表回落配置（离线，不查 Ollama） |
+| `CalibrationAdvisorTest`（4 例） | agent | 规则在净化后的输出上按声明序套用（围栏 JSON → 规则生效）；无规则原样透传；坏正则跳过且顺序保持；null 容错 |
+| `ObservabilitySsePublisherTest`（2 例） | observability | 无订阅者时发布为 no-op；注册缓冲 connected 事件、完成时解绑 emitter |
 | `OrchestratorDemoApplicationTests` | 集成 | Spring 上下文装配（Bean/Qualifier/自动配置/AOP 代理/观测组件） |
 
 ### 7.1 测试支撑：ChatClientStubs 与 Await
@@ -523,13 +546,15 @@ management.metrics.distribution.percentiles-histogram.orchestrator.run.duration=
   （含 `getOptions()` 合并、格式注入、record 反序列化）。
 - `ChatClientStubs.userTextOf(model)`：捕获发往模型的用户消息，用于断言 prompt
   内容（占位符替换结果 + 结构化输出格式指令）。
+- `ChatClientStubs.actor()`：组装带真实 SSE publisher（无人订阅，no-op）的
+  `ObservabilityActor`，供编排者/控制器测试注入。
 - `Await.until(condition)`：轮询断言异步折叠的状态（Actor 消费者是独立线程，
   `tell` 之后事件稍后才可见）。
 
 ### 7.2 运行
 
 ```bash
-./mvnw test                                     # 全量测试（58 例，离线）
+./mvnw test                                     # 全量测试（83 例，离线）
 ./mvnw spring-boot:run                          # 启动（需本地 Ollama + qwen:7b）
 docker compose -f docker/docker-compose.yml up  # 可选：Grafana + Tempo + Prometheus
 ```
@@ -563,3 +588,181 @@ docker compose -f docker/docker-compose.yml up  # 可选：Grafana + Tempo + Pro
   Grafana/Tempo/Prometheus 可视化栈（`docker/`）。
   可扩展：`RunTimeline` 持久化、`orchestrator.planTrip` 内增加波次级子 span、
   或为模板元数据挂 LLM token 用量。
+
+## 9. v1：Docker 化、并行示例与控制平面（Control Plane）
+
+v1 与 v0（旅行规划控制台）解耦演进：v0 的 REST API 与前端三个 tab 全部保留，
+v1 增量引入四块能力——容器化部署、并行模式官方示例、控制平面与实时事件流。
+版本边界一句话：**v0 = 只读观测**（时间线回放 + 指标），**v1 = 可写控制**
+（运行时改配置）。
+
+### 9.1 Docker 化（多阶段构建）
+
+`Dockerfile` 将 Maven 产物（jar）封装为容器服务，两阶段构建：
+
+- **build 阶段**：`eclipse-temurin:25-jdk`，`RUN --mount=type=cache,target=/root/.m2
+  ./mvnw -q -DskipTests package`——BuildKit cache mount 复用本地仓库，
+  依赖不随源码变更重下；
+- **runtime 阶段**：`eclipse-temurin:25-jre` + 非 root 用户（uid 1000），
+  `ENTRYPOINT ["java", "-jar", "app.jar"]`。
+
+镜像内默认环境：`SPRING_AI_OLLAMA_BASE_URL=http://host.docker.internal:11434`
+（容器内访问宿主 Ollama）、`OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317`
+（接入可视化栈）、`ORCHESTRATOR_CONTROL_CONFIG_FILE=/app/config/control-plane.json`
+（控制平面状态落卷）。`.dockerignore` 排除 `target/ config/ docker/ .git/` 等
+——尤其 `config/`，宿主的运行时状态不得烤进镜像。
+
+一键启动：`docker compose -f docker/docker-compose.yml up`——`app` 服务与
+tempo/prometheus/grafana 同栈编排（`extra_hosts: host.docker.internal:host-gateway`
+使容器可达宿主 Ollama；`orchestrator-config` 卷挂 `/app/config`，控制平面状态
+跨容器重建保留），控制台 http://localhost:8080/ 。
+
+### 9.2 并行模式内置示例（parallel 模板）
+
+v0 的内置模板是四级依赖链，`concurrent` 模式下也无波次可并行（见 4.9 边界）。
+v1 提供官方并行示例，两条配置即启用：
+
+```properties
+orchestrator.workflow.template=parallel
+orchestrator.workflow.mode=concurrent
+```
+
+模板拓扑（`WorkflowTemplate.parallelTripPlanningStages()`，模板名
+`parallel-trip-planning`）与执行时序：
+
+```
+wave 0:  research
+wave 1:  budget    ┐ 同波并行，各自从同一黑板快照出发
+         itinerary ┘
+wave 2:  review   （依赖前三者，汇聚调和）
+```
+
+**并行下的信息缺失兼容**：budget 与 itinerary 同波并行、共享同一快照，
+itinerary 看不到 budget 的产出。为避免模型编造，`ItineraryAgent` 在
+`budgetResponse == null` 时向 prompt 注入固定提示——预算正在并行运行中、
+尚不在黑板上，仅依据用户声明的预算保守规划；`ReviewAgent` 对两者缺一的
+情况同理守护。review 阶段（wave 2）拿到全量贡献后负责合并调和。
+
+这是"并行扇出 + 汇聚点收拢"的标准写法：**依赖不完整的 Agent 必须 null-safe，
+并把不确定性显式写进 prompt**——数据流的不完整不能留给模型脑补。
+
+### 9.3 控制平面（control 包）
+
+控制平面把 v0 中"编译期固化"的 Agent 人格与工作流拓扑升级为**运行时可写**。
+
+| 数据模型（record） | 内容 | 校验 |
+|---|---|---|
+| `AgentRuntimeConfig` | systemPrompt / model / temperature / calibrationRules / mcpRefs | agent 存在、prompt 非空、mcpRefs ⊆ 已录入 MCP 服务 |
+| `CalibrationRule` | 正则 pattern → replacement（+ 描述） | 坏正则运行期跳过并告警（配置错误不砸运行） |
+| `McpServerConfig` | name / transport(SSE\|STDIO) / endpoint / enabled / description | 名字唯一、transport 已知、endpoint 非空 |
+| `WorkflowControlState` | mode + 阶段列表（name/agent/dependsOn） | 复用 `WorkflowTemplate.validate`（未知 agent/依赖后置/环） |
+| `ControlPlaneState` | version + updatedAt + agents + workflow + mcpServers | version 每次成功更新 +1，单调递增 |
+
+**架构与热生效机制**：
+
+- `AgentConfigRegistry` 是文件持久化的状态仓库（默认 `config/control-plane.json`，
+  `orchestrator.control.config-file` 可改）：启动时文件存在则加载 + 校验 +
+  热应用，否则从 `AgentDefaults`（内置人格）与 `orchestrator.agents.*` /
+  `orchestrator.workflow.*` 播种；此后**状态文件是唯一事实源**。所有更新
+  `synchronized`（单写者），持久化为原子写（temp 文件 + `ATOMIC_MOVE`），
+  崩溃不会留下半截 JSON。
+- **Agent 配置热生效**：agents 不再持有编译期 ChatClient Bean，构造时拿到
+  `ChatModel` + `AgentRuntimeStore`（registry 实现），**每次调用**从 store
+  读 system prompt / model / temperature 动态构建 ChatClient——PUT 一保存，
+  下一次调用即生效，无需重启。
+- **工作流拓扑热生效**：`WorkflowTemplateHolder` 以 volatile 引用持有当前
+  模板（启动时从 properties 初始化）；`updateWorkflow` 校验通过后
+  `holder.replace(...)` 原子换引用，orchestrator 每次 `planTrip` 读一次——
+  下一次请求即用新拓扑，进行中的运行不受影响。
+- **花名册来源**：registry 校验模板/agent 引用使用 `AgentDefaults.KNOWN_AGENTS`
+  （与播种同源），**不**注入 orchestrator——agents → store(registry) →
+  orchestrator → agents 是构造器循环依赖，静态花名册是解环后的自然结论
+  （实测 BeanCurrentlyInCreationException 的教训）。
+
+**REST API**（`/api/v1/control`，前端控制平面 tab 全部经此）：
+
+| 方法与路径 | 作用 |
+|---|---|
+| `GET /state` | 全量状态快照（version/agents/workflow/mcpServers） |
+| `GET /agents` · `GET /agents/{name}` | Agent 配置读；未知名字 404 |
+| `PUT /agents/{name}` | 热更新单个 Agent（prompt/模型/温度/校准规则/MCP 引用） |
+| `GET /workflow` · `PUT /workflow` | 读/热切换工作流模板（非法模板 400，原模板不受影响） |
+| `GET /mcp/servers` · `PUT /mcp/servers` | 读/全量替换 MCP 服务记录 |
+| `GET /models` | 可选模型列表：优先实时查询后端（Ollama `/api/tags`），失败回落 `orchestrator.agents.*` 已引用模型（离线可用） |
+
+### 9.4 响应校准与 Advisor 链顺序
+
+v1 在净化 advisor 之外新增 `CalibrationAdvisor`（实现 `CallAdvisor`），
+把用户在控制平面录入的校准规则（正则 → 替换）套用到**模型输出**上——
+规范化/格式化/校准（去尾随空白、统一地名写法、替换措辞等）。
+
+Advisor 链顺序由 order 决定（低 = 外层 = 响应路径上更晚经过）：
+
+```
+请求 → [CalibrationAdvisor (-200)] → [ResponseSanitizerAdvisor (-100)] → [ChatModelCallAdvisor 终端] → 模型
+响应 ← 校准（规则套在"干净的 JSON 文本"上） ← 净化（剥围栏/提 JSON/修形状） ←
+```
+
+校准必须排在净化**之后**（响应路径上）：规则面对的应是剥掉围栏、提出 JSON
+之后的干净文本，否则正则可能匹配到围栏标记。坏正则被 try/catch 跳过并
+`WARN`——**配置错误绝不能 fail 一次运行**。解析仍失败时三层防线兜底
+（净化 → 重试 → 502，见 4.5/4.6）。
+
+**MCP v1 边界**：控制平面仅承载 MCP 的**配置录入/校验/Agent 映射**
+（mcpRefs），真正的 MCP 客户端接线（`spring-ai-starter-mcp-client`）与
+工具调用明细展示列入 v1.1 路线图（前端 hint 亦有说明）——先把配置面做对，
+再接执行面。
+
+### 9.5 SSE 实时事件流
+
+`GET /api/v1/events/stream`（`text/event-stream`）把 Actor 折叠的事件实时
+推给前端：
+
+- `ObservabilityActor.apply()`（单消费者线程）在折叠事件后调用
+  `ObservabilitySsePublisher.publish(event)`——发布在 actor 线程只做序列化
+  与任务提交，每个订阅者由**独立虚拟线程**发送，慢客户端不阻塞事件管线；
+- 事件名即前端监听名：`connected`（注册即发）/ `run_started` /
+  `stage_completed` / `stage_failed` / `run_completed` / `run_failed`；
+- 订阅者生命周期：`SseEmitter(0L)`（无超时），completion/timeout/error 自动
+  摘除；无订阅者时 publish 是 no-op。
+
+前端规划工作台据此新增**实时黑板卡**：执行期间逐阶段显示输入/输出与完整
+Context JSON（v0 的 2.5s 轮询保留作为兜底），运行回放与控制平面仍走 REST。
+
+### 9.6 热更新边界（hotfix 路线）
+
+v1 已落地的热更新是**配置级**的（进程内热生效，零重启）：
+
+| 可热更 | 机制 | 生效时机 |
+|---|---|---|
+| Agent system prompt / model / temperature | 每次调用从 registry 读取 | 下一次调用 |
+| 校准规则 / MCP 引用 | 同上（Advisor 每次调用读取） | 下一次调用 |
+| 工作流拓扑（mode/stages/dependsOn） | `WorkflowTemplateHolder` volatile 换引用 | 下一次请求 |
+| MCP 服务记录 | registry 状态（v1 不接执行面） | 接线后生效 |
+
+**不在 v1 范围内的 JVM 字节码级热替换（hotfix 场景）与推荐路径**：
+
+- **标准 HotSwap（JVM 内建）**：仅支持**方法体内**变更；加/删字段、改方法
+  签名等类结构变更直接 `UnsupportedOperationException`——适合改一行日志的微修；
+- **DCEVM / JetBrains Runtime（JBR）**：增强 HotSwap 支持结构变更（加方法/
+  字段/类）。开发期可用 JBR 运行时 + DCEVM（或带 DCEVM 补丁的 JDK）验证
+  hotfix；生产仍建议滚动重建镜像——容器化后重建即部署，成本已很低；
+- **spring-boot-devtools**：类路径变更自动重启上下文（秒级，非真热替换）。
+  控制平面状态文件（卷持久化）保证重启后配置不丢——与 v1 的"文件事实源"
+  设计天然契合，是最稳的"伪热更"；
+- **JRebel 等商业热部署**：开发期体验最好，demo 不引入。
+
+结论：**配置热更走控制平面（已实现）；代码热修走"容器重建 + 状态卷"**
+（镜像重建分钟级、状态零丢失）；开发期需要结构级热替换时优先 devtools
+重启，其次 JBR + DCEVM。生产环境的热修复以不可变镜像 + 滚动替换为准。
+
+### 9.7 版本解耦策略
+
+- v0 的 API（`/api/trips/*`、`/actuator/*`）与前端三个 tab 原样保留；v1 新增
+  `/api/v1/control/*` 与 `/api/v1/events/stream` 独立命名空间——**前向兼容**，
+  旧客户端不受影响；
+- 控制平面状态文件的 `version` 字段是"配置代数"而非 API 版本；后续大版本
+  若引入不兼容 schema，可按文件内容探测迁移；
+- Agent 从"编译期 Bean 人格"迁移到"运行时 store 人格"是**唯一**的 v0→v1
+  破坏性改动（`AgentConfiguration` 不再构建 ChatClient Bean）——对外 API
+  无感，仅影响直接 new Agent 的测试（已同步）。

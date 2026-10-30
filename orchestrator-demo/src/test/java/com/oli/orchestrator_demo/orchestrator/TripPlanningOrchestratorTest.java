@@ -32,6 +32,7 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 import com.oli.orchestrator_demo.agent.Agent;
+import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.model.BudgetResponse;
 import com.oli.orchestrator_demo.model.ItineraryResponse;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
@@ -87,7 +88,7 @@ class TripPlanningOrchestratorTest {
 
   private static TripPlanningOrchestrator orchestrator(List<Agent<OrchestratorContext, OrchestratorContext>> agents,
       WorkflowProperties properties, ObservabilityActor observability, SimpleMeterRegistry meters) {
-    return new TripPlanningOrchestrator(agents, properties, observability,
+    return new TripPlanningOrchestrator(agents, new WorkflowTemplateHolder(properties), observability,
         ObservationRegistry.create(), JsonMapper.builder().build(),
         new OrchestratorMetrics(meters, observability));
   }
@@ -96,7 +97,7 @@ class TripPlanningOrchestratorTest {
   void runsDefaultTemplateSequentiallyThroughThePipeline() {
     List<String> order = Collections.synchronizedList(new ArrayList<>());
     List<OrchestratorContext> received = Collections.synchronizedList(new ArrayList<>());
-    ObservabilityActor observability = new ObservabilityActor();
+    ObservabilityActor observability = ChatClientStubs.actor();
     SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
     ScriptedAgent research = new ScriptedAgent("research", order, received,
@@ -163,7 +164,7 @@ class TripPlanningOrchestratorTest {
     List<OrchestratorContext> snapshots = Collections.synchronizedList(new ArrayList<>());
     CountDownLatch researchStarted = new CountDownLatch(1);
     CountDownLatch budgetStarted = new CountDownLatch(1);
-    ObservabilityActor observability = new ObservabilityActor();
+    ObservabilityActor observability = ChatClientStubs.actor();
     SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
     ScriptedAgent research = new ScriptedAgent("research", order, snapshots, ctx -> {
@@ -238,8 +239,58 @@ class TripPlanningOrchestratorTest {
   }
 
   @Test
+  void parallelTemplateRunsBudgetAndItineraryInTheSameWaveFromTheSameSnapshot() {
+    List<String> order = Collections.synchronizedList(new ArrayList<>());
+    List<OrchestratorContext> snapshots = Collections.synchronizedList(new ArrayList<>());
+    ObservabilityActor observability = ChatClientStubs.actor();
+
+    ScriptedAgent research = new ScriptedAgent("research", order, snapshots,
+        ctx -> ctx.withResearchResponse(RESEARCH));
+    ScriptedAgent budget = new ScriptedAgent("budget", order, snapshots,
+        ctx -> ctx.withBudgetResponse(BUDGET));
+    ScriptedAgent itinerary = new ScriptedAgent("itinerary", order, snapshots,
+        ctx -> ctx.withItineraryResponse(ITINERARY));
+    ScriptedAgent review = new ScriptedAgent("review", order, snapshots,
+        ctx -> ctx.withReviewResponse(REVIEW));
+
+    WorkflowProperties properties = new WorkflowProperties();
+    properties.setTemplate(WorkflowProperties.TEMPLATE_PARALLEL);
+    properties.setMode(ExecutionMode.CONCURRENT);
+
+    TripPlanningOrchestrator orchestrator =
+        orchestrator(List.of(research, budget, itinerary, review), properties, observability);
+
+    OrchestratorContext result = orchestrator.planTrip(request);
+
+    // Wave 1 = budget || itinerary, both starting from the research-only
+    // snapshot: neither sees the other's contribution on the blackboard.
+    assertThat(snapshots).hasSize(4);
+    assertThat(snapshots.get(0).researchResponse()).isNull();
+    assertThat(snapshots.subList(1, 3)).allSatisfy(snapshot -> {
+      assertThat(snapshot.researchResponse()).isEqualTo(RESEARCH);
+      assertThat(snapshot.budgetResponse()).isNull();
+      assertThat(snapshot.itineraryResponse()).isNull();
+    });
+    // The review stage reconciles both parallel contributions.
+    assertThat(snapshots.get(3).budgetResponse()).isEqualTo(BUDGET);
+    assertThat(snapshots.get(3).itineraryResponse()).isEqualTo(ITINERARY);
+    assertThat(result.reviewResponse()).isEqualTo(REVIEW);
+
+    RunTimeline timeline = awaitTimeline(observability, RunStatus.COMPLETED);
+    assertThat(timeline.templateName()).isEqualTo("parallel-trip-planning");
+    assertThat(timeline.mode()).isEqualTo("CONCURRENT");
+    AgentObservabilityEvent budgetEvent = stageEvent(stageEvents(timeline), "budget");
+    AgentObservabilityEvent itineraryEvent = stageEvent(stageEvents(timeline), "itinerary");
+    assertThat(budgetEvent.waveIndex()).isEqualTo(1);
+    assertThat(budgetEvent.parallelPeers()).containsExactly("itinerary");
+    assertThat(itineraryEvent.waveIndex()).isEqualTo(1);
+    assertThat(itineraryEvent.parallelPeers()).containsExactly("budget");
+    assertThat(stageEvent(stageEvents(timeline), "review").waveIndex()).isEqualTo(2);
+  }
+
+  @Test
   void failedStageIsRecordedAndTheRunMarkedFailed() {
-    ObservabilityActor observability = new ObservabilityActor();
+    ObservabilityActor observability = ChatClientStubs.actor();
     SimpleMeterRegistry meters = new SimpleMeterRegistry();
     WorkflowProperties properties = new WorkflowProperties();
     properties.getStages().add(new WorkflowProperties.StageDefinition() {{
@@ -280,9 +331,9 @@ class TripPlanningOrchestratorTest {
 
     assertThatThrownBy(() -> new TripPlanningOrchestrator(
         List.of(new ScriptedAgent("research", new ArrayList<>(), new ArrayList<>(), Function.identity())),
-        properties, new ObservabilityActor(), ObservationRegistry.create(),
+        new WorkflowTemplateHolder(properties), ChatClientStubs.actor(), ObservationRegistry.create(),
         JsonMapper.builder().build(),
-        new OrchestratorMetrics(new SimpleMeterRegistry(), new ObservabilityActor())))
+        new OrchestratorMetrics(new SimpleMeterRegistry(), ChatClientStubs.actor())))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("ghost");
   }
@@ -300,7 +351,7 @@ class TripPlanningOrchestratorTest {
 
     List<String> order = Collections.synchronizedList(new ArrayList<>());
     List<OrchestratorContext> received = Collections.synchronizedList(new ArrayList<>());
-    ObservabilityActor observability = new ObservabilityActor();
+    ObservabilityActor observability = ChatClientStubs.actor();
     ScriptedAgent boom = new ScriptedAgent("boom", order, received,
         ctx -> {
           throw new IllegalStateException("boom");

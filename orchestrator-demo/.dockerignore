@@ -1,0 +1,10 @@
+# Keep the build context small: only the Maven project is needed.
+target/
+config/
+docker/
+.git/
+.idea/
+*.iml
+*.log
+HELP.md
+ARCHITECTURE.md

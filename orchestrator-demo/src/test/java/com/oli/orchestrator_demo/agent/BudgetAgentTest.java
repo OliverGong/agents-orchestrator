@@ -34,7 +34,7 @@ class BudgetAgentTest {
          "isBudgetMet":true,
          "recommendations":["Book accommodation early"]}
         """);
-    BudgetAgent agent = new BudgetAgent(stub.client());
+    BudgetAgent agent = new BudgetAgent(stub.model(), stub.store());
 
     OrchestratorContext context = OrchestratorContext
         .start(new TripRequest("Tokyo", 5, new BigDecimal("15000"), "food and culture"))

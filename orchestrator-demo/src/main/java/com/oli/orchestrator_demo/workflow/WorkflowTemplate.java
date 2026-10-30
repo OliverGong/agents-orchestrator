@@ -42,6 +42,22 @@ public record WorkflowTemplate(String name, ExecutionMode mode, List<StageSpec> 
   }
 
   /**
+   * The built-in parallel trip planning pipeline: research -> (budget ||
+   * itinerary) -> review. Budget and itinerary only depend on the research,
+   * so under {@link ExecutionMode#CONCURRENT} they run in the same wave from
+   * the same context snapshot; the itinerary agent is aware that the budget
+   * breakdown may not be on the blackboard yet (it plans against the user's
+   * budget alone), and the final review stage reconciles both contributions.
+   */
+  public static List<StageSpec> parallelTripPlanningStages() {
+    return List.of(
+        new StageSpec("research", "research", List.of()),
+        new StageSpec("budget", "budget", List.of("research")),
+        new StageSpec("itinerary", "itinerary", List.of("research")),
+        new StageSpec("review", "review", List.of("research", "budget", "itinerary")));
+  }
+
+  /**
    * Validates the template against the available agents: every stage must
    * reference a known agent and may only depend on stages that precede it in
    * the definition order (which also rules out dependency cycles and keeps

@@ -17,12 +17,13 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.observability.AgentObservabilityEvent.Type;
 import com.oli.orchestrator_demo.observability.RunTimeline.RunStatus;
 
 class ObservabilityActorTest {
 
-  private final ObservabilityActor actor = new ObservabilityActor();
+  private final ObservabilityActor actor = ChatClientStubs.actor();
 
   @Test
   void foldsEventsIntoARunTimeline() {

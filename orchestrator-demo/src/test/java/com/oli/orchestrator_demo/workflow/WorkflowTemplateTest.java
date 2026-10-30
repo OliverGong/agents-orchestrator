@@ -35,6 +35,20 @@ class WorkflowTemplateTest {
   }
 
   @Test
+  void parallelTripPlanningTemplateSharesTheBudgetAndItineraryWave() {
+    WorkflowTemplate template = new WorkflowTemplate("parallel-trip-planning", ExecutionMode.CONCURRENT,
+        WorkflowTemplate.parallelTripPlanningStages());
+
+    template.validate(Set.of("research", "budget", "itinerary", "review"));
+
+    List<List<StageSpec>> waves = template.waves();
+    assertThat(waves).hasSize(3);
+    assertThat(waves.get(0)).extracting(StageSpec::name).containsExactly("research");
+    assertThat(waves.get(1)).extracting(StageSpec::name).containsExactlyInAnyOrder("budget", "itinerary");
+    assertThat(waves.get(2)).extracting(StageSpec::name).containsExactly("review");
+  }
+
+  @Test
   void independentStagesShareTheSameWave() {
     WorkflowTemplate template = new WorkflowTemplate("parallel", ExecutionMode.CONCURRENT, List.of(
         StageSpec.of("research"),

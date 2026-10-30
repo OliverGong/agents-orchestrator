@@ -19,6 +19,7 @@ document.querySelectorAll('.tab').forEach((btn) => btn.addEventListener('click',
   // run replay list and the metrics panel reflect what just happened.
   if (btn.dataset.tab === 'runs') refreshRuns();
   if (btn.dataset.tab === 'obs') refreshObservability();
+  if (btn.dataset.tab === 'control') refreshControl();
 }));
 
 async function refreshHealthDot() {
@@ -340,10 +341,330 @@ async function metricCount(name, tag) {
   } catch { return 0; }
 }
 
+/* ---------------- live blackboard (SSE, control-plane v1) ----------------
+   GET /api/v1/events/stream pushes every observability event as it is folded
+   into the run timeline: per-stage input/output snapshots and the final
+   context arrive without any polling latency. */
+function connectEvents() {
+  const sse = new EventSource('/api/v1/events/stream');
+  sse.addEventListener('connected', () =>
+    setSseStatus('SSE 已连接', 'badge-ok'));
+  sse.addEventListener('run_started', (ev) => {
+    const e = JSON.parse(ev.data);
+    $('#live-card').hidden = false;
+    setSseStatus('SSE 已连接', 'badge-ok');
+    setLiveStatus('RUNNING', 'badge-RUNNING');
+    $('#live-stages').innerHTML =
+      `<div class="hint">运行 ${esc(e.runId.slice(0, 8))}… 已启动（模板 ${esc(e.templateName)} · ${esc(e.mode)}），等待阶段完成推送…</div>`;
+    $('#live-context').textContent = '黑板初始化中…';
+  });
+  sse.addEventListener('stage_completed', (ev) => {
+    const e = JSON.parse(ev.data);
+    appendLiveStage(e, true);
+    if (e.outputContextJson) updateLiveContext(e.outputContextJson);
+  });
+  sse.addEventListener('stage_failed', (ev) => {
+    const e = JSON.parse(ev.data);
+    appendLiveStage(e, false);
+    updateLiveContext(e.inputContextJson);
+  });
+  sse.addEventListener('run_completed', (ev) => {
+    setLiveStatus('COMPLETED', 'badge-COMPLETED');
+    updateLiveContext(ev.data);
+  });
+  sse.addEventListener('run_failed', () => setLiveStatus('FAILED', 'badge-FAILED'));
+  sse.onerror = () => setSseStatus('SSE 重连中…', 'badge-RUNNING');
+}
+
+function setSseStatus(text, cls) {
+  const el = $('#sse-status');
+  el.textContent = text;
+  el.className = 'badge ' + cls;
+}
+
+function setLiveStatus(status, cls) {
+  const el = $('#live-status');
+  el.textContent = status;
+  el.className = 'badge ' + cls;
+}
+
+function appendLiveStage(e, ok) {
+  $('#live-stages').insertAdjacentHTML('beforeend', `
+    <div class="stage-line ${ok ? 'done' : 'fail'}">
+      <span class="name">${esc(e.stageName)}</span><span class="arrow">→</span>
+      <span>${esc(e.agentName)}</span>
+      <span class="badge ${ok ? 'badge-ok' : 'badge-failed'}">${ok ? '完成' : '失败'}</span>
+      <span class="meta">wave ${esc(e.waveIndex)} · ${e.durationMs != null ? esc(e.durationMs) + ' ms' : ''}
+        ${e.threadName ? '· ' + esc(e.threadName) : ''}
+        ${e.parallelPeers && e.parallelPeers.length ? '· 同波: ' + esc(e.parallelPeers.join(', ')) : ''}</span>
+      ${e.errorMessage ? `<span class="meta" style="color:var(--err)">${esc(e.errorMessage)}</span>` : ''}
+    </div>
+    ${jsonDetails('该阶段输入黑板快照', e.inputContextJson)}
+    ${ok ? jsonDetails('该阶段输出黑板快照', e.outputContextJson) : ''}`);
+}
+
+function updateLiveContext(jsonStr) {
+  let pretty = jsonStr;
+  try { pretty = JSON.stringify(JSON.parse(jsonStr), null, 2); } catch { /* raw */ }
+  $('#live-context').textContent = pretty;
+}
+
+/* ---------------- control plane tab ---------------- */
+let cpState = null;
+let cpModels = [];
+let wfStages = [];
+let mcpServers = [];
+
+async function refreshControl() {
+  try {
+    cpState = await getJson('/api/v1/control/state');
+  } catch {
+    $('#agent-configs').innerHTML =
+      '<div class="card"><p class="hint">控制平面 API 不可达。</p></div>';
+    return;
+  }
+  try {
+    cpModels = (await getJson('/api/v1/control/models')).models || [];
+  } catch { cpModels = []; }
+  $('#cp-version').textContent = 'version ' + cpState.version;
+  renderAgentConfigs();
+  renderWorkflow();
+  renderMcp();
+}
+
+function renderAgentConfigs() {
+  if (!$('#cp-model-list')) {
+    $('#agent-configs').insertAdjacentHTML('beforebegin',
+      `<datalist id="cp-model-list">${cpModels.map((m) => `<option value="${esc(m)}">`).join('')}</datalist>`);
+  }
+  $('#agent-configs').innerHTML = Object.values(cpState.agents).map((a) => `
+    <div class="card agent-card" data-agent="${esc(a.name)}">
+      <h2>Agent: ${esc(a.name)}
+        <span class="badge">${a.mcpRefs.length ? 'MCP ×' + a.mcpRefs.length : '无 MCP 映射'}</span></h2>
+      <label>System Prompt（每次模型调用即时读取）
+        <textarea class="cp-prompt" rows="8">${esc(a.systemPrompt)}</textarea></label>
+      <div class="row">
+        <label>模型（留空继承后端默认）
+          <input class="cp-model" type="text" list="cp-model-list" value="${esc(a.model || '')}" placeholder="如 qwen:7b"></label>
+        <label>温度
+          <input class="cp-temp" type="number" step="0.1" min="0" max="2"
+            value="${a.temperature ?? ''}" placeholder="默认"></label>
+      </div>
+      <h3>响应校准规则（调用后按序执行：正则 → 替换，可用 $1 引用分组）</h3>
+      <div class="cp-rules">
+        ${a.calibrationRules.length ? a.calibrationRules.map((r) => ruleRow(r)).join('') : '<div class="hint">无规则</div>'}
+      </div>
+      <button class="wf-add cp-add-rule" type="button">+ 添加规则</button>
+      <h3>MCP 服务器映射</h3>
+      <div class="cp-mcprefs">
+        ${(cpState.mcpServers || []).length ? cpState.mcpServers.map((s) => `
+          <label class="inline-check"><input type="checkbox" class="cp-mcpref" value="${esc(s.name)}"
+            ${a.mcpRefs.includes(s.name) ? 'checked' : ''}> ${esc(s.name)}
+            <span class="meta">${esc(s.transport)}${s.enabled ? '' : '（停用）'}</span></label>`).join('')
+          : '<div class="hint">尚未录入 MCP 服务器。</div>'}
+      </div>
+      <button class="cp-save" type="button">保存 agent 配置</button>
+      <span class="cp-msg hint"></span>
+    </div>`).join('');
+
+  document.querySelectorAll('.agent-card').forEach((card) => {
+    card.querySelector('.cp-add-rule').addEventListener('click', () =>
+      card.querySelector('.cp-rules').insertAdjacentHTML('beforeend', ruleRow({ pattern: '', replacement: '', description: '' })));
+    card.querySelectorAll('.cp-rule-del').forEach((btn) =>
+      btn.addEventListener('click', () => btn.closest('.cp-rule').remove()));
+    card.querySelector('.cp-save').addEventListener('click', () => saveAgent(card));
+  });
+}
+
+function ruleRow(rule) {
+  return `
+    <div class="cp-rule">
+      <input class="cp-rule-pattern" placeholder="正则 pattern" value="${esc(rule.pattern)}">
+      <input class="cp-rule-replacement" placeholder="替换为（可空=删除匹配）" value="${esc(rule.replacement)}">
+      <button class="del cp-rule-del" type="button" title="删除该规则">✕</button>
+    </div>`;
+}
+
+async function saveAgent(card) {
+  const name = card.dataset.agent;
+  const msg = card.querySelector('.cp-msg');
+  const tempRaw = card.querySelector('.cp-temp').value.trim();
+  const rules = [...card.querySelectorAll('.cp-rule')].map((row) => ({
+    pattern: row.querySelector('.cp-rule-pattern').value,
+    replacement: row.querySelector('.cp-rule-replacement').value,
+    description: '',
+  })).filter((r) => r.pattern.trim());
+  const body = {
+    name,
+    systemPrompt: card.querySelector('.cp-prompt').value,
+    model: card.querySelector('.cp-model').value.trim() || null,
+    temperature: tempRaw === '' ? null : Number(tempRaw),
+    calibrationRules: rules,
+    mcpRefs: [...card.querySelectorAll('.cp-mcpref:checked')].map((c) => c.value),
+  };
+  msg.textContent = '保存中…'; msg.className = 'cp-msg hint';
+  try {
+    const st = await putJson(`/api/v1/control/agents/${encodeURIComponent(name)}`, body);
+    cpState = st;
+    $('#cp-version').textContent = 'version ' + st.version;
+    msg.textContent = `已保存并热生效（version ${st.version}）`; msg.className = 'cp-msg hint ok';
+  } catch (e) {
+    msg.textContent = '保存失败: ' + e.message; msg.className = 'cp-msg hint';
+  }
+}
+
+/* workflow editor: declaration order is the source of truth; a dependency may
+   only reference preceding stages (validated server-side as well). */
+function renderWorkflow() {
+  wfStages = cpState.workflow.stages.map((s) =>
+    ({ name: s.name, agent: s.agent, dependsOn: [...s.dependsOn] }));
+  drawWorkflow();
+}
+
+function drawWorkflow() {
+  const agentNames = Object.keys(cpState.agents);
+  $('#workflow-editor').innerHTML = `
+    <label>执行模式（CONCURRENT 时同波阶段并行执行并合并）
+      <select id="wf-mode" class="wf-mode-sel">
+        <option value="SEQUENTIAL" ${cpState.workflow.mode === 'SEQUENTIAL' ? 'selected' : ''}>SEQUENTIAL（串行）</option>
+        <option value="CONCURRENT" ${cpState.workflow.mode === 'CONCURRENT' ? 'selected' : ''}>CONCURRENT（并行）</option>
+      </select></label>
+    <table class="data-table" id="wf-table">
+      <thead><tr><th>顺序</th><th>阶段名</th><th>Agent 映射</th><th>依赖（仅限前置阶段）</th><th></th></tr></thead>
+      <tbody>
+        ${wfStages.map((s, i) => `
+          <tr>
+            <td class="num">${i}</td>
+            <td><input class="wf-name" value="${esc(s.name)}"></td>
+            <td><select class="wf-agent">${agentNames.map((n) =>
+              `<option value="${esc(n)}" ${s.agent === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></td>
+            <td>${wfStages.filter((_, j) => j < i).map((p) => `
+              <label class="inline-check"><input type="checkbox" class="wf-dep" data-stage="${esc(p.name)}"
+                ${s.dependsOn.includes(p.name) ? 'checked' : ''}> ${esc(p.name)}</label>`).join('') || '—'}</td>
+            <td><button class="del wf-del" data-i="${i}" type="button">✕</button></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <button class="wf-add" type="button" id="wf-add">+ 添加阶段</button>
+    <button class="wf-save" type="button" id="wf-save">保存并热切换模板</button>
+    <span id="wf-msg" class="hint"></span>`;
+  $('#workflow-editor').querySelectorAll('.wf-name').forEach((inp, i) =>
+    inp.addEventListener('input', () => { wfStages[i].name = inp.value; }));
+  $('#workflow-editor').querySelectorAll('.wf-agent').forEach((sel, i) =>
+    sel.addEventListener('change', () => { wfStages[i].agent = sel.value; }));
+  $('#workflow-editor').querySelectorAll('tr').forEach((tr, i) => {
+    if (!i) return; // header row
+    tr.querySelectorAll('.wf-dep').forEach((cb) => cb.addEventListener('change', () => {
+      const deps = wfStages[i - 1].dependsOn;
+      if (cb.checked) { if (!deps.includes(cb.dataset.stage)) deps.push(cb.dataset.stage); }
+      else wfStages[i - 1].dependsOn = deps.filter((d) => d !== cb.dataset.stage);
+    }));
+  });
+  $('#workflow-editor').querySelectorAll('.wf-del').forEach((btn) =>
+    btn.addEventListener('click', () => { wfStages.splice(Number(btn.dataset.i), 1); drawWorkflow(); }));
+  $('#wf-add').addEventListener('click', () => {
+    wfStages.push({ name: 'stage-' + wfStages.length, agent: Object.keys(cpState.agents)[0], dependsOn: [] });
+    drawWorkflow();
+  });
+  $('#wf-save').addEventListener('click', saveWorkflow);
+}
+
+async function saveWorkflow() {
+  const msg = $('#wf-msg');
+  msg.textContent = '保存中…'; msg.className = 'hint';
+  const body = {
+    mode: $('#wf-mode').value,
+    stages: wfStages.map((s) => ({
+      name: String(s.name || '').trim(), agent: s.agent, dependsOn: s.dependsOn,
+    })),
+  };
+  try {
+    const st = await putJson('/api/v1/control/workflow', body);
+    cpState = st;
+    $('#cp-version').textContent = 'version ' + st.version;
+    renderWorkflow();
+    msg.textContent = `模板已热切换，下一次请求即生效（version ${st.version}）`;
+    msg.className = 'hint ok';
+  } catch (e) {
+    msg.textContent = '保存失败: ' + e.message; msg.className = 'hint';
+  }
+}
+
+function renderMcp() {
+  mcpServers = cpState.mcpServers.map((s) => ({ ...s }));
+  drawMcp();
+}
+
+function drawMcp() {
+  $('#mcp-panel').innerHTML = `
+    <table class="data-table" id="mcp-table">
+      <thead><tr><th>名称</th><th>传输</th><th>端点 / 命令</th><th>启用</th><th>说明</th><th></th></tr></thead>
+      <tbody>
+        ${mcpServers.map((s, i) => `
+          <tr>
+            <td><input class="mcp-name" value="${esc(s.name)}"></td>
+            <td><select class="mcp-transport">
+              <option value="SSE" ${s.transport === 'SSE' ? 'selected' : ''}>SSE</option>
+              <option value="STDIO" ${s.transport === 'STDIO' ? 'selected' : ''}>STDIO</option>
+            </select></td>
+            <td><input class="mcp-endpoint" value="${esc(s.endpoint)}"></td>
+            <td><input type="checkbox" class="mcp-enabled" ${s.enabled ? 'checked' : ''}></td>
+            <td><input class="mcp-desc" value="${esc(s.description)}"></td>
+            <td><button class="del mcp-del" data-i="${i}" type="button">✕</button></td>
+          </tr>`).join('') || '<tr><td colspan="6" class="hint">尚未录入 MCP 服务器。</td></tr>'}
+      </tbody>
+    </table>
+    <button class="mcp-add" type="button" id="mcp-add">+ 添加服务器</button>
+    <button class="mcp-save" type="button" id="mcp-save">保存 MCP 配置</button>
+    <span id="mcp-msg" class="hint"></span>`;
+  $('#mcp-panel').querySelectorAll('.mcp-del').forEach((btn) =>
+    btn.addEventListener('click', () => { mcpServers.splice(Number(btn.dataset.i), 1); drawMcp(); }));
+  $('#mcp-add').addEventListener('click', () => {
+    mcpServers.push({ name: 'mcp-server-' + (mcpServers.length + 1), transport: 'SSE',
+      endpoint: 'http://localhost:3001/sse', enabled: false, description: '' });
+    drawMcp();
+  });
+  $('#mcp-save').addEventListener('click', saveMcp);
+}
+
+async function saveMcp() {
+  const msg = $('#mcp-msg');
+  msg.textContent = '保存中…'; msg.className = 'hint';
+  const body = [...$('#mcp-panel').querySelectorAll('#mcp-table tbody tr')].map((tr) => ({
+    name: tr.querySelector('.mcp-name').value.trim(),
+    transport: tr.querySelector('.mcp-transport').value,
+    endpoint: tr.querySelector('.mcp-endpoint').value.trim(),
+    enabled: tr.querySelector('.mcp-enabled').checked,
+    description: tr.querySelector('.mcp-desc').value,
+  })).filter((s) => s.name);
+  try {
+    const st = await putJson('/api/v1/control/mcp/servers', body);
+    cpState = st;
+    $('#cp-version').textContent = 'version ' + st.version;
+    msg.textContent = `已保存（version ${st.version}）`; msg.className = 'hint ok';
+  } catch (e) {
+    msg.textContent = '保存失败: ' + e.message; msg.className = 'hint';
+  }
+}
+
+$('#cp-refresh').addEventListener('click', refreshControl);
+
 /* ---------------- helpers ---------------- */
 async function getJson(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
+  return res.json();
+}
+
+async function putJson(url, body) {
+  const res = await fetch(url, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err && err.message ? err.message : `HTTP ${res.status}`);
+  }
   return res.json();
 }
 
@@ -358,3 +679,4 @@ function fmtTime(iso) {
 refreshHealthDot();
 refreshRuns();
 refreshObservability();
+connectEvents();

@@ -19,9 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
+import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.agent.Agent;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.orchestrator.TripPlanningOrchestrator;
+import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.workflow.WorkflowProperties;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -32,7 +34,7 @@ class OrchestratorHealthIndicatorTest {
 
   @Test
   void reportsUpWithTemplateAgentsAndRetainedRuns() {
-    ObservabilityActor observability = new ObservabilityActor();
+    ObservabilityActor observability = ChatClientStubs.actor();
     WorkflowProperties properties = new WorkflowProperties();
     properties.getStages().add(new WorkflowProperties.StageDefinition() {{
       setName("research");
@@ -49,7 +51,7 @@ class OrchestratorHealthIndicatorTest {
             return context;
           }
         }),
-        properties, observability, ObservationRegistry.create(), JsonMapper.builder().build(),
+        new WorkflowTemplateHolder(properties), observability, ObservationRegistry.create(), JsonMapper.builder().build(),
         new OrchestratorMetrics(new SimpleMeterRegistry(), observability));
 
     Health health = new OrchestratorHealthIndicator(orchestrator, observability).health();

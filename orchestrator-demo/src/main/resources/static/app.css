@@ -141,3 +141,39 @@ details.json-details summary { color: var(--accent); cursor: pointer; font-size:
 footer { color: var(--muted); text-align: center; font-size: 12px; padding: 18px 0 26px; }
 .wave-head { margin: 14px 0 6px; font-size: 13px; color: var(--muted); }
 .wave-head b { color: var(--text); }
+
+/* ============ v1: live blackboard (SSE) & control plane ============ */
+#live-card .badge { margin-left: 8px; }
+#live-context { max-height: 340px; overflow-y: auto; }
+
+.agent-card label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+.agent-card textarea, .agent-card input, #workflow-editor input, #workflow-editor select,
+#mcp-panel input, #mcp-panel select {
+  display: block; width: 100%; margin-top: 3px; padding: 7px 9px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; font-size: 13px; font-family: inherit;
+}
+.agent-card textarea { font-family: var(--mono); font-size: 12px; resize: vertical; }
+.agent-card input:focus, .agent-card textarea:focus,
+#workflow-editor input:focus, #workflow-editor select:focus,
+#mcp-panel input:focus, #mcp-panel select:focus { outline: none; border-color: var(--accent); }
+.agent-card .row { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
+.agent-card .row label { margin-bottom: 0; }
+.cp-rule { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin: 4px 0; align-items: center; }
+.cp-rule .del, #wf-table .del, #mcp-table .del {
+  background: var(--panel-2); color: var(--err); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px;
+}
+.agent-card .cp-save, #workflow-editor .wf-save, #mcp-panel .mcp-save {
+  margin-top: 10px; margin-right: 8px; padding: 7px 16px; border: none; border-radius: 6px;
+  background: var(--accent); color: #04121f; font-weight: 600; cursor: pointer; font-size: 13px;
+}
+#workflow-editor .wf-add, #mcp-panel .mcp-add {
+  margin-top: 10px; padding: 6px 14px; background: var(--panel-2); color: var(--accent);
+  border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px;
+}
+.inline-check { display: inline-flex !important; align-items: center; gap: 4px; margin: 0 10px 4px 0 !important; }
+.inline-check input { display: inline-block; width: auto !important; margin: 0 !important; }
+#workflow-editor label:first-child { display: block; color: var(--muted); font-size: 12px; }
+#workflow-editor .wf-mode-sel { width: 240px; }
+.cp-msg.ok, .cp-msg.ok, #wf-msg.ok, #mcp-msg.ok { color: var(--ok); }

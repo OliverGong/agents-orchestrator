@@ -34,7 +34,7 @@ class AbstractContextAgentTest {
     final int failuresBeforeSuccess;
 
     FlakyResearchAgent(int failuresBeforeSuccess) {
-      super("Flaky-Research-Agent", null);
+      super("Flaky-Research-Agent", null, null);
       this.failuresBeforeSuccess = failuresBeforeSuccess;
     }
 

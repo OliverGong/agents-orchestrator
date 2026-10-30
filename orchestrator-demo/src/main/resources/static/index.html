@@ -26,6 +26,7 @@
   <button class="tab active" data-tab="plan">规划工作台</button>
   <button class="tab" data-tab="runs">运行回放</button>
   <button class="tab" data-tab="obs">系统观测</button>
+  <button class="tab" data-tab="control">控制平面</button>
 </nav>
 
 <main>
@@ -56,6 +57,15 @@
       <h2>执行进度 <span id="progress-status" class="badge">RUNNING</span>
         <span id="progress-elapsed" class="elapsed"></span></h2>
       <div id="progress-stages" class="stages"></div>
+    </div>
+
+    <div class="card" id="live-card" hidden>
+      <h2>实时黑板 <span id="sse-status" class="badge">SSE 连接中…</span>
+        <span id="live-status" class="badge"></span></h2>
+      <p class="hint">由 <code>GET /api/v1/events/stream</code>（SSE）实时推送：每个阶段完成即展示其输入/输出黑板快照，并滚动更新完整 Context。</p>
+      <div id="live-stages" class="stages"></div>
+      <h3>当前完整 Context</h3>
+      <pre id="live-context" class="json">等待运行启动…</pre>
     </div>
 
     <div class="card" id="error-card" hidden>
@@ -108,10 +118,35 @@
           <code>/actuator/prometheus</code> → Prometheus。点击页头链接查看瀑布图与仪表盘。</p>
     </div>
   </section>
+
+  <!-- ============ Tab 4: 控制平面 ============ -->
+  <section id="tab-control" class="tab-panel">
+    <div class="card">
+      <h2>控制平面状态
+        <span id="cp-version" class="badge badge-ok">version —</span>
+        <button id="cp-refresh" class="mini-btn" type="button">刷新</button></h2>
+      <p class="hint">Agent 的 system prompt / 模型 / 温度 / 校准规则、工作流模板与 MCP 服务器均可在运行时编辑并<b>立即热生效</b>
+          （agent 配置逐次调用读取，工作流模板作用于下一次请求）。全部状态持久化于 <code>config/control-plane.json</code>，重启后自动恢复。</p>
+    </div>
+
+    <div id="agent-configs" class="grid-2"></div>
+
+    <div class="card">
+      <h2>工作流编排（模板热切换）</h2>
+      <p class="hint">阶段按声明顺序执行/校验（依赖必须位于其前）；同一依赖波次内的阶段在 CONCURRENT 模式下并行执行并合并结果。</p>
+      <div id="workflow-editor"></div>
+    </div>
+
+    <div class="card">
+      <h2>MCP 服务器</h2>
+      <p class="hint">v1 为配置录入与 agent 映射（校准/引用校验即时生效）；MCP 客户端传输接线与工具调用详情展示在下一迭代接入。</p>
+      <div id="mcp-panel"></div>
+    </div>
+  </section>
 </main>
 
 <footer>Spring Boot 4 · Spring AI 2.0 · Micrometer/OTel — 前端为应用内静态资源（static/），与 REST API 同源直连。</footer>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

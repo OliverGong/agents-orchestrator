@@ -33,7 +33,7 @@ class ReviewAgentTest {
          "issues":[],
          "recommendations":["Pre-book the teamLab tickets"]}
         """);
-    ReviewAgent agent = new ReviewAgent(stub.client());
+    ReviewAgent agent = new ReviewAgent(stub.model(), stub.store());
 
     OrchestratorContext context = OrchestratorContext
         .start(new TripRequest("Tokyo", 5, new BigDecimal("15000"), "food and culture"))

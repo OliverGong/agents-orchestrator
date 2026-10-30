@@ -46,8 +46,13 @@ public class ObservabilityActor {
   private final Map<String, RunTimeline> timelines = new ConcurrentHashMap<>();
   /** Actor-thread-only insertion order used to evict the oldest runs. */
   private final ArrayDeque<String> insertionOrder = new ArrayDeque<>();
+  private final ObservabilitySsePublisher ssePublisher;
   private final Thread actorThread = Thread.ofVirtual().name("observability-actor").start(this::consume);
   private volatile boolean accepting = true;
+
+  public ObservabilityActor(ObservabilitySsePublisher ssePublisher) {
+    this.ssePublisher = ssePublisher;
+  }
 
   /** Fire-and-forget mailbox send: never blocks the producer. */
   public void tell(AgentObservabilityEvent event) {
@@ -102,6 +107,9 @@ public class ObservabilityActor {
         timelines.remove(insertionOrder.pollFirst());
       }
     }
+    // Forwarded from the actor thread, so SSE clients observe the same
+    // per-run event order the timeline was folded with.
+    ssePublisher.publish(event);
   }
 
   private RunTimeline fold(String runId, RunTimeline timeline, AgentObservabilityEvent event) {

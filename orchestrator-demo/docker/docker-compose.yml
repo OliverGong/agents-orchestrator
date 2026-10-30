@@ -1,9 +1,31 @@
-# Local observability stack for orchestrator-demo:
+# Local stack for orchestrator-demo:
+#   app          the orchestrator itself (jar built by ../Dockerfile)
 #   Tempo        receives OTLP traces (HTTP :4318 / gRPC :4317) -> trace search
 #   Prometheus   scrapes the app's /actuator/prometheus endpoint
 #   Grafana      UI on :3000 with both datasources pre-provisioned
 # Start with:  docker compose -f docker/docker-compose.yml up
+#
+# The app connects to the Ollama instance on the Docker host
+# (host.docker.internal:11434); override SPRING_AI_OLLAMA_BASE_URL to point
+# somewhere else. Control-plane state persists in the orchestrator-config
+# volume so agent/workflow edits survive container restarts.
 services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_AI_OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - orchestrator-config:/app/config
+    depends_on:
+      - tempo
+
   tempo:
     image: grafana/tempo:2.7.2
     command: ["-config.file=/etc/tempo/tempo.yaml"]
@@ -37,3 +59,4 @@ services:
 
 volumes:
   tempo-data:
+  orchestrator-config:
