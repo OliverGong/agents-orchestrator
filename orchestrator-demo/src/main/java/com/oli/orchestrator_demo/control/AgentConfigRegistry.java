@@ -1,28 +1,23 @@
 /**
  * @ClassName AgentConfigRegistry
- * @Description The file-backed store of the control plane (production
- *              {@link AgentRuntimeStore}). On startup it either loads the
- *              persisted {@link ControlPlaneState} JSON or seeds it from the
- *              built-in personas and the `orchestrator.agents.*` /
- *              `orchestrator.workflow.*` properties; afterwards the state
- *              file is the single source of truth. Every update is
- *              synchronized (single-writer semantics), validates its input,
- *              bumps the version, hot-applies the change (workflow template
- *              into the {@link WorkflowTemplateHolder}; agent configuration
- *              is read per call by the agents) and persists the state
- *              atomically (temp file + move), so a crash can never leave a
- *              half-written file behind.
+ * @Description The single writer of the control plane. On startup it either
+ *              loads the persisted {@link ControlPlaneState} from the
+ *              {@link ControlPlaneStore} or seeds it from the built-in
+ *              personas and the `orchestrator.agents.*` /
+ *              `orchestrator.workflow.*` properties; afterwards every update
+ *              is synchronized, validates its input, bumps the version,
+ *              hot-applies the change (workflow template into the
+ *              {@link WorkflowTemplateHolder}; agent configuration is read
+ *              per call by the agents) and hands the new state to the store.
+ *              The store decides where the state physically lives — file
+ *              (default) or database; the in-memory snapshot stays the
+ *              read-side truth for the running process.
  * @Author OliverGong
  * @Date Oct 30, 2026
- * @Version 1.0
+ * @Version 2.0
  */
 package com.oli.orchestrator_demo.control;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -33,7 +28,6 @@ import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.oli.orchestrator_demo.config.AgentModelProperties;
@@ -44,7 +38,6 @@ import com.oli.orchestrator_demo.workflow.WorkflowProperties;
 import com.oli.orchestrator_demo.workflow.WorkflowTemplate;
 
 import jakarta.annotation.PostConstruct;
-import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class AgentConfigRegistry implements AgentRuntimeStore {
@@ -57,9 +50,8 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
   private final AgentModelProperties modelProperties;
   private final WorkflowProperties workflowProperties;
   private final WorkflowTemplateHolder templateHolder;
-  private final ObjectMapper objectMapper;
   private final Set<String> knownAgents;
-  private final Path configFile;
+  private final ControlPlaneStore store;
 
   /**
    * Attached after construction by {@link AgentDescriptorRegistry} (setter
@@ -73,30 +65,29 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
   private ControlPlaneState state;
 
   public AgentConfigRegistry(AgentModelProperties modelProperties, WorkflowProperties workflowProperties,
-      WorkflowTemplateHolder templateHolder, ObjectMapper objectMapper,
-      @Value("${orchestrator.control.config-file:config/control-plane.json}") Path configFile) {
+      WorkflowTemplateHolder templateHolder, ControlPlaneStore store) {
     this.modelProperties = modelProperties;
     this.workflowProperties = workflowProperties;
     this.templateHolder = templateHolder;
-    this.objectMapper = objectMapper;
     // The demo roster is static: the same list seeds the state file, so it is
     // also the validation reference for workflow stage agents. Depending on
     // the orchestrator here would create a constructor cycle (agents -> store
     // -> registry -> orchestrator -> agents).
     this.knownAgents = Set.copyOf(AgentDefaults.KNOWN_AGENTS);
-    this.configFile = configFile;
+    this.store = store;
   }
 
   /** Public for tests outside the package; Spring invokes it as {@code @PostConstruct}. */
   @PostConstruct
-  public void initialize() throws IOException {
-    if (Files.exists(configFile)) {
-      state = objectMapper.readValue(configFile, ControlPlaneState.class);
-      WorkflowTemplate persisted = toTemplate(state.workflow());
-      persisted.validate(knownAgents);
-      templateHolder.replace(persisted);
+  public void initialize() {
+    var persisted = store.load();
+    if (persisted.isPresent()) {
+      state = persisted.get();
+      WorkflowTemplate persistedTemplate = toTemplate(state.workflow());
+      persistedTemplate.validate(knownAgents);
+      templateHolder.replace(persistedTemplate);
       log.info("Control plane state loaded from {} (version {}, template '{}')",
-          configFile, state.version(), persisted.name());
+          store.name(), state.version(), persistedTemplate.name());
     }
     else {
       Map<String, AgentRuntimeConfig> agents = new LinkedHashMap<>();
@@ -105,9 +96,9 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
       }
       state = new ControlPlaneState(1, Instant.now(), agents,
           fromTemplate(workflowProperties.toTemplate()), List.of(), Map.of());
-      save();
+      store.save(state);
       log.info("Control plane state seeded to {} (template '{}')",
-          configFile, workflowProperties.toTemplate().name());
+          store.name(), workflowProperties.toTemplate().name());
     }
   }
 
@@ -150,7 +141,7 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
         update.temperature(), update.calibrationRules(), update.mcpRefs()));
     state = new ControlPlaneState(state.version() + 1, Instant.now(), agents, state.workflow(), state.mcpServers(),
         state.descriptors());
-    save();
+    store.save(state);
     log.info("Control plane: agent '{}' updated (version {})", name, state.version());
     return state;
   }
@@ -167,7 +158,7 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
     templateHolder.replace(template);
     state = new ControlPlaneState(state.version() + 1, Instant.now(), state.agents(), workflow, state.mcpServers(),
         state.descriptors());
-    save();
+    store.save(state);
     log.info("Control plane: workflow template replaced with '{}' ({}) (version {})",
         template.name(), template.mode(), state.version());
     return state;
@@ -193,7 +184,7 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
     if (seeded) {
       state = new ControlPlaneState(state.version(), state.updatedAt(), state.agents(), state.workflow(),
           state.mcpServers(), descriptors);
-      save();
+      store.save(state);
       log.info("Control plane: seeded {} agent descriptor(s) from the agent beans", descriptors.size());
     }
     try {
@@ -235,7 +226,7 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
             state.agents().keySet(), descriptors));
     state = new ControlPlaneState(state.version() + 1, Instant.now(), state.agents(), state.workflow(),
         state.mcpServers(), descriptors);
-    save();
+    store.save(state);
     log.info("Control plane: descriptor of agent '{}' updated (version {})", name, state.version());
     return state;
   }
@@ -290,7 +281,7 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
     }
     state = new ControlPlaneState(state.version() + 1, Instant.now(), state.agents(), state.workflow(), servers,
         state.descriptors());
-    save();
+    store.save(state);
     log.info("Control plane: {} MCP server(s) recorded (version {})", servers.size(), state.version());
     return state;
   }
@@ -320,20 +311,5 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
 
   private static String emptyToNull(String value) {
     return value == null || value.isBlank() ? null : value;
-  }
-
-  /** Atomic persistence: write to a sibling temp file, then move it into place. */
-  private void save() {
-    try {
-      if (configFile.getParent() != null) {
-        Files.createDirectories(configFile.getParent());
-      }
-      Path temp = configFile.resolveSibling(configFile.getFileName() + ".tmp");
-      objectMapper.writerWithDefaultPrettyPrinter().writeValue(temp.toFile(), state);
-      Files.move(temp, configFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-    }
-    catch (IOException ex) {
-      throw new UncheckedIOException("Failed to persist control plane state to " + configFile, ex);
-    }
   }
 }

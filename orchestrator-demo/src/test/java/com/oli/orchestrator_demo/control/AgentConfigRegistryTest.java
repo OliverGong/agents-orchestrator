@@ -62,7 +62,7 @@ class AgentConfigRegistryTest {
   private AgentConfigRegistry freshRegistry() throws IOException {
     holder = new WorkflowTemplateHolder(new WorkflowProperties());
     AgentConfigRegistry registry = new AgentConfigRegistry(modelProperties, new WorkflowProperties(), holder,
-        JsonMapper.builder().build(), configFile);
+        new FileControlPlaneStore(configFile, JsonMapper.builder().build()));
     registry.initialize();
     return registry;
   }

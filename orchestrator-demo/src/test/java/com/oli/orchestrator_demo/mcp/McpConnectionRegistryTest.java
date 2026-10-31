@@ -31,6 +31,7 @@ import com.oli.orchestrator_demo.Await;
 import com.oli.orchestrator_demo.config.AgentModelProperties;
 import com.oli.orchestrator_demo.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.control.FileControlPlaneStore;
 import com.oli.orchestrator_demo.control.McpServerConfig;
 import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
@@ -54,7 +55,7 @@ class McpConnectionRegistryTest {
   void setUp() throws IOException {
     WorkflowTemplateHolder holder = new WorkflowTemplateHolder(new WorkflowProperties());
     registry = new AgentConfigRegistry(new AgentModelProperties(), new WorkflowProperties(), holder,
-        JsonMapper.builder().build(), tempDir.resolve("control-plane.json"));
+        new FileControlPlaneStore(tempDir.resolve("control-plane.json"), JsonMapper.builder().build()));
     registry.initialize();
   }
 

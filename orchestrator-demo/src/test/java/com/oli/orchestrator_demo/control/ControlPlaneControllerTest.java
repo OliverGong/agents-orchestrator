@@ -61,7 +61,7 @@ class ControlPlaneControllerTest {
   void setUp() throws IOException {
     WorkflowTemplateHolder holder = new WorkflowTemplateHolder(new WorkflowProperties());
     registry = new AgentConfigRegistry(new AgentModelProperties(), new WorkflowProperties(), holder,
-        JsonMapper.builder().build(), tempDir.resolve("control-plane.json"));
+        new FileControlPlaneStore(tempDir.resolve("control-plane.json"), JsonMapper.builder().build()));
     registry.initialize();
     // The agent beans back the self-declared slot contracts.
     ChatModel model = Mockito.mock(ChatModel.class);
