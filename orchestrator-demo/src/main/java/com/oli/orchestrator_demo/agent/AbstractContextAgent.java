@@ -43,6 +43,9 @@ import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
+import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.ObservabilityEventBus;
+import com.oli.orchestrator_demo.observability.RunContext;
 import tools.jackson.core.JacksonException;
 
 public abstract class AbstractContextAgent<R> implements Agent<OrchestratorContext, OrchestratorContext> {
@@ -120,9 +123,26 @@ public abstract class AbstractContextAgent<R> implements Agent<OrchestratorConte
         lastFailure = ex;
         log.warn("{}: attempt {}/{} failed to parse model output ({}), retrying",
             name, attempt, MAX_ATTEMPTS, ex.getMessage());
+        publishRetry(attempt, ex.getMessage());
       }
     }
     throw lastFailure;
+  }
+
+  /**
+   * Reports one parse retry into the observability stream so the console can
+   * visualize the retry chain of a stage. Attribution comes from the
+   * {@link RunContext} thread-local; without it (template-method tests, calls
+   * outside a workflow run) the event is silently dropped.
+   */
+  private void publishRetry(int attempt, String errorMessage) {
+    RunContext.Attribution attribution = RunContext.current();
+    if (attribution == null) {
+      return;
+    }
+    ObservabilityEventBus.publish(AgentObservabilityEvent.stageRetried(attribution.runId(),
+        attribution.stageName(), attribution.agentName(), attribution.waveIndex(),
+        Thread.currentThread().getName(), attempt, errorMessage));
   }
 
   /**
