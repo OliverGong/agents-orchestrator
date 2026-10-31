@@ -111,7 +111,7 @@ com.oli.orchestrator_demo
 │   └── OrchestratorInfoContributor  # /actuator/info 的 workflow 配置
 ├── aop                          # 横切关注点
 │   └── AgentExecutionAspect     # @Around：Agent 耗时日志 + span + Timer 指标
-├── control                      # 控制平面（v1，见第 9 节）
+├── control                      # 控制平面（v1，见第 9 节；v2.0 存储分层，见第 10 节）
 │   ├── AgentRuntimeConfig       # Agent 运行时配置：prompt/model/温度/校准规则/MCP 引用
 │   ├── CalibrationRule          # 校准规则：正则 pattern → replacement
 │   ├── McpServerConfig          # MCP 服务记录：名称/传输(SSE|STDIO)/端点/启停
@@ -119,7 +119,18 @@ com.oli.orchestrator_demo
 │   ├── ControlPlaneState        # 全量状态快照（version 单调递增，JSON 持久化）
 │   ├── AgentDefaults            # 内置人格（状态文件种子）+ 已知 Agent 花名册
 │   ├── AgentRuntimeStore        # Agent 读取运行时配置的 SPI
-│   └── AgentConfigRegistry      # 生产实现：文件持久化 + 校验 + 热应用 + 原子写
+│   ├── AgentConfigRegistry      # 生产实现：文件持久化 + 校验 + 热应用 + 原子写
+│   ├── ControlPlaneStore        # 持久化接缝（v2.0）：load/save/currentVersion
+│   ├── FileControlPlaneStore / DbControlPlaneStore / CachedControlPlaneStore
+│   │                            # JSON 原子写 │ cp_* 表单事务写 │ Caffeine 读缓存
+│   └── ControlPlaneCrypto       # AES-256-GCM 字段加密 + GET 脱敏/PUT 还原（v2.0）
+├── scenario                     # 场景平面（v2.1，见第 11 节）
+│   ├── Scenario                 # 场景记录：请求模板 + workflow/agent/MCP 覆盖 + 产物类型
+│   ├── ScenarioState / ScenarioStore # 版本化快照与持久化接缝（镜像 ControlPlaneStore 模式）
+│   ├── FileScenarioStore / DbScenarioStore # config/scenarios.json │ cp_scenario* 两表
+│   ├── ScenarioRegistry         # 单写者：CRUD + 引用校验 + activate 热应用 + dry-run
+│   ├── DryRunEngine / DryRunReport # 零 token 推演：模板校验 + 波次展开 + 槽位流
+│   └── ScenarioController       # /api/v1/scenarios CRUD + dry-run + activate
 ├── config                       # 配置
 │   ├── AgentConfiguration       # @EnableConfigurationProperties 激活（人格已迁控制平面）
 │   ├── ModelHttpClientConfig    # 模型后端 HTTP 超时（connect 5s / read 5min）
@@ -400,6 +411,17 @@ curl http://localhost:8080/api/trips/runs/{runId}    # 完整时间线：波次 
 | 运行回放 | 运行列表（状态/耗时/阶段数）→ 点开单次运行：**用户最初提出的请求** + 依赖波次与每阶段输入/输出黑板快照（折叠 JSON）+ 终态上下文 | `GET /api/trips/runs[/{id}]` |
 | 系统观测 | 过程指标卡片（运行发起/成功/失败、阶段计数、运行总时长、保留时间线）、Agent 维度表格（`agent.execution.duration` 按标签查询）、健康检查与工作流配置 JSON 面板、Grafana/Tempo/Prometheus 链接 | `/actuator/health`、`/actuator/info`、`/actuator/metrics/{name}?tag=…` |
 | 控制平面（v1） | Agent 卡片编辑（system prompt/模型/温度/校准规则/MCP 引用）+ 工作流编辑器（mode/阶段/agent/依赖，增删行）+ MCP 服务面板 + 版本徽章与刷新 | `/api/v1/control/*` |
+
+v2.1 起控制台重构为**左侧导航布局**（三组八项），替代 v0–v1 的顶部 tab：
+
+| 导航组 | 页面 | 内容 |
+|---|---|---|
+| 场景 | 场景运行 | 顶栏场景选择与**激活**（覆盖热应用到控制平面，激活徽章）+ 原规划工作台全部能力 |
+| 场景 | 场景推演 | dry-run 报告：校验徽章与问题清单、**依赖 DAG（SVG）**、波次展开（有效模型/温度/槽位/pending-safe）、黑板槽位流表 |
+| 场景 | 场景配置 | 场景 CRUD 表格 + 编辑器（请求模板 / workflow 覆盖 JSON / agent 覆盖 JSON / MCP 依赖复选 / 产物类型 / 启停） |
+| 元数据 | Agent 配置 / 工作流编排 / MCP 服务器 | 原「控制平面」tab 的三块内容原样承接（id 不变） |
+| 可观测 | 运行回放 | 详情升级为**三视图切换**：时间线（含 `↻ retry` 第 N 次尝试链与工具明细）/ **DAG 依赖图**（模板精确依赖，回退波次推导，节点带状态填色与 ⚠retry 徽章）/ **泳道图**（agent 泳道 × 时间轴，⚠ 重试时刻定位、▲工具刻度，无完成时间戳时退化为顺序布局） |
+| 可观测 | 系统观测 | 原「系统观测」tab 原样承接 |
 
 实现要点（改错即复发）：
 
@@ -833,3 +855,79 @@ ControlPlaneStore
   接入，`orchestrator-config` 卷保留（迁移源/回退后端）。
 - 测试：H2 内存库跑同一份可移植 schema（`DbControlPlaneStoreTest` 六例：
   往返、保序、密文落库断言、无密钥明文回退、一次性导入、缓存失效）。
+
+## 11. v2.1：场景元模型、重试事件链与控制台导航
+
+v2.0 回答"配置存在哪"，v2.1 回答"如何把一整套编排逻辑作为资产切换"。
+三块增量：**场景平面**（scenario 包）、**解析重试事件链**（observability）与
+**控制台 v2.1**（左侧导航 + DAG/泳道可视化，见 5.3）。
+
+### 11.1 场景平面（scenario 包）
+
+场景（Scenario）= 一套可持久化的编排逻辑组，**镜像控制平面的既有模式**
+（单写者 registry + store 接缝 + version 单调递增），但不复用
+`ControlPlaneState`——避免破坏控制平面"单一事实源"的不变量：
+
+| 组成 | 说明 |
+|---|---|
+| `requestTemplate` | 目的地/天数/预算/偏好——场景运行页可作请求预填与后续一键运行的模板 |
+| `workflowOverride` | 可空 `WorkflowControlState`（mode + stages）——null = 继承控制平面当前模板 |
+| `agentOverrides` | agent 名 → `{systemPrompt?, model?, temperature?, calibrationRules?, mcpRefs?}`，null 字段保留现值（`applyTo` null-keep 合并） |
+| `mcpServerRefs` | 场景要求的 MCP 服务器（未在控制平面录入则 dry-run 判 invalid） |
+| `artifactType` | 产物类型：HTML / SPRING_BOOT_PROJECT / JAR / AUDIO（jar/工程包/音频的实际生成列入 v2.2） |
+| `active` | 启停标记 |
+
+- **存储接缝**：`ScenarioStore`（load/save/name）→ `FileScenarioStore`
+  （`config/scenarios.json`，temp + `ATOMIC_MOVE`）或 `DbScenarioStore`
+  （`cp_scenario_meta` 单行版本戳 + `cp_scenario` 记录表，@Transactional
+  delete+insert 单事务写）。跟随 `orchestrator.control.store` 同一开关装配
+  （`ScenarioStoreConfig`），`orchestrator.scenarios.file` 可改文件路径。
+  `workflowOverride` 恒序列化（Jackson 写字面 `"null"`），避免 SQL NULL
+  反序列化崩溃——H2/PostgreSQL 同一份可移植 schema。
+- **校验**：id slug 格式与唯一性、名称非空、requestTemplate.days ≥ 1、
+  agentOverrides 键须是已知 agent、mcpServerRefs 须已录入、workflowOverride
+  构造 `WorkflowTemplate` 试校验（未知 agent / 依赖后置 / 环 → 400）。
+- **activate = 动态实例化**：先 validateReferences，再
+  `updateWorkflow`（模板热切换）+ 逐 agent `updateAgent(applyTo)`（null 字段
+  保留现值）——场景覆盖落进控制平面后，热生效机制与 v1/v2.0 完全一致
+  （每次调用读、下一次请求生效）。
+- **dry-run = 零 token 推演**：`DryRunEngine` 解析生效模板
+  （override ?? 控制平面）→ `WorkflowTemplate.validate` 捕 `IllegalStateException`
+  入 issues（不抛）→ `waves()` 波次展开（校验失败仍展开，报告"能走多远"）→
+  每阶段有效模型/温度（override.applyTo(config)）/ MCP / 输入输出槽位 /
+  pending-safe / warnings → 槽位流（每个黑板槽位的产出方与消费方）。
+  **不调用任何模型、不改变任何状态**（测试断言 version 不变）。
+- 内置种子场景 `kyoto-classic`（京都经典四阶段）首启自动落库。
+
+### 11.2 解析重试事件链（STAGE_RETRIED）
+
+v1 的解析重试（4.6）对可观测性是黑盒：时间线只见最终成败。v2.1 让每次
+尝试可见：
+
+- `AbstractContextAgent.respondWithRetry` 解析失败进入重试前，发布
+  `STAGE_RETRIED` 事件（attempt 序号 + 原始错误消息）；
+- 归因：agent 内部拿不到 stage/run 上下文 → 复用 MCP 工具插桩同款
+  `RunContext`（ThreadLocal，orchestrator 执行阶段前设置）读
+  runId/stage/agent/waveIndex；**工作流之外（单测直调）归因为 null，事件
+  丢弃**——不污染时间线；
+- 传输：agent 无法注入 `ObservabilityActor` bean → 新建轻量静态
+  `ObservabilityEventBus`（CopyOnWriteArrayList 订阅者），Actor 构造时
+  `subscribe(this::tell)`，事件走既有 fold 管线（时间线 / SSE
+  `stage_retried` / REST 回放）零改动接入；
+- 消费：回放详情每阶段新增 `retries[]`（attempt/errorMessage/timestamp），
+  时间线与泳道图渲染 `↻ retry` / `⚠` 标记。
+
+### 11.3 本地 file 模式启动与 DataSource 排除
+
+JDBC starter（store=db 所需）常驻 classpath，而本地 file 模式没有
+`spring.datasource.url`——`DataSourceAutoConfiguration` 会直接炸掉启动。
+处置：`spring.autoconfigure.exclude` 默认排除该自动配置，
+`ORCHESTRATOR_SPRING_EXCLUDE=`（空）由 docker compose（db 模式）置空恢复。
+
+### 11.4 测试增量
+
+`ScenarioRegistryTest`（seed/重启重载/CRUD 版本递增/全套引用校验/activate
+热应用/dry-run 不改状态）、`DbScenarioStoreTest`（H2 往返/一次性导入/空库）、
+`DryRunEngineTest`（默认模板 4 波 6 边 + 槽位流/CONCURRENT 覆盖并行/校验
+问题报告/槽位缺口/覆盖生效/未配置 MCP 判 invalid）、`AbstractContextAgentTest`
+追加重试事件归因与工作流外丢弃两例——合计 **140 例全绿**。

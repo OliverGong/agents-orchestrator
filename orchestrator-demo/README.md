@@ -19,8 +19,9 @@
 | v1.1 · Phase 1 | `7cf2587` | Agent 槽位契约描述符（input/output/pending-safe slots）+ 工作流逻辑闭环校验（保存模板即验证数据依赖可满足，否则 400） |
 | v1.1 · Phase 2 | `d1e261a` | **MCP 解耦**：连接注册表从控制平面动态建连（Streamable HTTP 默认 / SSE 兼容 / STDIO 子进程）、版本 diff 热重建、失败冷却重试与手动重连；**工具注入**：映射服务器的工具以 ToolCallback 进入每次模型调用；**工具调用可观测**：耗时 / 结果 / 归因进时间线与 SSE；前端 MCP 面板与运行回放工具明细 |
 | v2.0 | `14fe222` / `1aaa4c6` | **控制平面持久化基座**：`ControlPlaneStore` 抽象——文件（默认/seed/回退）或 PostgreSQL（规范化 `cp_*` 表 + 单事务写 + WAL 崩溃安全）；Caffeine 缓存（version 戳失效 + 写透 + TTL）；`cp_mcp_server.env` 字段级 AES-256-GCM 加密（`ORCHESTRATOR_CRYPTO_KEY`），GET 脱敏 `******` / PUT 回写还原；首次启动 JSON → DB 一次性导入；compose 栈切 db 模式（postgres:16 + 健康检查） |
+| v2.1 | `90f76a8` + console | **场景元模型（Scenario Plane）**：场景 = 请求模板 + 工作流覆盖 + Agent 覆盖 + MCP 映射 + 产物类型，`ScenarioRegistry` 单写者 + `ScenarioStore` 接缝（file / `cp_scenario*` 表，跟随同一 store 开关）；`activate` 将覆盖热应用到控制平面（动态实例化）；`dry-run` 零 token 推演（模板校验 + 波次展开 + 黑板槽位流）；**解析重试事件链**：`STAGE_RETRIED` 经 RunContext 归因进时间线 / SSE / 回放；**控制台 v2.1**：左侧三组导航（场景运行·推演·配置 / agents·workflow·MCP / 回放·观测）+ 运行回放时间线 / DAG / 泳道三视图（原生 SVG）+ retry 链可视化 |
 
-当前测试规模：**123 个用例全绿**（`./mvnw test`，DB 相关用例跑 H2 内存库），覆盖编排、控制平面校验、MCP 注册表与工具插桩、观测控制器、存储后端与加密。
+当前测试规模：**140 个用例全绿**（`./mvnw test`，DB 相关用例跑 H2 内存库），覆盖编排、控制平面校验、场景注册表与零 token 推演、MCP 注册表与工具插桩、观测控制器、存储后端与加密。
 
 ## 2. 体系架构
 
@@ -50,6 +51,12 @@
 │      CachedControlPlaneStore：Caffeine，version 戳失效 + TTL               │
 │      ControlPlaneCrypto：AES-256-GCM 字段加密（env）+ GET 脱敏/PUT 还原     │
 │                                                                          │
+│ scenario/ 场景平面（v2.1，镜像控制平面模式）                                 │
+│   ScenarioRegistry（单写者）· DryRunEngine（零 token 推演）                 │
+│   └─ ScenarioStore：file（scenarios.json）│ db（cp_scenario* 两表）         │
+│      Scenario = 请求模板 + workflow/agent/MCP 覆盖 + 产物类型；             │
+│      activate → 覆盖热应用到控制平面（动态实例化）                           │
+│                                                                          │
 │ mcp/ MCP 动态连接层（解耦核心）                                            │
 │   McpConnectionRegistry：版本 diff reconcile · 异步建连 · 30s 冷却重试     │
 │   ├─ Streamable HTTP（默认） ├─ SSE（SDK 已弃用，保留兼容） ├─ STDIO 子进程 │
@@ -69,6 +76,8 @@
 - **串行 / 并行执行**：模板按声明序校验依赖，依赖相同的阶段在 CONCURRENT 模式下组成同一波次，于虚拟线程上并行执行并合并结果（§4.7）。
 - **逻辑闭环**：控制平面保存工作流时，按各 Agent 的槽位契约验证「输入槽位必须由前置阶段产出或声明为 pending-safe」，否则拒绝（Phase 1）。
 - **MCP 解耦**：服务器连接由 `McpConnectionRegistry` 全生命周期管理——控制平面编辑即 bump 版本，下一次 reconcile 按差异重建；连接失败不阻塞 Agent 调用，工具在连接成功后的下一次请求自动出现（Phase 2）。
+- **场景平面**：场景把「一套编排逻辑组」持久化为可切换资产——请求模板 + 工作流/Agent/MCP 覆盖（空字段继承控制平面当前值）；`activate` 经 registry 校验后热应用到控制平面，下一次运行即按场景执行；`dry-run` 复用工作流校验与波次分解做零 token 推演，报告含依赖 DAG、波次展开与黑板槽位流（v2.1）。
+- **重试事件链**：Agent 解析重试不再静默——`AbstractContextAgent` 经 `ObservabilityEventBus`（RunContext 归因）发布 `STAGE_RETRIED`，折叠进时间线、SSE 推送、回放视图按阶段展示每次尝试（v2.1）。
 - **语音回放定位**：时间线事件带 runId / stage / agent / waveIndex / 工具调用明细，回放与实时 SSE 共用同一折叠器，可精确对位到每次模型与工具调用。
 
 ## 3. REST API 一览
@@ -85,6 +94,10 @@
 | GET | `/api/v1/control/mcp/status` | MCP 实时连接状态（含工具清单） |
 | POST | `/api/v1/control/mcp/servers/{name}/reconnect` | 手动重连（绕过冷却） |
 | GET | `/api/v1/control/state` · `/models` | 控制平面全量状态 / 可选模型 |
+| GET/POST | `/api/v1/scenarios` | 场景列表 / 创建（创建即校验引用与模板合法性） |
+| GET/PUT/DELETE | `/api/v1/scenarios/{id}` | 场景读 / 更新 / 删除（version 单调递增） |
+| POST | `/api/v1/scenarios/{id}/dry-run` | 零 token 推演：校验 + 波次展开 + DAG 边 + 槽位流 |
+| POST | `/api/v1/scenarios/{id}/activate` | 激活：覆盖热应用到控制平面（返回脱敏后状态） |
 | — | `/actuator/health` · `/info` · `/metrics` · `/prometheus` | 健康检查（含 orchestrator 组件）、活工作流配置、指标 |
 
 ## 4. Docker 服务
@@ -102,7 +115,7 @@
 | grafana | `grafana/grafana:11.5.2` | 3000 | 可视化：匿名 Admin 登录，预置 Tempo/Prometheus 数据源与 `agent-observability` 仪表盘 |
 
 - **卷**：`postgres-data` → 控制平面表存储、`orchestrator-config` → `/app/config`（JSON 状态：迁移源/回退后端）、`tempo-data` → Tempo 存储。
-- **环境变量契约**：`SPRING_AI_OLLAMA_BASE_URL`（模型后端）、`OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://tempo:4317`，gRPC 传输——HTTP 传输对 Tempo receiver 会 404）、`ORCHESTRATOR_CONTROL_STORE`（`db`：PostgreSQL / `file`：JSON，默认 db 经 compose 注入）、`SPRING_DATASOURCE_URL|USERNAME|PASSWORD`（db 模式连接）、`ORCHESTRATOR_CRYPTO_KEY`（可选，开启 MCP secret 的 AES-GCM 字段加密）、`ORCHESTRATOR_CONTROL_CONFIG_FILE`（file 模式路径，默认 `/app/config/control-plane.json`）。
+- **环境变量契约**：`SPRING_AI_OLLAMA_BASE_URL`（模型后端）、`OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://tempo:4317`，gRPC 传输——HTTP 传输对 Tempo receiver 会 404）、`ORCHESTRATOR_CONTROL_STORE`（`db`：PostgreSQL / `file`：JSON，默认 db 经 compose 注入）、`SPRING_DATASOURCE_URL|USERNAME|PASSWORD`（db 模式连接）、`ORCHESTRATOR_CRYPTO_KEY`（可选，开启 MCP secret 的 AES-GCM 字段加密）、`ORCHESTRATOR_CONTROL_CONFIG_FILE`（file 模式路径，默认 `/app/config/control-plane.json`）、`ORCHESTRATOR_SPRING_EXCLUDE`（compose 置空以恢复 DataSource 自动配置——本地 file 模式默认排除它，避免无 JDBC url 启动失败）。
 - **前置条件**：宿主机 Ollama 已就绪并拉取模型（默认 `qwen3-vl:4b` / 各 agent 覆盖为 `qwen:7b`，可用 `ollama pull` 调整）。
 
 ```bash
@@ -122,7 +135,7 @@ docker compose -f docker/docker-compose.yml up --build
 
 ```bash
 ./mvnw spring-boot:run        # 需要 localhost:11434 有 Ollama；控制台 http://localhost:8080
-./mvnw test                   # 123 个用例（无需真实模型，ChatClient 打桩；DB 用例跑 H2）
+./mvnw test                   # 140 个用例（无需真实模型，ChatClient 打桩；DB 用例跑 H2）
 ./mvnw clean package          # 产出 fat jar
 ```
 
@@ -137,11 +150,11 @@ GitHub Actions / GitLab CI：
 
 | 阶段 | 命令 / 机制 | 说明 |
 | --- | --- | --- |
-| 1. 编译 + 测试 | `./mvnw clean test` | 123 用例，ChatClient 打桩 + H2 内存库，无外部依赖，天然适合 CI |
+| 1. 编译 + 测试 | `./mvnw clean test` | 140 用例，ChatClient 打桩 + H2 内存库，无外部依赖，天然适合 CI |
 | 2. 打包 | `./mvnw clean package` | Spring Boot fat jar |
 | 3. 镜像构建 | `docker build .` | 多阶段构建 + 层缓存（pom 先行）+ `/root/.m2` cache mount；无外部 syntax 前端，CI 无需额外拉取 |
 | 4. 部署 | `docker compose -f docker/docker-compose.yml up -d` | app + PostgreSQL + Tempo + Prometheus + Grafana 一键编排，数据卷持久化 |
-| 5. 冒烟验证 | `/actuator/health`、`GET /api/trips/runs`、`GET /api/v1/control/mcp/status` | 健康与控制平面状态即冒烟断言点（db 模式下 `postgres` 容器的 `pg_isready` 先行） |
+| 5. 冒烟验证 | `/actuator/health`、`GET /api/trips/runs`、`GET /api/v1/control/mcp/status`、`POST /api/v1/scenarios/kyoto-classic/dry-run` | 健康、控制平面状态与场景推演即冒烟断言点（db 模式下 `postgres` 容器的 `pg_isready` 先行） |
 
 工程约定：
 

@@ -4,150 +4,210 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Orchestrator Demo — 多 Agent 旅行规划控制台</title>
-<link rel="stylesheet" href="app.css?v=7">
+<link rel="stylesheet" href="app.css?v=8">
 </head>
 <body>
-<header>
-  <div class="brand">
-    <h1>Orchestrator Demo</h1>
-    <span class="subtitle">多 Agent 旅行规划 · 编排者 + 黑板模式</span>
-  </div>
-  <div class="header-right">
-    <span id="health-dot" class="dot dot-unknown" title="应用健康状态"></span>
-    <nav class="links">
-      <a href="http://localhost:3000" target="_blank">Grafana</a>
-      <a href="http://localhost:3200" target="_blank">Tempo</a>
-      <a href="http://localhost:9090" target="_blank">Prometheus</a>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="side-brand">
+      <h1>Orchestrator Demo</h1>
+      <span class="subtitle">多 Agent 编排控制台</span>
+    </div>
+    <nav class="side-nav">
+      <div class="nav-group">场景</div>
+      <button class="nav-item active" data-page="run">场景运行</button>
+      <button class="nav-item" data-page="dryrun">场景推演</button>
+      <button class="nav-item" data-page="scenarios">场景配置</button>
+      <div class="nav-group">元数据</div>
+      <button class="nav-item" data-page="agents">Agent 配置</button>
+      <button class="nav-item" data-page="workflow">工作流编排</button>
+      <button class="nav-item" data-page="mcp">MCP 服务器</button>
+      <div class="nav-group">可观测</div>
+      <button class="nav-item" data-page="runs">运行回放</button>
+      <button class="nav-item" data-page="metrics">系统观测</button>
     </nav>
-  </div>
-</header>
+    <div class="side-footer">
+      <span id="health-dot" class="dot dot-unknown" title="应用健康状态"></span>
+      <nav class="links">
+        <a href="http://localhost:3000" target="_blank">Grafana</a>
+        <a href="http://localhost:3200" target="_blank">Tempo</a>
+        <a href="http://localhost:9090" target="_blank">Prometheus</a>
+      </nav>
+    </div>
+  </aside>
 
-<nav class="tabs">
-  <button class="tab active" data-tab="plan">规划工作台</button>
-  <button class="tab" data-tab="runs">运行回放</button>
-  <button class="tab" data-tab="obs">系统观测</button>
-  <button class="tab" data-tab="control">控制平面</button>
-</nav>
+  <div class="content">
+  <main>
+    <!-- ============ 页面: 场景运行 ============ -->
+    <section id="page-run" class="page-panel active">
+      <div class="card" id="scenario-bar">
+        <h2>场景选择
+          <span id="active-scenario-badge" class="badge">控制平面默认</span></h2>
+        <p class="hint">选择一个场景并「激活」：其工作流 / Agent / MCP 覆盖将热应用到控制平面，下一次运行即按该场景的逻辑组执行。</p>
+        <div class="scenario-bar-row">
+          <select id="run-scenario-select"></select>
+          <button id="activate-btn" class="accent-btn" type="button">激活场景</button>
+        </div>
+        <span id="activate-msg" class="hint"></span>
+      </div>
 
-<main>
-  <!-- ============ Tab 1: 规划工作台 ============ -->
-  <section id="tab-plan" class="tab-panel active">
-    <div class="grid-2">
+      <div class="grid-2">
+        <div class="card">
+          <h2>用户请求</h2>
+          <p class="hint">整个工作流的入口：目的地、天数、预算与偏好将被写入黑板（OrchestratorContext），
+              由当前激活的工作流模板驱动各 Agent 消费与贡献。</p>
+          <form id="plan-form">
+            <label>目的地<input id="f-destination" type="text" value="Kyoto" required></label>
+            <div class="row">
+              <label>天数<input id="f-days" type="number" min="1" max="7" value="3" required></label>
+              <label>预算 (CNY)<input id="f-budget" type="number" min="1" step="0.01" value="15000" required></label>
+            </div>
+            <label>偏好（自由文本，可留空）<input id="f-preferences" type="text" value="temples and local food"></label>
+            <button id="submit-btn" type="submit">开始规划</button>
+          </form>
+        </div>
+        <div class="card" id="echo-card" hidden>
+          <h2>本次请求</h2>
+          <div id="echo-body" class="request-echo"></div>
+        </div>
+      </div>
+
+      <div class="card" id="progress-card" hidden>
+        <h2>执行进度 <span id="progress-status" class="badge">RUNNING</span>
+          <span id="progress-elapsed" class="elapsed"></span></h2>
+        <div id="progress-stages" class="stages"></div>
+      </div>
+
+      <div class="card" id="live-card" hidden>
+        <h2>实时黑板 <span id="sse-status" class="badge">SSE 连接中…</span>
+          <span id="live-status" class="badge"></span></h2>
+        <p class="hint">由 <code>GET /api/v1/events/stream</code>（SSE）实时推送：每个阶段完成即展示其输入/输出黑板快照，并滚动更新完整 Context。</p>
+        <div id="live-stages" class="stages"></div>
+        <h3>当前完整 Context</h3>
+        <pre id="live-context" class="json">等待运行启动…</pre>
+      </div>
+
+      <div class="card" id="error-card" hidden>
+        <h2><span id="error-badge" class="badge badge-failed">ERROR</span> 调用失败</h2>
+        <p id="error-message" class="error-message"></p>
+        <p class="hint">异常已由后端结构化映射（400/404/502/503/500）并全程日志可见，不会静默吞掉。</p>
+      </div>
+
+      <div id="results"></div>
+    </section>
+
+    <!-- ============ 页面: 场景推演 ============ -->
+    <section id="page-dryrun" class="page-panel">
       <div class="card">
-        <h2>用户请求</h2>
-        <p class="hint">整个工作流的入口：目的地、天数、预算与偏好将被写入黑板（OrchestratorContext），
-            由 research → budget → itinerary → review 四个 Agent 依次消费与贡献。</p>
-        <form id="plan-form">
-          <label>目的地<input id="f-destination" type="text" value="Kyoto" required></label>
-          <div class="row">
-            <label>天数<input id="f-days" type="number" min="1" max="7" value="3" required></label>
-            <label>预算 (CNY)<input id="f-budget" type="number" min="1" step="0.01" value="15000" required></label>
-          </div>
-          <label>偏好（自由文本，可留空）<input id="f-preferences" type="text" value="temples and local food"></label>
-          <button id="submit-btn" type="submit">开始规划</button>
-        </form>
+        <h2>场景推演（Dry Run）</h2>
+        <p class="hint">不调用任何真实模型：后端按控制平面实时状态做模板校验、槽位闭环检查与依赖波次展开，
+            输出 DAG 边、黑板槽位流与每个阶段的有效配置。推演通过再运行，不浪费一次 token。</p>
+        <div class="scenario-bar-row">
+          <select id="dryrun-scenario-select"></select>
+          <button id="dryrun-btn" class="accent-btn" type="button">开始推演</button>
+        </div>
       </div>
-      <div class="card" id="echo-card" hidden>
-        <h2>本次请求</h2>
-        <div id="echo-body" class="request-echo"></div>
+      <div id="dryrun-report"></div>
+    </section>
+
+    <!-- ============ 页面: 场景配置 ============ -->
+    <section id="page-scenarios" class="page-panel">
+      <div class="card">
+        <h2>场景列表
+          <button id="scn-refresh" class="mini-btn" type="button">刷新</button></h2>
+        <p class="hint">场景 = 一套可持久化的编排逻辑组：请求模板 + 工作流覆盖 + Agent 覆盖 + MCP 映射 + 产物类型。
+            空字段继承控制平面当前值；保存于 <code>cp_scenario</code> 表（db 模式）或 <code>config/scenarios.json</code>。</p>
+        <table class="data-table" id="scn-table">
+          <thead><tr>
+            <th>ID</th><th>名称</th><th>产物</th><th>工作流覆盖</th><th>Agent 覆盖</th><th>MCP</th><th>启用</th><th></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+        <button id="scn-new" class="wf-add" type="button">+ 新建场景</button>
       </div>
-    </div>
+      <div class="card" id="scn-editor-card" hidden>
+        <h2 id="scn-editor-title">编辑场景</h2>
+        <div id="scn-editor"></div>
+      </div>
+    </section>
 
-    <div class="card" id="progress-card" hidden>
-      <h2>执行进度 <span id="progress-status" class="badge">RUNNING</span>
-        <span id="progress-elapsed" class="elapsed"></span></h2>
-      <div id="progress-stages" class="stages"></div>
-    </div>
+    <!-- ============ 页面: Agent 配置（元数据） ============ -->
+    <section id="page-agents" class="page-panel">
+      <div class="card">
+        <h2>控制平面状态
+          <span id="cp-version" class="badge badge-ok">version —</span>
+          <button id="cp-refresh" class="mini-btn" type="button">刷新</button></h2>
+        <p class="hint">Agent 的 system prompt / 模型 / 温度 / 校准规则均可在运行时编辑并<b>立即热生效</b>（逐次调用读取）。</p>
+      </div>
+      <div id="agent-configs" class="grid-2"></div>
+    </section>
 
-    <div class="card" id="live-card" hidden>
-      <h2>实时黑板 <span id="sse-status" class="badge">SSE 连接中…</span>
-        <span id="live-status" class="badge"></span></h2>
-      <p class="hint">由 <code>GET /api/v1/events/stream</code>（SSE）实时推送：每个阶段完成即展示其输入/输出黑板快照，并滚动更新完整 Context。</p>
-      <div id="live-stages" class="stages"></div>
-      <h3>当前完整 Context</h3>
-      <pre id="live-context" class="json">等待运行启动…</pre>
-    </div>
+    <!-- ============ 页面: 工作流编排（元数据） ============ -->
+    <section id="page-workflow" class="page-panel">
+      <div class="card">
+        <h2>工作流编排（模板热切换）</h2>
+        <p class="hint">阶段按声明顺序执行/校验（依赖必须位于其前）；同一依赖波次内的阶段在 CONCURRENT 模式下并行执行并合并结果。
+            保存时后端按各 Agent 的<b>槽位契约</b>校验逻辑闭环：输入槽位必须由前置阶段/更早波次产出，或被该 Agent 声明为 pending-safe（卡片中 ⟂ 标注），否则返回 400。</p>
+        <div id="workflow-editor"></div>
+      </div>
+    </section>
 
-    <div class="card" id="error-card" hidden>
-      <h2><span id="error-badge" class="badge badge-failed">ERROR</span> 调用失败</h2>
-      <p id="error-message" class="error-message"></p>
-      <p class="hint">异常已由后端结构化映射（400/404/502/503/500）并全程日志可见，不会静默吞掉。</p>
-    </div>
+    <!-- ============ 页面: MCP 服务器（元数据） ============ -->
+    <section id="page-mcp" class="page-panel">
+      <div class="card">
+        <h2>MCP 服务器</h2>
+        <p class="hint">连接由后端注册表动态维护：Streamable HTTP 为默认传输（SSE 已弃用、STDIO 启动本地子进程并继承当前环境变量），保存后自动按配置差异重建连接；映射到 Agent 的服务器，其工具会注入该 Agent 的每次模型调用，调用详情（服务器/工具/耗时/结果）可在「运行回放」详情中查看。状态 15s 自动重试，失败可手动重连。</p>
+        <div id="mcp-panel"></div>
+      </div>
+    </section>
 
-    <div id="results"></div>
-  </section>
+    <!-- ============ 页面: 运行回放（可观测） ============ -->
+    <section id="page-runs" class="page-panel">
+      <div class="card">
+        <h2>运行列表 <button id="runs-refresh" class="mini-btn" type="button">刷新</button></h2>
+        <p class="hint">ObservabilityActor 折叠的每次运行时间线（保留上限见系统观测）。
+            点击行查看完整回放：时间线 / DAG 依赖图 / 泳道图三种视图，含解析重试链与工具调用明细。</p>
+        <table class="data-table" id="runs-table">
+          <thead><tr>
+            <th>开始时间</th><th>模板</th><th>模式</th><th>状态</th><th>耗时</th><th>阶段</th><th>失败</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="run-detail"></div>
+    </section>
 
-  <!-- ============ Tab 2: 运行回放 ============ -->
-  <section id="tab-runs" class="tab-panel">
-    <div class="card">
-      <h2>运行列表 <button id="runs-refresh" class="mini-btn" type="button">刷新</button></h2>
-      <p class="hint">ObservabilityActor 折叠的每次运行时间线（保留上限见系统观测）。
-          点击行查看完整回放：依赖波次、每阶段黑板快照与最终上下文。</p>
-      <table class="data-table" id="runs-table">
-        <thead><tr>
-          <th>开始时间</th><th>模板</th><th>模式</th><th>状态</th><th>耗时</th><th>阶段</th><th>失败</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <div id="run-detail"></div>
-  </section>
+    <!-- ============ 页面: 系统观测（可观测） ============ -->
+    <section id="page-metrics" class="page-panel">
+      <div class="card">
+        <h2>过程指标 <button id="obs-refresh" class="mini-btn" type="button">刷新</button>
+          <label class="auto-refresh"><input id="obs-auto" type="checkbox"> 自动刷新 (10s)</label></h2>
+        <div class="metric-grid" id="metric-cards"></div>
+        <h3>Agent 维度（stage 计数 + agent.execution.duration）</h3>
+        <table class="data-table" id="agent-table">
+          <thead><tr>
+            <th>Agent</th><th>阶段成功</th><th>阶段失败</th><th>执行次数</th><th>总耗时 (s)</th><th>最大耗时 (s)</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="grid-2">
+        <div class="card"><h2>健康检查 (/actuator/health)</h2><div id="health-panel" class="mono-panel">加载中…</div></div>
+        <div class="card"><h2>工作流配置 (/actuator/info)</h2><div id="info-panel" class="mono-panel">加载中…</div></div>
+      </div>
+      <div class="card">
+        <h2>追踪与指标后端</h2>
+        <p class="hint">每次运行产生 <code>orchestrator.planTrip</code> 父 span 与每阶段一个
+            <code>agent.execute</code> 子 span（OTLP/gRPC :4317 → Tempo）；指标经
+            <code>/actuator/prometheus</code> → Prometheus。点击侧栏底部链接查看瀑布图与仪表盘。</p>
+      </div>
+    </section>
+  </main>
 
-  <!-- ============ Tab 3: 系统观测 ============ -->
-  <section id="tab-obs" class="tab-panel">
-    <div class="card">
-      <h2>过程指标 <button id="obs-refresh" class="mini-btn" type="button">刷新</button>
-        <label class="auto-refresh"><input id="obs-auto" type="checkbox"> 自动刷新 (10s)</label></h2>
-      <div class="metric-grid" id="metric-cards"></div>
-      <h3>Agent 维度（stage 计数 + agent.execution.duration）</h3>
-      <table class="data-table" id="agent-table">
-        <thead><tr>
-          <th>Agent</th><th>阶段成功</th><th>阶段失败</th><th>执行次数</th><th>总耗时 (s)</th><th>最大耗时 (s)</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <div class="grid-2">
-      <div class="card"><h2>健康检查 (/actuator/health)</h2><div id="health-panel" class="mono-panel">加载中…</div></div>
-      <div class="card"><h2>工作流配置 (/actuator/info)</h2><div id="info-panel" class="mono-panel">加载中…</div></div>
-    </div>
-    <div class="card">
-      <h2>追踪与指标后端</h2>
-      <p class="hint">每次运行产生 <code>orchestrator.planTrip</code> 父 span 与每阶段一个
-          <code>agent.execute</code> 子 span（OTLP/gRPC :4317 → Tempo）；指标经
-          <code>/actuator/prometheus</code> → Prometheus。点击页头链接查看瀑布图与仪表盘。</p>
-    </div>
-  </section>
+  <footer>Spring Boot 4 · Spring AI 2.0 · Micrometer/OTel — 前端为应用内静态资源（static/），与 REST API 同源直连。</footer>
+  </div>
+</div>
 
-  <!-- ============ Tab 4: 控制平面 ============ -->
-  <section id="tab-control" class="tab-panel">
-    <div class="card">
-      <h2>控制平面状态
-        <span id="cp-version" class="badge badge-ok">version —</span>
-        <button id="cp-refresh" class="mini-btn" type="button">刷新</button></h2>
-      <p class="hint">Agent 的 system prompt / 模型 / 温度 / 校准规则、工作流模板与 MCP 服务器均可在运行时编辑并<b>立即热生效</b>
-          （agent 配置逐次调用读取，工作流模板作用于下一次请求）。全部状态持久化于 <code>config/control-plane.json</code>，重启后自动恢复。</p>
-    </div>
-
-    <div id="agent-configs" class="grid-2"></div>
-
-    <div class="card">
-      <h2>工作流编排（模板热切换）</h2>
-      <p class="hint">阶段按声明顺序执行/校验（依赖必须位于其前）；同一依赖波次内的阶段在 CONCURRENT 模式下并行执行并合并结果。
-          保存时后端按各 Agent 的<b>槽位契约</b>校验逻辑闭环：输入槽位必须由前置阶段/更早波次产出，或被该 Agent 声明为 pending-safe（卡片中 ⟂ 标注），否则返回 400。</p>
-      <div id="workflow-editor"></div>
-    </div>
-
-    <div class="card">
-      <h2>MCP 服务器</h2>
-      <p class="hint">连接由后端注册表动态维护：Streamable HTTP 为默认传输（SSE 已弃用、STDIO 启动本地子进程并继承当前环境变量），保存后自动按配置差异重建连接；映射到 Agent 的服务器，其工具会注入该 Agent 的每次模型调用，调用详情（服务器/工具/耗时/结果）可在「运行记录」详情中查看。状态 15s 自动重试，失败可手动重连。</p>
-      <div id="mcp-panel"></div>
-    </div>
-  </section>
-</main>
-
-<footer>Spring Boot 4 · Spring AI 2.0 · Micrometer/OTel — 前端为应用内静态资源（static/），与 REST API 同源直连。</footer>
-
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

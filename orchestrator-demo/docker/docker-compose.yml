@@ -26,6 +26,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/orchestrator
       - SPRING_DATASOURCE_USERNAME=orchestrator
       - SPRING_DATASOURCE_PASSWORD=orchestrator
+      # store=db needs the DataSource auto-configuration: clear the default
+      # exclusion (empty value) that local file-store boots rely on.
+      - ORCHESTRATOR_SPRING_EXCLUDE=
       # - ORCHESTRATOR_CRYPTO_KEY=change-me   # enable field-level secret encryption
     extra_hosts:
       - "host.docker.internal:host-gateway"
