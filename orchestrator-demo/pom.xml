@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.oli</groupId>
-	<artifactId>orchestrator-demo</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>orchestrator-demo</name>
-	<description/>
+	<artifactId>orchestrator</artifactId>
+	<version>2.1.0</version>
+	<name>orchestrator</name>
+	<description>Multi-agent trip-planning orchestrator with a hot-reloadable control plane, scenario plane and observability stack</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -43,6 +43,15 @@
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-openai</artifactId>
 		</dependency>
+		<!-- MCP (Model Context Protocol) client support: tool callbacks over
+		     STDIO / SSE (deprecated) / Streamable HTTP transports. Version comes
+		     from the spring-ai-bom; deliberately no starter, because connections
+		     are created dynamically from the control plane and their lifecycle is
+		     self-managed by McpConnectionRegistry (no static auto-configuration). -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-mcp</artifactId>
+		</dependency>
 		<!-- AOP: @Aspect support (AopAutoConfiguration activates on AspectJ presence;
 		     Spring Boot 4 no longer ships spring-boot-starter-aop). -->
 		<dependency>
@@ -67,9 +76,31 @@
 			<artifactId>spring-boot-starter-opentelemetry</artifactId>
 		</dependency>
 
+		<!-- Control-plane persistence (v2.0): JDBC backend — PostgreSQL in
+		     production, H2 in tests — plus a Caffeine read cache with
+		     version-stamp invalidation in front of the DB store. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-jdbc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -90,6 +121,14 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<executions>
+					<!-- Expose the project version through /actuator/info -->
+					<execution>
+						<goals>
+							<goal>build-info</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

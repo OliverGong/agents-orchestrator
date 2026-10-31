@@ -46,8 +46,16 @@ public class ObservabilityActor {
   private final Map<String, RunTimeline> timelines = new ConcurrentHashMap<>();
   /** Actor-thread-only insertion order used to evict the oldest runs. */
   private final ArrayDeque<String> insertionOrder = new ArrayDeque<>();
+  private final ObservabilitySsePublisher ssePublisher;
   private final Thread actorThread = Thread.ofVirtual().name("observability-actor").start(this::consume);
   private volatile boolean accepting = true;
+
+  public ObservabilityActor(ObservabilitySsePublisher ssePublisher) {
+    this.ssePublisher = ssePublisher;
+    // Retry events are published from inside agent calls (no bean access);
+    // the static bus routes them into the same mailbox as direct producers.
+    ObservabilityEventBus.subscribe(this::tell);
+  }
 
   /** Fire-and-forget mailbox send: never blocks the producer. */
   public void tell(AgentObservabilityEvent event) {
@@ -102,6 +110,9 @@ public class ObservabilityActor {
         timelines.remove(insertionOrder.pollFirst());
       }
     }
+    // Forwarded from the actor thread, so SSE clients observe the same
+    // per-run event order the timeline was folded with.
+    ssePublisher.publish(event);
   }
 
   private RunTimeline fold(String runId, RunTimeline timeline, AgentObservabilityEvent event) {
@@ -111,7 +122,7 @@ public class ObservabilityActor {
     }
     return switch (event.type()) {
       case RUN_STARTED -> timeline; // duplicate start: keep the first
-      case STAGE_COMPLETED, STAGE_FAILED -> timeline.withEvent(event);
+      case TOOL_CALLED, STAGE_COMPLETED, STAGE_FAILED, STAGE_RETRIED -> timeline.withEvent(event);
       case RUN_COMPLETED -> timeline.withEvent(event).completed(event.timestamp(), event.outputContextJson());
       case RUN_FAILED -> timeline.withEvent(event).failed(event.timestamp());
     };

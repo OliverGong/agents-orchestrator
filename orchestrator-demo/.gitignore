@@ -34,3 +34,6 @@ build/
 
 ### macOS ###
 .DS_Store
+
+### Runtime state (control plane persists here) ###
+config/

@@ -18,9 +18,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
+import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.model.ResearchResponse;
 import com.oli.orchestrator_demo.model.TripRequest;
+import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.ObservabilityEventBus;
+import com.oli.orchestrator_demo.observability.RunContext;
 import tools.jackson.core.exc.StreamReadException;
 
 class AbstractContextAgentTest {
@@ -34,8 +38,14 @@ class AbstractContextAgentTest {
     final int failuresBeforeSuccess;
 
     FlakyResearchAgent(int failuresBeforeSuccess) {
-      super("Flaky-Research-Agent", null);
+      super("Flaky-Research-Agent", null, null);
       this.failuresBeforeSuccess = failuresBeforeSuccess;
+    }
+
+    @Override
+    public AgentDescriptor descriptor() {
+      return new AgentDescriptor(name(), "Flaky Research", "",
+          List.of("researchResponse"), List.of(), List.of(), null, null);
     }
 
     @Override
@@ -83,5 +93,38 @@ class AbstractContextAgentTest {
     agent.execute(start);
 
     assertThat(agent.attempts.get()).isEqualTo(1);
+  }
+
+  @Test
+  void publishesARetryEventAttributedToTheRunningStage() {
+    List<AgentObservabilityEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+    ObservabilityEventBus.subscribe(events::add);
+    RunContext.set(new RunContext.Attribution("run-1", "research", "research", 0));
+    try {
+      FlakyResearchAgent agent = new FlakyResearchAgent(1);
+      agent.execute(OrchestratorContext.start(request));
+
+      assertThat(events).hasSize(1);
+      AgentObservabilityEvent event = events.get(0);
+      assertThat(event.type()).isEqualTo(AgentObservabilityEvent.Type.STAGE_RETRIED);
+      assertThat(event.runId()).isEqualTo("run-1");
+      assertThat(event.stageName()).isEqualTo("research");
+      assertThat(event.agentName()).isEqualTo("research");
+      assertThat(event.attempt()).isEqualTo(1);
+      assertThat(event.errorMessage()).contains("attempt 1");
+    }
+    finally {
+      RunContext.clear();
+    }
+  }
+
+  @Test
+  void dropsTheRetryEventOutsideAWorkflowRun() {
+    List<AgentObservabilityEvent> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+    ObservabilityEventBus.subscribe(events::add);
+
+    new FlakyResearchAgent(1).execute(OrchestratorContext.start(request));
+
+    assertThat(events).isEmpty();
   }
 }

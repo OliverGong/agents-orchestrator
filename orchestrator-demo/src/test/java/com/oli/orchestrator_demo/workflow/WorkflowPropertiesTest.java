@@ -60,4 +60,40 @@ class WorkflowPropertiesTest {
     assertThat(budget.agent()).isEqualTo("research"); // explicit override
     assertThat(budget.dependsOn()).containsExactly("research");
   }
+
+  @Test
+  void parallelBuiltInTemplateIsSelectableWithoutCustomStages() {
+    WorkflowTemplate template = bind(Map.of(
+        "orchestrator.workflow.template", "parallel",
+        "orchestrator.workflow.mode", "concurrent")).toTemplate();
+
+    assertThat(template.name()).isEqualTo("parallel-trip-planning");
+    assertThat(template.mode()).isEqualTo(ExecutionMode.CONCURRENT);
+    assertThat(template.stages()).extracting(StageSpec::name)
+        .containsExactly("research", "budget", "itinerary", "review");
+    // budget || itinerary depend only on the research...
+    assertThat(template.stages().get(1).dependsOn()).containsExactly("research");
+    assertThat(template.stages().get(2).dependsOn()).containsExactly("research");
+    // ...and the review reconciles everything.
+    assertThat(template.stages().get(3).dependsOn()).containsExactly("research", "budget", "itinerary");
+  }
+
+  @Test
+  void customStagesTakePrecedenceOverTheBuiltInTemplateSwitch() {
+    WorkflowTemplate template = bind(Map.of(
+        "orchestrator.workflow.template", "parallel",
+        "orchestrator.workflow.stages[0].name", "research")).toTemplate();
+
+    assertThat(template.name()).isEqualTo("configured");
+    assertThat(template.stages()).extracting(StageSpec::name).containsExactly("research");
+  }
+
+  @Test
+  void unknownBuiltInTemplateFailsFast() {
+    WorkflowProperties properties = bind(Map.of("orchestrator.workflow.template", "dunno"));
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(properties::toTemplate)
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("dunno");
+  }
 }

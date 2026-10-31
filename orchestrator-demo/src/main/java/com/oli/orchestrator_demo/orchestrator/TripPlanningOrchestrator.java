@@ -48,9 +48,9 @@ import com.oli.orchestrator_demo.model.TripRequest;
 import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.observability.OrchestratorMetrics;
+import com.oli.orchestrator_demo.observability.RunContext;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.workflow.StageSpec;
-import com.oli.orchestrator_demo.workflow.WorkflowProperties;
 import com.oli.orchestrator_demo.workflow.WorkflowTemplate;
 
 import io.micrometer.context.ContextSnapshot;
@@ -65,7 +65,7 @@ public class TripPlanningOrchestrator {
 
   private static final int MAX_CONTEXT_JSON_LENGTH = 20_000;
 
-  private final WorkflowTemplate template;
+  private final WorkflowTemplateHolder templateHolder;
   private final Map<String, Agent<OrchestratorContext, OrchestratorContext>> agents;
   private final ObservabilityActor observability;
   private final ObservationRegistry observationRegistry;
@@ -73,7 +73,7 @@ public class TripPlanningOrchestrator {
   private final OrchestratorMetrics orchestratorMetrics;
 
   public TripPlanningOrchestrator(List<Agent<OrchestratorContext, OrchestratorContext>> agents,
-      WorkflowProperties workflowProperties, ObservabilityActor observability,
+      WorkflowTemplateHolder templateHolder, ObservabilityActor observability,
       ObservationRegistry observationRegistry, ObjectMapper objectMapper,
       OrchestratorMetrics orchestratorMetrics) {
     // Insertion-ordered so template()/agentNames() report agents in declaration order.
@@ -84,21 +84,22 @@ public class TripPlanningOrchestrator {
       }
     }
     this.agents = Collections.unmodifiableMap(resolved);
-    this.template = workflowProperties.toTemplate();
-    this.template.validate(this.agents.keySet());
+    this.templateHolder = templateHolder;
+    // Fail fast at startup if the initial template does not match the agents.
+    this.templateHolder.get().validate(this.agents.keySet());
     this.observability = observability;
     this.observationRegistry = observationRegistry;
     this.objectMapper = objectMapper;
     this.orchestratorMetrics = orchestratorMetrics;
-    log.info("Workflow template '{}' ({}): {}", template.name(), template.mode(),
-        template.stages().stream()
+    log.info("Workflow template '{}' ({}): {}", template().name(), template().mode(),
+        template().stages().stream()
             .map(stage -> stage.name() + stage.dependsOn())
             .toList());
   }
 
-  /** The collaboration template this orchestrator executes (for Actuator health/info). */
+  /** The currently active collaboration template (hot-swappable via the control plane). */
   public WorkflowTemplate template() {
-    return template;
+    return templateHolder.get();
   }
 
   /** Names of the registered agents, in declaration order (for Actuator health/info). */
@@ -115,6 +116,9 @@ public class TripPlanningOrchestrator {
    */
   public OrchestratorContext planTrip(TripRequest request) {
     String runId = UUID.randomUUID().toString();
+    // Read once per run: a control-plane template swap takes effect on the
+    // next request without disturbing the ones already executing.
+    WorkflowTemplate template = templateHolder.get();
     log.info("Planning trip for request: {} (run {})", request, runId);
 
     long workflowStartTime = System.currentTimeMillis();
@@ -133,7 +137,8 @@ public class TripPlanningOrchestrator {
       try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
         List<List<StageSpec>> waves = template.waves();
         for (int waveIndex = 0; waveIndex < waves.size(); waveIndex++) {
-          context = executeWave(runId, context, waves.get(waveIndex), waveIndex, propagation, executor);
+          context = executeWave(runId, template.mode(), context, waves.get(waveIndex), waveIndex, propagation,
+              executor);
         }
       }
       OrchestratorContext finalContext = context.end();
@@ -156,14 +161,14 @@ public class TripPlanningOrchestrator {
     }
   }
 
-  private OrchestratorContext executeWave(String runId, OrchestratorContext context, List<StageSpec> wave,
-      int waveIndex, ContextSnapshot propagation, ExecutorService executor) {
-    if (template.mode() == ExecutionMode.CONCURRENT && wave.size() > 1) {
-      return executeWaveConcurrently(runId, context, wave, waveIndex, propagation, executor);
+  private OrchestratorContext executeWave(String runId, ExecutionMode mode, OrchestratorContext context,
+      List<StageSpec> wave, int waveIndex, ContextSnapshot propagation, ExecutorService executor) {
+    if (mode == ExecutionMode.CONCURRENT && wave.size() > 1) {
+      return executeWaveConcurrently(runId, mode, context, wave, waveIndex, propagation, executor);
     }
     OrchestratorContext current = context;
     for (StageSpec stage : wave) {
-      current = executeStage(runId, current, stage, waveIndex, parallelPeers(wave, stage));
+      current = executeStage(runId, mode, current, stage, waveIndex, parallelPeers(wave, stage));
     }
     return current;
   }
@@ -176,11 +181,11 @@ public class TripPlanningOrchestrator {
    * {@link ContextSnapshot} makes each task run under the run's observation,
    * so its agent spans stay children of the orchestrator span.
    */
-  private OrchestratorContext executeWaveConcurrently(String runId, OrchestratorContext snapshot,
+  private OrchestratorContext executeWaveConcurrently(String runId, ExecutionMode mode, OrchestratorContext snapshot,
       List<StageSpec> wave, int waveIndex, ContextSnapshot propagation, ExecutorService executor) {
     List<CompletableFuture<OrchestratorContext>> futures = wave.stream()
         .map(stage -> CompletableFuture.supplyAsync(
-            () -> executeStage(runId, snapshot, stage, waveIndex, parallelPeers(wave, stage)),
+            () -> executeStage(runId, mode, snapshot, stage, waveIndex, parallelPeers(wave, stage)),
             propagation.wrapExecutor(executor)))
         .toList();
     OrchestratorContext merged = snapshot;
@@ -200,26 +205,33 @@ public class TripPlanningOrchestrator {
     return merged;
   }
 
-  private OrchestratorContext executeStage(String runId, OrchestratorContext context, StageSpec stage,
-      int waveIndex, List<String> parallelPeers) {
+  private OrchestratorContext executeStage(String runId, ExecutionMode mode, OrchestratorContext context,
+      StageSpec stage, int waveIndex, List<String> parallelPeers) {
     Agent<OrchestratorContext, OrchestratorContext> agent = agents.get(stage.agent());
     log.info("Executing stage '{}' -> agent '{}'", stage.name(), agent.name());
     long startTime = System.currentTimeMillis();
     String threadName = Thread.currentThread().getName();
+    // Attribution for components inside the agent call (MCP tool callbacks):
+    // the thread-local is set/cleared around the stage, on whichever thread
+    // (request or virtual) happens to execute it.
+    RunContext.set(new RunContext.Attribution(runId, stage.name(), agent.name(), waveIndex));
     try {
       OrchestratorContext output = agent.execute(context);
       observability.tell(AgentObservabilityEvent.stageCompleted(runId, stage.name(), agent.name(), waveIndex,
-          parallelPeers, template.mode().name(), threadName, System.currentTimeMillis() - startTime,
+          parallelPeers, mode.name(), threadName, System.currentTimeMillis() - startTime,
           toJson(context), toJson(output)));
-      orchestratorMetrics.stageCompleted(agent.name(), template.mode().name());
+      orchestratorMetrics.stageCompleted(agent.name(), mode.name());
       return output;
     }
     catch (RuntimeException ex) {
       observability.tell(AgentObservabilityEvent.stageFailed(runId, stage.name(), agent.name(), waveIndex,
-          parallelPeers, template.mode().name(), threadName, System.currentTimeMillis() - startTime,
+          parallelPeers, mode.name(), threadName, System.currentTimeMillis() - startTime,
           describe(ex), toJson(context)));
-      orchestratorMetrics.stageFailed(agent.name(), template.mode().name());
+      orchestratorMetrics.stageFailed(agent.name(), mode.name());
       throw ex;
+    }
+    finally {
+      RunContext.clear();
     }
   }
 

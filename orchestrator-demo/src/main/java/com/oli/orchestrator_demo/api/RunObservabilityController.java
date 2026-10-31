@@ -67,14 +67,36 @@ public class RunObservabilityController {
   }
 
   private static RunDetails toDetails(RunTimeline timeline) {
+    // Tool-call and retry events are emitted during stage execution, i.e.
+    // before the stage's own STAGE_* event; attribute them by (wave, stage, agent).
+    Map<String, List<RunDetails.ToolCallView>> pendingToolCalls = new LinkedHashMap<>();
+    Map<String, List<RunDetails.RetryView>> pendingRetries = new LinkedHashMap<>();
     Map<Integer, List<RunDetails.StageView>> stagesByWave = new LinkedHashMap<>();
     for (AgentObservabilityEvent event : timeline.events()) {
-      if (event.type() == AgentObservabilityEvent.Type.STAGE_COMPLETED
-          || event.type() == AgentObservabilityEvent.Type.STAGE_FAILED) {
-        stagesByWave.computeIfAbsent(event.waveIndex(), wave -> new ArrayList<>())
-            .add(new RunDetails.StageView(event.stageName(), event.agentName(), event.type().name(),
-                event.threadName(), event.durationMs(), event.errorMessage(), event.inputContextJson(),
-                event.outputContextJson(), event.parallelPeers()));
+      switch (event.type()) {
+        case TOOL_CALLED -> {
+          String key = attributionKey(event);
+          pendingToolCalls.computeIfAbsent(key, ignored -> new ArrayList<>())
+              .add(new RunDetails.ToolCallView(event.toolCall().serverName(), event.toolCall().toolName(),
+                  event.toolCall().durationMs(), event.toolCall().outcome(), event.toolCall().resultSummary(),
+                  event.toolCall().errorMessage()));
+        }
+        case STAGE_RETRIED -> {
+          String key = attributionKey(event);
+          pendingRetries.computeIfAbsent(key, ignored -> new ArrayList<>())
+              .add(new RunDetails.RetryView(event.attempt(), event.errorMessage(), event.timestamp()));
+        }
+        case STAGE_COMPLETED, STAGE_FAILED -> {
+          String key = attributionKey(event);
+          List<RunDetails.ToolCallView> toolCalls =
+              pendingToolCalls.getOrDefault(key, List.of());
+          List<RunDetails.RetryView> retries = pendingRetries.getOrDefault(key, List.of());
+          stagesByWave.computeIfAbsent(event.waveIndex(), wave -> new ArrayList<>())
+              .add(new RunDetails.StageView(event.stageName(), event.agentName(), event.type().name(),
+                  event.threadName(), event.durationMs(), event.errorMessage(), event.inputContextJson(),
+                  event.outputContextJson(), event.parallelPeers(), toolCalls, retries, event.timestamp()));
+        }
+        default -> { /* run-level events carry no stage view */ }
       }
     }
     List<RunDetails.WaveView> waves = stagesByWave.entrySet().stream()
@@ -85,6 +107,10 @@ public class RunObservabilityController {
     return new RunDetails(timeline.runId(), timeline.templateName(), timeline.mode(),
         timeline.status().name(), timeline.startedAt(), timeline.completedAt(),
         timeline.finalContextJson(), waves);
+  }
+
+  private static String attributionKey(AgentObservabilityEvent event) {
+    return event.waveIndex() + "|" + event.stageName() + "|" + event.agentName();
   }
 
   /** Compact run entry of the list endpoint. */
@@ -100,10 +126,22 @@ public class RunObservabilityController {
     public record WaveView(int waveIndex, boolean parallel, List<StageView> stages) {
     }
 
-    /** One executed stage with its context snapshots. */
+    /** One executed stage with its context snapshots, the MCP tool calls it
+     *  triggered, its parse-retry chain and the completion timestamp (the
+     *  swimlane view derives the start from durationMs). */
     public record StageView(String stageName, String agentName, String outcome, String threadName,
         Long durationMs, String errorMessage, String inputContext, String outputContext,
-        List<String> parallelPeers) {
+        List<String> parallelPeers, List<ToolCallView> toolCalls, List<RetryView> retries,
+        Instant completedAt) {
+    }
+
+    /** One MCP tool invocation attributed to the surrounding stage. */
+    public record ToolCallView(String serverName, String toolName, long durationMs, String outcome,
+        String resultSummary, String errorMessage) {
+    }
+
+    /** One parse retry inside the stage's agent call (STAGE_RETRIED event). */
+    public record RetryView(Integer attempt, String errorMessage, Instant timestamp) {
     }
   }
 }

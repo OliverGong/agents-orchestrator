@@ -5,14 +5,19 @@
  *              attaches a {@link BudgetResponse} to the context.
  * @Author OliverGong
  * @Date Oct 29, 2026
- * @Version 1.0
+ * @Version 1.1
  */
 package com.oli.orchestrator_demo.agent;
 
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Qualifier;
+import java.util.List;
+
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
+import com.oli.orchestrator_demo.control.AgentDescriptor;
+import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.model.BudgetResponse;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.model.TripRequest;
@@ -20,15 +25,25 @@ import com.oli.orchestrator_demo.model.TripRequest;
 @Component
 public class BudgetAgent extends AbstractContextAgent<BudgetResponse> {
 
-  public BudgetAgent(@Qualifier("budgetChatClient") ChatClient chatClient) {
-    super("budget", chatClient);
+  public BudgetAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore, McpConnectionRegistry mcpRegistry) {
+    super("budget", chatModel, runtimeStore, mcpRegistry);
+  }
+
+  @Override
+  public AgentDescriptor descriptor() {
+    return new AgentDescriptor(name(), "Budget Estimation",
+        "Estimates realistic costs from the research findings and checks them against the user's budget.",
+        List.of("budgetResponse"), List.of("researchResponse"), List.of(), null, null);
   }
 
   @Override
   protected BudgetResponse respond(OrchestratorContext context) {
+    AgentRuntimeConfig runtime = runtime();
     TripRequest request = context.request();
     return chatClient
         .prompt()
+        .system(runtime.systemPrompt())
+        .options(chatOptions(runtime))
         .user(
           user -> user
             .text("""

@@ -5,14 +5,19 @@
  *              attaches a {@link ResearchResponse} to the context.
  * @Author OliverGong
  * @Date Oct 29, 2026
- * @Version 1.0
+ * @Version 1.1
  */
 package com.oli.orchestrator_demo.agent;
 
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Qualifier;
+import java.util.List;
+
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
+import com.oli.orchestrator_demo.control.AgentDescriptor;
+import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.model.ResearchResponse;
 import com.oli.orchestrator_demo.model.TripRequest;
@@ -20,15 +25,25 @@ import com.oli.orchestrator_demo.model.TripRequest;
 @Component
 public class ResearchAgent extends AbstractContextAgent<ResearchResponse> {
 
-  public ResearchAgent(@Qualifier("researchChatClient") ChatClient chatClient) {
-    super("research", chatClient);
+  public ResearchAgent(ChatModel chatModel, AgentRuntimeStore runtimeStore, McpConnectionRegistry mcpRegistry) {
+    super("research", chatModel, runtimeStore, mcpRegistry);
+  }
+
+  @Override
+  public AgentDescriptor descriptor() {
+    return new AgentDescriptor(name(), "Travel Research",
+        "Gathers attractions, food options and practical travel tips for the destination.",
+        List.of("researchResponse"), List.of(), List.of(), null, null);
   }
 
   @Override
   protected ResearchResponse respond(OrchestratorContext context) {
+    AgentRuntimeConfig runtime = runtime();
     TripRequest request = context.request();
     return chatClient
         .prompt()
+        .system(runtime.systemPrompt())
+        .options(chatOptions(runtime))
         .user(
           user -> user
             .text("""

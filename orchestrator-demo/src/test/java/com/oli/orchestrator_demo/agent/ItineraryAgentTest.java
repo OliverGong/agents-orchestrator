@@ -33,7 +33,7 @@ class ItineraryAgentTest {
           {"day":2,"morning":"Tsukiji market","afternoon":"Akihabara","evening":"Izakaya","estimatedCost":300.00}
         ]}
         """);
-    ItineraryAgent agent = new ItineraryAgent(stub.client());
+    ItineraryAgent agent = new ItineraryAgent(stub.model(), stub.store(), null);
 
     OrchestratorContext context = OrchestratorContext
         .start(new TripRequest("Tokyo", 5, new BigDecimal("15000"), "food and culture"))
@@ -56,5 +56,31 @@ class ItineraryAgentTest {
         .contains("Destination: Tokyo")
         .contains("Senso-ji")
         .contains("Book early");
+  }
+
+  @Test
+  void plansWithoutBudgetBreakdownWhenTheBudgetStageRunsInParallel() {
+    var stub = ChatClientStubs.modelReturning("""
+        {"dayPlans":[
+          {"day":1,"morning":"Senso-ji","afternoon":"Ueno Park","evening":"Ramen tasting","estimatedCost":250.00}
+        ]}
+        """);
+    ItineraryAgent agent = new ItineraryAgent(stub.model(), stub.store(), null);
+
+    // Parallel template: budget and itinerary start from the same snapshot,
+    // so the budget breakdown is not on the blackboard yet.
+    OrchestratorContext context = OrchestratorContext
+        .start(new TripRequest("Tokyo", 5, new BigDecimal("15000"), "food and culture"))
+        .withResearchResponse(new ResearchResponse(
+            List.of("Senso-ji"), List.of("Buy a Suica card"), List.of("Ramen")));
+
+    OrchestratorContext result = agent.execute(context);
+
+    assertThat(result.itineraryResponse()).isNotNull();
+
+    String userText = ChatClientStubs.userTextOf(stub.model());
+    assertThat(userText)
+        .contains("not on the blackboard yet")
+        .contains("stay conservative");
   }
 }

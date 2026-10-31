@@ -29,14 +29,34 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "orchestrator.workflow")
 public class WorkflowProperties {
 
+  /** Built-in template selection used when no custom stages are configured. */
+  public static final String TEMPLATE_SEQUENTIAL = "sequential";
+  public static final String TEMPLATE_PARALLEL = "parallel";
+
   private ExecutionMode mode = ExecutionMode.SEQUENTIAL;
+
+  /**
+   * Built-in template selection when no custom stages are declared:
+   * {@code sequential} (research -> budget -> itinerary -> review, the strict
+   * chain) or {@code parallel} (research -> (budget || itinerary) -> review).
+   * Ignored when {@code stages} is non-empty.
+   */
+  private String template = TEMPLATE_SEQUENTIAL;
 
   private List<StageDefinition> stages = new ArrayList<>();
 
   /** Builds the collaboration template described by this configuration. */
   public WorkflowTemplate toTemplate() {
     if (stages.isEmpty()) {
-      return new WorkflowTemplate("default-trip-planning", mode, WorkflowTemplate.defaultTripPlanningStages());
+      return switch (template) {
+        case TEMPLATE_PARALLEL ->
+          new WorkflowTemplate("parallel-trip-planning", mode, WorkflowTemplate.parallelTripPlanningStages());
+        case TEMPLATE_SEQUENTIAL ->
+          new WorkflowTemplate("default-trip-planning", mode, WorkflowTemplate.defaultTripPlanningStages());
+        default -> throw new IllegalArgumentException(
+            "Unknown built-in workflow template '%s'. Expected '%s' or '%s'"
+                .formatted(template, TEMPLATE_SEQUENTIAL, TEMPLATE_PARALLEL));
+      };
     }
     List<StageSpec> specs = stages.stream()
         .map(definition -> new StageSpec(definition.getName(),
@@ -52,6 +72,14 @@ public class WorkflowProperties {
 
   public void setMode(ExecutionMode mode) {
     this.mode = mode;
+  }
+
+  public String getTemplate() {
+    return template;
+  }
+
+  public void setTemplate(String template) {
+    this.template = template;
   }
 
   public List<StageDefinition> getStages() {

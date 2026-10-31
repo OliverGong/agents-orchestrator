@@ -6,11 +6,16 @@
  *              intermediate execution state was sequential or concurrent
  *              (mode + wave index + the stages that shared the wave) and carry
  *              the agent context as JSON, so a whole run can be replayed from
- *              the outside. Static factories keep the many optional fields
- *              type-safe at the call sites.
+ *              the outside. Since the MCP wiring, stage events are interleaved
+ *              with {@code TOOL_CALLED} events (one per MCP tool invocation,
+ *              attributed to the stage that triggered it via the
+ *              {@link RunContext} thread-local), so a replayed timeline shows
+ *              exactly which external tools fed which agent answer. Static
+ *              factories keep the many optional fields type-safe at the call
+ *              sites.
  * @Author OliverGong
  * @Date Oct 29, 2026
- * @Version 1.0
+ * @Version 1.1
  */
 package com.oli.orchestrator_demo.observability;
 
@@ -30,12 +35,25 @@ public record AgentObservabilityEvent(
   String threadName,
   Long durationMs,
   String errorMessage,
+  Integer attempt,
   String inputContextJson,
-  String outputContextJson
+  String outputContextJson,
+  ToolCallDetail toolCall
 ) {
 
   public enum Type {
-    RUN_STARTED, STAGE_COMPLETED, STAGE_FAILED, RUN_COMPLETED, RUN_FAILED
+    RUN_STARTED, STAGE_COMPLETED, STAGE_FAILED, STAGE_RETRIED, RUN_COMPLETED, RUN_FAILED, TOOL_CALLED
+  }
+
+  /** One MCP tool invocation observed during a stage execution. */
+  public record ToolCallDetail(
+    String serverName,
+    String toolName,
+    long durationMs,
+    String outcome,
+    String resultSummary,
+    String errorMessage
+  ) {
   }
 
   public AgentObservabilityEvent {
@@ -44,33 +62,62 @@ public record AgentObservabilityEvent(
 
   public static AgentObservabilityEvent runStarted(String runId, String templateName, String mode) {
     return new AgentObservabilityEvent(Type.RUN_STARTED, Instant.now(), runId, templateName,
-        null, null, null, null, mode, null, null, null, null, null);
+        null, null, null, null, mode, null, null, null, null, null, null, null);
   }
 
   public static AgentObservabilityEvent stageCompleted(String runId, String stageName, String agentName,
       int waveIndex, List<String> parallelPeers, String mode, String threadName, long durationMs,
       String inputContextJson, String outputContextJson) {
     return new AgentObservabilityEvent(Type.STAGE_COMPLETED, Instant.now(), runId, null,
-        stageName, agentName, waveIndex, parallelPeers, mode, threadName, durationMs, null,
-        inputContextJson, outputContextJson);
+        stageName, agentName, waveIndex, parallelPeers, mode, threadName, durationMs, null, null,
+        inputContextJson, outputContextJson, null);
   }
 
   public static AgentObservabilityEvent stageFailed(String runId, String stageName, String agentName,
       int waveIndex, List<String> parallelPeers, String mode, String threadName, long durationMs,
       String errorMessage, String inputContextJson) {
     return new AgentObservabilityEvent(Type.STAGE_FAILED, Instant.now(), runId, null,
-        stageName, agentName, waveIndex, parallelPeers, mode, threadName, durationMs, errorMessage,
-        inputContextJson, null);
+        stageName, agentName, waveIndex, parallelPeers, mode, threadName, durationMs, errorMessage, null,
+        inputContextJson, null, null);
+  }
+
+  /**
+   * Emitted by the agent base class whenever a parse retry re-samples the
+   * model; the attribution fields come from the {@link RunContext} of the
+   * executing thread (null-safe: retries outside a workflow run are dropped).
+   */
+  public static AgentObservabilityEvent stageRetried(String runId, String stageName, String agentName,
+      Integer waveIndex, String threadName, int attempt, String errorMessage) {
+    return new AgentObservabilityEvent(Type.STAGE_RETRIED, Instant.now(), runId, null,
+        stageName, agentName, waveIndex, null, null, threadName, null,
+        "attempt %d failed to parse model output: %s".formatted(attempt, errorMessage), attempt,
+        null, null, null);
   }
 
   /** Reuses the {@code outputContextJson} slot to carry the final context. */
   public static AgentObservabilityEvent runCompleted(String runId, String finalContextJson) {
     return new AgentObservabilityEvent(Type.RUN_COMPLETED, Instant.now(), runId, null,
-        null, null, null, null, null, null, null, null, null, finalContextJson);
+        null, null, null, null, null, null, null, null, null, null, finalContextJson, null);
   }
 
   public static AgentObservabilityEvent runFailed(String runId, String errorMessage) {
     return new AgentObservabilityEvent(Type.RUN_FAILED, Instant.now(), runId, null,
-        null, null, null, null, null, null, null, errorMessage, null, null);
+        null, null, null, null, null, null, null, errorMessage, null, null, null, null);
+  }
+
+  /**
+   * Emitted by the instrumented MCP tool callbacks while a stage is executing;
+   * the attribution fields (run/stage/agent/wave) come from the
+   * {@link RunContext} of the executing thread and are {@code null} for tool
+   * calls outside a workflow run.
+   */
+  public static AgentObservabilityEvent toolCalled(String runId, String stageName, String agentName,
+      Integer waveIndex, String serverName, String toolName, long durationMs,
+      String resultSummary, String errorMessage) {
+    ToolCallDetail detail = new ToolCallDetail(serverName, toolName, durationMs,
+        errorMessage == null ? "OK" : "ERROR", resultSummary, errorMessage);
+    return new AgentObservabilityEvent(Type.TOOL_CALLED, Instant.now(), runId, null,
+        stageName, agentName, waveIndex, null, null, null, durationMs, errorMessage, null,
+        null, null, detail);
   }
 }
