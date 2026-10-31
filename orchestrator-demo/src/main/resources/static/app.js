@@ -1248,6 +1248,14 @@ function fmtTime(iso) {
     + '.' + String(d.getMilliseconds()).padStart(3, '0');
 }
 
+/* ---------------- observability stack links ----------------
+   The console may be opened from a remote machine (http://<host>:8080);
+   rewrite the fixed-port Grafana/Tempo/Prometheus links to that host so
+   they stay usable instead of pointing at the browser's own localhost. */
+document.querySelectorAll('.links a[data-fixed-port]').forEach((a) => {
+  a.href = `http://${window.location.hostname || 'localhost'}:${a.dataset.fixedPort}`;
+});
+
 /* ---------------- boot ---------------- */
 refreshHealthDot();
 refreshRuns();

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Orchestrator Demo — 多 Agent 旅行规划控制台</title>
-<link rel="stylesheet" href="app.css?v=8">
+<link rel="stylesheet" href="app.css?v=9">
 </head>
 <body>
 <div class="shell">
@@ -29,9 +29,9 @@
     <div class="side-footer">
       <span id="health-dot" class="dot dot-unknown" title="应用健康状态"></span>
       <nav class="links">
-        <a href="http://localhost:3000" target="_blank">Grafana</a>
-        <a href="http://localhost:3200" target="_blank">Tempo</a>
-        <a href="http://localhost:9090" target="_blank">Prometheus</a>
+        <a href="http://localhost:3000" data-fixed-port="3000" target="_blank">Grafana</a>
+        <a href="http://localhost:3200" data-fixed-port="3200" target="_blank">Tempo</a>
+        <a href="http://localhost:9090" data-fixed-port="9090" target="_blank">Prometheus</a>
       </nav>
     </div>
   </aside>
@@ -208,6 +208,6 @@
   </div>
 </div>
 
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
