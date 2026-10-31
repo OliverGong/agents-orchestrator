@@ -1,4 +1,4 @@
-# orchestrator-demo 架构说明
+# Orchestrator 架构说明
 
 基于 **Spring Boot 4 + Spring AI 2.0** 的多 Agent 编排示例：以"旅行规划"为业务载体，
 演示 **Orchestrator-Workflow（编排者模式）** 与 **Blackboard（黑板模式）** 的组合用法，

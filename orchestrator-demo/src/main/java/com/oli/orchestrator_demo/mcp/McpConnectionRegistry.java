@@ -100,7 +100,7 @@ public class McpConnectionRegistry {
   /** A FAILED binding retries no faster than this (unless forced). */
   static final Duration RETRY_COOLDOWN = Duration.ofSeconds(30);
   static final long RETRY_INTERVAL_SECONDS = 15;
-  private static final String CLIENT_NAME = "orchestrator-demo";
+  private static final String CLIENT_NAME = "orchestrator";
   private static final String CLIENT_VERSION = "1.1";
   private static final String DEFAULT_SSE_PATH = "/sse";
   private static final String DEFAULT_STREAMABLE_PATH = "/mcp";

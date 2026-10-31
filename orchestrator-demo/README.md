@@ -1,11 +1,11 @@
-# orchestrator-demo
+# Orchestrator
 
-多 Agent 旅行规划控制台 —— 以「编排者 + 黑板」模式演示 Spring AI 2.0 的多 Agent 协作、
-运行时控制平面、MCP 动态工具接入与端到端可观测性（Traces / Metrics / 运行时间线回放）。
+多 Agent 旅行规划编排服务 —— 以「编排者 + 黑板」模式演示 Spring AI 2.0 的多 Agent 协作、
+运行时控制平面、场景平面、MCP 动态工具接入与端到端可观测性（Traces / Metrics / 运行时间线回放）。
 
 - 技术基线：Java 25 · Spring Boot 4.1.2 · Spring AI 2.0.1（BOM）· MCP Java SDK
-- Maven 坐标：`com.oli:orchestrator-demo:0.0.1-SNAPSHOT`
-- 功能版本：**v2.0**，分支 `feat/navigation`
+- Maven 坐标：`com.oli:orchestrator:2.1.0`（版本经 `/actuator/info` 暴露，控制台侧栏可见）
+- 功能版本：**v2.1**，分支 `feat/navigation`
 - 深入设计细节见 [ARCHITECTURE.md](./ARCHITECTURE.md)（本文为其索引入口）
 
 ---
@@ -115,20 +115,22 @@
 | grafana | `grafana/grafana:11.5.2` | 3000 | 可视化：匿名 Admin 登录，预置 Tempo/Prometheus 数据源与 `agent-observability` 仪表盘 |
 
 - **卷**：`postgres-data` → 控制平面表存储、`orchestrator-config` → `/app/config`（JSON 状态：迁移源/回退后端）、`tempo-data` → Tempo 存储。
-- **环境变量契约**：`SPRING_AI_OLLAMA_BASE_URL`（模型后端）、`OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://tempo:4317`，gRPC 传输——HTTP 传输对 Tempo receiver 会 404）、`ORCHESTRATOR_CONTROL_STORE`（`db`：PostgreSQL / `file`：JSON，默认 db 经 compose 注入）、`SPRING_DATASOURCE_URL|USERNAME|PASSWORD`（db 模式连接）、`ORCHESTRATOR_CRYPTO_KEY`（可选，开启 MCP secret 的 AES-GCM 字段加密）、`ORCHESTRATOR_CONTROL_CONFIG_FILE`（file 模式路径，默认 `/app/config/control-plane.json`）、`ORCHESTRATOR_SPRING_EXCLUDE`（compose 置空以恢复 DataSource 自动配置——本地 file 模式默认排除它，避免无 JDBC url 启动失败）。
-- **前置条件**：宿主机 Ollama 已就绪并拉取模型（默认 `qwen3-vl:4b` / 各 agent 覆盖为 `qwen:7b`，可用 `ollama pull` 调整）。
+- **环境变量契约**：所有宿主相关值都经 compose 变量插值（`docker/.env.example` 有完整清单与默认值——复制为 `.env` 即可按环境覆盖，无需改动 compose 文件）：`SPRING_AI_OLLAMA_BASE_URL`（模型后端，部署到其他环境时指向可达的推理服务）、`APP_VERSION`（镜像 tag，与 pom 版本一致）、`APP_PORT`（宿主端口，Prometheus 经 compose 网络内 `app:8080` 抓取，不随端口映射变化）、`OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://tempo:4317`，gRPC 传输——HTTP 传输对 Tempo receiver 会 404）、`ORCHESTRATOR_CONTROL_STORE`（`db`：PostgreSQL / `file`：JSON）、`POSTGRES_DB|USER|PASSWORD`、`ORCHESTRATOR_CRYPTO_KEY`（可选，开启 MCP secret 的 AES-GCM 字段加密）、`ORCHESTRATOR_SPRING_EXCLUDE`（compose 置空以恢复 DataSource 自动配置——本地 file 模式默认排除它，避免无 JDBC url 启动失败）。
+- **可迁移部署**：整套服务以 `name: orchestrator` 固定项目名，镜像 `orchestrator:${APP_VERSION:-2.1.0}` 版本化命名——在任何有 Docker 的机器上 clone 仓库 + `docker compose up -d --build` 即得一致部署，或将镜像推送到 registry 后在其他环境直接 pull 启动；除 Ollama 地址外无宿主耦合。
+- **前置条件**：模型后端就绪（本地为宿主机 Ollama，默认 `qwen3-vl:4b` / 各 agent 覆盖为 `qwen:7b`，可用 `ollama pull` 调整）。
 
 ```bash
-# 构建镜像（可选，compose up 会自动构建）
-docker build -t orchestrator-demo .
+cd docker
+cp .env.example .env    # 按环境调整（可选，默认值即本地开发栈）
+docker build -t orchestrator:2.1.0 ..   # 构建镜像（可选，compose up 会自动构建）
 
-# 启动完整栈（app + tempo + prometheus + grafana）
-docker compose -f docker/docker-compose.yml up --build
+# 启动完整栈（app + postgres + tempo + prometheus + grafana）
+docker compose up -d --build
 
 # 查看可视化
 #   Grafana     http://localhost:3000   （Tempo trace search + 指标仪表盘）
 #   Prometheus  http://localhost:9090
-#   控制台      http://localhost:8080
+#   控制台      http://localhost:8080   （侧栏显示运行版本）
 ```
 
 ## 5. 本地运行与测试

@@ -1256,6 +1256,14 @@ document.querySelectorAll('.links a[data-fixed-port]').forEach((a) => {
   a.href = `http://${window.location.hostname || 'localhost'}:${a.dataset.fixedPort}`;
 });
 
+/* ---------------- app version ----------------
+   The build-info actuator endpoint carries the maven project version; show
+   it in the sidebar so what is running is always visible. */
+fetch('/actuator/info').then((r) => r.json()).then((info) => {
+  const v = info?.build?.version;
+  if (v) $('#app-version').textContent = `v${v}`;
+}).catch(() => { /* keep the placeholder on old images */ });
+
 /* ---------------- boot ---------------- */
 refreshHealthDot();
 refreshRuns();

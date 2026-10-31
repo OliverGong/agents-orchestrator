@@ -1,5 +1,5 @@
 #
-# Multi-stage build for orchestrator-demo: the Maven build runs inside the
+# Multi-stage build for orchestrator: the Maven build runs inside the
 # same JDK 25 toolchain the project targets, and the runtime image ships only
 # the JRE plus the Spring Boot fat jar produced by `./mvnw package`.
 # NOTE: no `# syntax=` directive on purpose — the builtin BuildKit frontend
@@ -31,7 +31,7 @@ RUN useradd --system --uid 10001 app \
     && chown -R app:app /app
 USER app
 
-COPY --from=build /build/target/orchestrator-demo-*.jar app.jar
+COPY --from=build /build/target/orchestrator-*.jar app.jar
 
 # Control-plane state lives on a writable path (mount a volume here).
 ENV ORCHESTRATOR_CONTROL_CONFIG_FILE=/app/config/control-plane.json

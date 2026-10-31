@@ -2,7 +2,9 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: orchestrator-demo
+  # Scrapes the app over the compose network directly — independent of the
+  # host port mapping (APP_PORT).
+  - job_name: orchestrator
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["host.docker.internal:8080"]
+      - targets: ["app:8080"]

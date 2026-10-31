@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.oli</groupId>
-	<artifactId>orchestrator-demo</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>orchestrator-demo</name>
-	<description/>
+	<artifactId>orchestrator</artifactId>
+	<version>2.1.0</version>
+	<name>orchestrator</name>
+	<description>Multi-agent trip-planning orchestrator with a hot-reloadable control plane, scenario plane and observability stack</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -121,6 +121,14 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<executions>
+					<!-- Expose the project version through /actuator/info -->
+					<execution>
+						<goals>
+							<goal>build-info</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

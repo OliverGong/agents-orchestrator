@@ -1,35 +1,36 @@
-# Local stack for orchestrator-demo:
+# Orchestrator stack — the whole service bundle is environment-decoupled:
+# every host-specific value goes through a variable (see .env.example), so
+# `docker compose up -d --build` produces the same deployment on any machine.
 #   app          the orchestrator itself (jar built by ../Dockerfile)
 #   postgres     control-plane persistence (v2.0: db backend, cp_* tables)
 #   Tempo        receives OTLP traces (HTTP :4318 / gRPC :4317) -> trace search
 #   Prometheus   scrapes the app's /actuator/prometheus endpoint
 #   Grafana      UI on :3000 with both datasources pre-provisioned
-# Start with:  docker compose -f docker/docker-compose.yml up
-#
-# The app connects to the Ollama instance on the Docker host
-# (host.docker.internal:11434); override SPRING_AI_OLLAMA_BASE_URL to point
-# somewhere else. Control-plane state persists in PostgreSQL (orchestrator
-# control store=db); the JSON state file volume is kept as the one-time
-# migration source / fallback backend. Set ORCHESTRATOR_CRYPTO_KEY to enable
-# AES-GCM field encryption of MCP secrets at rest.
+# Start with:  docker compose up -d --build
+# Copy .env.example to .env to override anything without editing this file.
+name: orchestrator
+
 services:
   app:
     build:
       context: ..
       dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
+    # Versioned image name (APP_VERSION, default = the pom version): push it
+    # to a registry to deploy the bundle elsewhere without rebuilding.
+    image: orchestrator:${APP_VERSION:-2.1.0}
     environment:
-      - SPRING_AI_OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
-      - ORCHESTRATOR_CONTROL_STORE=db
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/orchestrator
-      - SPRING_DATASOURCE_USERNAME=orchestrator
-      - SPRING_DATASOURCE_PASSWORD=orchestrator
+      - SPRING_AI_OLLAMA_BASE_URL=${SPRING_AI_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4317}
+      - ORCHESTRATOR_CONTROL_STORE=${ORCHESTRATOR_CONTROL_STORE:-db}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-orchestrator}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-orchestrator}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-orchestrator}
       # store=db needs the DataSource auto-configuration: clear the default
       # exclusion (empty value) that local file-store boots rely on.
       - ORCHESTRATOR_SPRING_EXCLUDE=
-      # - ORCHESTRATOR_CRYPTO_KEY=change-me   # enable field-level secret encryption
+      - ORCHESTRATOR_CRYPTO_KEY=${ORCHESTRATOR_CRYPTO_KEY:-}
+    ports:
+      - "${APP_PORT:-8080}:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
