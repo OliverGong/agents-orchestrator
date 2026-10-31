@@ -5,7 +5,7 @@
 
 - 技术基线：Java 25 · Spring Boot 4.1.2 · Spring AI 2.0.1（BOM）· MCP Java SDK
 - Maven 坐标：`com.oli:orchestrator-demo:0.0.1-SNAPSHOT`
-- 功能版本：**v1.1（β）**，分支 `feat/navigation`
+- 功能版本：**v2.0**，分支 `feat/navigation`
 - 深入设计细节见 [ARCHITECTURE.md](./ARCHITECTURE.md)（本文为其索引入口）
 
 ---
@@ -18,8 +18,9 @@
 | v1 | `7b01c53` / `5211e4f` | Docker 多阶段镜像、parallel 并行模板、SSE 实时事件流、控制平面 v1（agent 配置热更新 + 响应校准规则）、非 root 运行时镜像 |
 | v1.1 · Phase 1 | `7cf2587` | Agent 槽位契约描述符（input/output/pending-safe slots）+ 工作流逻辑闭环校验（保存模板即验证数据依赖可满足，否则 400） |
 | v1.1 · Phase 2 | `d1e261a` | **MCP 解耦**：连接注册表从控制平面动态建连（Streamable HTTP 默认 / SSE 兼容 / STDIO 子进程）、版本 diff 热重建、失败冷却重试与手动重连；**工具注入**：映射服务器的工具以 ToolCallback 进入每次模型调用；**工具调用可观测**：耗时 / 结果 / 归因进时间线与 SSE；前端 MCP 面板与运行回放工具明细 |
+| v2.0 | `14fe222` / `1aaa4c6` | **控制平面持久化基座**：`ControlPlaneStore` 抽象——文件（默认/seed/回退）或 PostgreSQL（规范化 `cp_*` 表 + 单事务写 + WAL 崩溃安全）；Caffeine 缓存（version 戳失效 + 写透 + TTL）；`cp_mcp_server.env` 字段级 AES-256-GCM 加密（`ORCHESTRATOR_CRYPTO_KEY`），GET 脱敏 `******` / PUT 回写还原；首次启动 JSON → DB 一次性导入；compose 栈切 db 模式（postgres:16 + 健康检查） |
 
-当前测试规模：**109 个用例全绿**（`./mvnw test`），覆盖编排、控制平面校验、MCP 注册表与工具插桩、观测控制器。
+当前测试规模：**123 个用例全绿**（`./mvnw test`，DB 相关用例跑 H2 内存库），覆盖编排、控制平面校验、MCP 注册表与工具插桩、观测控制器、存储后端与加密。
 
 ## 2. 体系架构
 
@@ -43,8 +44,11 @@
 │ Spring AI 2.0.1 ChatModel ──► Ollama（默认）/ OpenAI                      │
 │                                                                          │
 │ control/ 控制平面（version 戳，逐次调用读取 → 即时生效）                    │
-│   AgentConfigRegistry · AgentDescriptorRegistry · WorkflowConfig         │
-│   └── 持久化 config/control-plane.json（重启自动恢复）                     │
+│   AgentConfigRegistry（单写者）· AgentDescriptorRegistry · WorkflowConfig  │
+│   └─ ControlPlaneStore：file（JSON，默认/seed/回退）│ db（PostgreSQL）      │
+│      DbControlPlaneStore：cp_* 规范化表 · 单事务写（WAL 崩溃安全）          │
+│      CachedControlPlaneStore：Caffeine，version 戳失效 + TTL               │
+│      ControlPlaneCrypto：AES-256-GCM 字段加密（env）+ GET 脱敏/PUT 还原     │
 │                                                                          │
 │ mcp/ MCP 动态连接层（解耦核心）                                            │
 │   McpConnectionRegistry：版本 diff reconcile · 异步建连 · 30s 冷却重试     │
@@ -92,12 +96,13 @@
 | 服务 | 镜像 / 构建 | 端口 | 职责 |
 | --- | --- | --- | --- |
 | app | 本地多阶段构建（根目录 Dockerfile） | 8080 | 编排器本体；Ollama 默认走 `host.docker.internal:11434` |
+| postgres | `postgres:16-alpine` | 5432 | 控制平面持久化（v2.0 db 模式）：`cp_*` 表 + `pg_isready` 健康检查 |
 | tempo | `grafana/tempo:2.7.2` | 4317 (OTLP gRPC) / 4318 (HTTP) / 3200 (查询) | 接收并存储链路 trace |
 | prometheus | `prom/prometheus:v3.2.1` | 9090 | 抓取 app 的 `/actuator/prometheus` |
 | grafana | `grafana/grafana:11.5.2` | 3000 | 可视化：匿名 Admin 登录，预置 Tempo/Prometheus 数据源与 `agent-observability` 仪表盘 |
 
-- **卷**：`orchestrator-config` → `/app/config`（控制平面状态跨重启保留）、`tempo-data` → Tempo 存储。
-- **环境变量契约**：`SPRING_AI_OLLAMA_BASE_URL`（模型后端）、`OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://tempo:4317`，gRPC 传输——HTTP 传输对 Tempo receiver 会 404）、`ORCHESTRATOR_CONTROL_CONFIG_FILE`（默认 `/app/config/control-plane.json`）。
+- **卷**：`postgres-data` → 控制平面表存储、`orchestrator-config` → `/app/config`（JSON 状态：迁移源/回退后端）、`tempo-data` → Tempo 存储。
+- **环境变量契约**：`SPRING_AI_OLLAMA_BASE_URL`（模型后端）、`OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://tempo:4317`，gRPC 传输——HTTP 传输对 Tempo receiver 会 404）、`ORCHESTRATOR_CONTROL_STORE`（`db`：PostgreSQL / `file`：JSON，默认 db 经 compose 注入）、`SPRING_DATASOURCE_URL|USERNAME|PASSWORD`（db 模式连接）、`ORCHESTRATOR_CRYPTO_KEY`（可选，开启 MCP secret 的 AES-GCM 字段加密）、`ORCHESTRATOR_CONTROL_CONFIG_FILE`（file 模式路径，默认 `/app/config/control-plane.json`）。
 - **前置条件**：宿主机 Ollama 已就绪并拉取模型（默认 `qwen3-vl:4b` / 各 agent 覆盖为 `qwen:7b`，可用 `ollama pull` 调整）。
 
 ```bash
@@ -117,7 +122,7 @@ docker compose -f docker/docker-compose.yml up --build
 
 ```bash
 ./mvnw spring-boot:run        # 需要 localhost:11434 有 Ollama；控制台 http://localhost:8080
-./mvnw test                   # 109 个用例（无需真实模型，ChatClient 打桩）
+./mvnw test                   # 123 个用例（无需真实模型，ChatClient 打桩；DB 用例跑 H2）
 ./mvnw clean package          # 产出 fat jar
 ```
 
@@ -132,11 +137,11 @@ GitHub Actions / GitLab CI：
 
 | 阶段 | 命令 / 机制 | 说明 |
 | --- | --- | --- |
-| 1. 编译 + 测试 | `./mvnw clean test` | 109 用例，ChatClient 打桩，无外部依赖，天然适合 CI |
+| 1. 编译 + 测试 | `./mvnw clean test` | 123 用例，ChatClient 打桩 + H2 内存库，无外部依赖，天然适合 CI |
 | 2. 打包 | `./mvnw clean package` | Spring Boot fat jar |
 | 3. 镜像构建 | `docker build .` | 多阶段构建 + 层缓存（pom 先行）+ `/root/.m2` cache mount；无外部 syntax 前端，CI 无需额外拉取 |
-| 4. 部署 | `docker compose -f docker/docker-compose.yml up -d` | app + Tempo + Prometheus + Grafana 一键编排，配置卷持久化 |
-| 5. 冒烟验证 | `/actuator/health`、`GET /api/trips/runs`、`GET /api/v1/control/mcp/status` | 健康与控制平面状态即冒烟断言点 |
+| 4. 部署 | `docker compose -f docker/docker-compose.yml up -d` | app + PostgreSQL + Tempo + Prometheus + Grafana 一键编排，数据卷持久化 |
+| 5. 冒烟验证 | `/actuator/health`、`GET /api/trips/runs`、`GET /api/v1/control/mcp/status` | 健康与控制平面状态即冒烟断言点（db 模式下 `postgres` 容器的 `pg_isready` 先行） |
 
 工程约定：
 

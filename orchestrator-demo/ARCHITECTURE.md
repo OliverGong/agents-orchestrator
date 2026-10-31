@@ -766,3 +766,70 @@ v1 已落地的热更新是**配置级**的（进程内热生效，零重启）�
 - Agent 从"编译期 Bean 人格"迁移到"运行时 store 人格"是**唯一**的 v0→v1
   破坏性改动（`AgentConfiguration` 不再构建 ChatClient Bean）——对外 API
   无感，仅影响直接 new Agent 的测试（已同步）。
+
+## 10. v2.0：控制平面持久化基座（数据库 + 缓存 + 加密）
+
+### 10.1 存储分层
+
+控制平面的"写入权"与"存放地"解耦：`AgentConfigRegistry` 仍是唯一写者
+（校验 → 热生效 → bump version），持久化下沉到 `ControlPlaneStore` 接口：
+
+```
+AgentConfigRegistry（单写者，内存快照 = 运行时读侧事实源）
+        │ load() / save() / currentVersion()
+        ▼
+ControlPlaneStore
+  ├─ FileControlPlaneStore   JSON 文件（默认；seed 源 + 回退后端，原子写）
+  └─ CachedControlPlaneStore Caffeine 缓存（仅 db 模式）
+       └─ DbControlPlaneStore  PostgreSQL（生产）/ H2（测试）
+            └─ ControlPlaneCrypto  AES-GCM 字段级加密（env 值）
+```
+
+- **选择**：`orchestrator.control.store=file|db`（默认 file，零迁移成本）；
+  `ControlPlaneStoreConfig` 按配置装配，db 模式启动时建表 + 一次性导入。
+- **读路径**：热路径（每次模型调用、控制台轮询）读 registry 内存快照，
+  不触库；缓存服务于**二级读**（后续场景匹配、多实例部署），用廉价
+  `currentVersion()`（单行查询）做 version 戳失效 + 写透 + TTL 兜底。
+- **一致性**：db 保存为单事务（小表 delete + 全量 insert），借 PostgreSQL
+  WAL 获得崩溃安全——控制平面更新要么整体生效要么不生效。
+- **热加载**：沿用 version-diff reconcile（MCP 连接重建、模板换引用），
+  **不引入**字节码热替换；DB 带来的只是事实源的更换，热生效机制不变。
+
+### 10.2 表结构（cp_*，PostgreSQL/H2 可移植）
+
+| 表 | 说明 |
+|---|---|
+| `cp_meta` | 单行版本戳（version, updated_at）——缓存失效探针 |
+| `cp_agent` | agent 运行时配置（prompt/model/temperature/calibration_rules/mcp_refs，display_order 保序） |
+| `cp_workflow` / `cp_workflow_stage` | 模板 mode + 有序 stage（depends_on） |
+| `cp_mcp_server` | MCP 记录（transport/endpoint/command/args/**env 加密**/enabled） |
+| `cp_agent_descriptor` | 槽位契约（output/input/pending_safe slots + 默认模型信息） |
+
+嵌套列表/映射以 JSON 文本列存储（跨库可移植）；实体本身规范化建表，
+为 v2.1 场景元模型（Scenario = workflow + agents + MCP 映射 + 产物模板）
+保留直接 SQL 查询能力。Schema 由应用幂等创建
+（`CREATE TABLE IF NOT EXISTS`），后续可交 Flyway 演进。
+
+### 10.3 加密与脱敏闭环
+
+- **字段级 AES-256-GCM**：`cp_mcp_server.env` 的每个非空值在入库前加密为
+  `enc:v1:<iv>:<ciphertext>`（随机 IV、128 位认证标签），读取时解密；
+  前缀版本化，旧明文值兼容加载，未来可平滑升 `v2`。
+- **密钥**：`ORCHESTRATOR_CRYPTO_KEY`（任意口令，SHA-256 派生 AES-256）；
+  未设置时为明文直存（file 模式默认），db 模式启动大声 WARN。
+- **脱敏闭环**：`GET /api/v1/control/state` 与 `/mcp/servers` 的 env 值一律
+  `******`；PUT 回传 `******` 由 registry 依名字从既有状态**还原**真实值
+  （`mergeMaskedEnv`）——控制台整表回写不会破坏密钥；连接层始终拿到明文。
+- 日志与时间线不输出 env 值（MCP 注册表仅将其传给子进程）。
+
+### 10.4 迁移与运行
+
+- db 模式首次启动：DB 为空且 JSON 文件存在 → 整体导入（版本号不变）；
+  DB 为空且无文件 → 从 `orchestrator.agents.*` / `orchestrator.workflow.*`
+  种子直落库；此后 JSON 文件仅作回退。
+- Docker compose（`docker/`）已切 db 模式：`postgres:16-alpine` +
+  `pg_isready` 健康检查 + `postgres-data` 卷；app 经
+  `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` 与 `ORCHESTRATOR_CONTROL_STORE=db`
+  接入，`orchestrator-config` 卷保留（迁移源/回退后端）。
+- 测试：H2 内存库跑同一份可移植 schema（`DbControlPlaneStoreTest` 六例：
+  往返、保序、密文落库断言、无密钥明文回退、一次性导入、缓存失效）。
