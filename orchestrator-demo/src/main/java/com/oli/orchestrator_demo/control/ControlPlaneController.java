@@ -60,10 +60,10 @@ public class ControlPlaneController {
     this.objectMapper = objectMapper;
   }
 
-  /** Full snapshot: agents + workflow + MCP servers + version. */
+  /** Full snapshot: agents + workflow + MCP servers + version (secrets masked). */
   @GetMapping("/state")
   public ControlPlaneState state() {
-    return registry.state();
+    return registry.maskedState();
   }
 
   @GetMapping("/agents")
@@ -120,7 +120,7 @@ public class ControlPlaneController {
 
   @GetMapping("/mcp/servers")
   public List<McpServerConfig> mcpServers() {
-    return registry.state().mcpServers();
+    return registry.maskedMcpServers();
   }
 
   @PutMapping("/mcp/servers")

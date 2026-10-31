@@ -1,5 +1,6 @@
 # Local stack for orchestrator-demo:
 #   app          the orchestrator itself (jar built by ../Dockerfile)
+#   postgres     control-plane persistence (v2.0: db backend, cp_* tables)
 #   Tempo        receives OTLP traces (HTTP :4318 / gRPC :4317) -> trace search
 #   Prometheus   scrapes the app's /actuator/prometheus endpoint
 #   Grafana      UI on :3000 with both datasources pre-provisioned
@@ -7,8 +8,10 @@
 #
 # The app connects to the Ollama instance on the Docker host
 # (host.docker.internal:11434); override SPRING_AI_OLLAMA_BASE_URL to point
-# somewhere else. Control-plane state persists in the orchestrator-config
-# volume so agent/workflow edits survive container restarts.
+# somewhere else. Control-plane state persists in PostgreSQL (orchestrator
+# control store=db); the JSON state file volume is kept as the one-time
+# migration source / fallback backend. Set ORCHESTRATOR_CRYPTO_KEY to enable
+# AES-GCM field encryption of MCP secrets at rest.
 services:
   app:
     build:
@@ -19,12 +22,36 @@ services:
     environment:
       - SPRING_AI_OLLAMA_BASE_URL=http://host.docker.internal:11434
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
+      - ORCHESTRATOR_CONTROL_STORE=db
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/orchestrator
+      - SPRING_DATASOURCE_USERNAME=orchestrator
+      - SPRING_DATASOURCE_PASSWORD=orchestrator
+      # - ORCHESTRATOR_CRYPTO_KEY=change-me   # enable field-level secret encryption
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - orchestrator-config:/app/config
     depends_on:
-      - tempo
+      tempo:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=orchestrator
+      - POSTGRES_USER=orchestrator
+      - POSTGRES_PASSWORD=orchestrator
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orchestrator -d orchestrator"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   tempo:
     image: grafana/tempo:2.7.2
@@ -60,3 +87,4 @@ services:
 volumes:
   tempo-data:
   orchestrator-config:
+  postgres-data:

@@ -68,6 +68,29 @@ class AgentConfigRegistryTest {
   }
 
   @Test
+  void persistsThroughTheDatabaseStoreAndReloadsOnRestart() {
+    org.h2.jdbcx.JdbcDataSource dataSource = new org.h2.jdbcx.JdbcDataSource();
+    dataSource.setURL("jdbc:h2:mem:registry" + System.nanoTime() + ";DB_CLOSE_DELAY=-1");
+    DbControlPlaneStore store = new DbControlPlaneStore(
+        org.springframework.jdbc.core.simple.JdbcClient.create(dataSource),
+        JsonMapper.builder().build(), ControlPlaneCrypto.disabled());
+    store.initialize();
+
+    holder = new WorkflowTemplateHolder(new WorkflowProperties());
+    AgentConfigRegistry first = new AgentConfigRegistry(modelProperties, new WorkflowProperties(), holder, store);
+    first.initialize();
+    first.updateAgent("research", new AgentRuntimeConfig("research", "db persona", "m1", 0.5, List.of(), List.of()));
+
+    // "Restart": a fresh registry over the same database reloads the state.
+    AgentConfigRegistry restarted = new AgentConfigRegistry(new AgentModelProperties(),
+        new WorkflowProperties(), holder, store);
+    restarted.initialize();
+    assertThat(restarted.state().version()).isEqualTo(2);
+    assertThat(restarted.agent("research").systemPrompt()).isEqualTo("db persona");
+    assertThat(restarted.agent("research").temperature()).isEqualTo(0.5);
+  }
+
+  @Test
   void seedsDefaultsAndPersistsThem() throws IOException {
     AgentConfigRegistry registry = freshRegistry();
 

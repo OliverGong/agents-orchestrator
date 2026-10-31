@@ -118,6 +118,28 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
   }
 
   /**
+   * The snapshot for the HTTP surface: secret env values of the MCP servers
+   * are replaced with {@code ******} so GET responses never leak tokens.
+   */
+  public ControlPlaneState maskedState() {
+    return new ControlPlaneState(state.version(), state.updatedAt(), state.agents(), state.workflow(),
+        maskedServers(), state.descriptors());
+  }
+
+  /** Like {@link #maskedState()}, restricted to the MCP servers. */
+  public List<McpServerConfig> maskedMcpServers() {
+    return maskedServers();
+  }
+
+  private List<McpServerConfig> maskedServers() {
+    return state.mcpServers().stream()
+        .map(server -> new McpServerConfig(server.name(), server.transport(), server.endpoint(),
+            server.command(), server.args(), ControlPlaneCrypto.maskEnv(server.env()),
+            server.enabled(), server.description()))
+        .toList();
+  }
+
+  /**
    * Hot-applies a new runtime configuration for one agent: blank prompts and
    * MCP references pointing at unrecorded servers are rejected.
    */
@@ -246,10 +268,24 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
   /**
    * Replaces the recorded MCP servers: names must be unique, URL-safe and
    * become the tool-name prefix; HTTP transports (STREAMABLE_HTTP, the
-   * deprecated SSE) require an endpoint, STDIO requires a command. The MCP
-   * registry picks the change up on its next reconcile pass.
+   * deprecated SSE) require an endpoint, STDIO requires a command. Env values
+   * masked as {@code ******} (echoed from the masked GET response) are
+   * restored from the currently stored server of the same name, so a console
+   * round-trip never destroys a secret. The MCP registry picks the change up
+   * on its next reconcile pass.
    */
   public synchronized ControlPlaneState updateMcpServers(List<McpServerConfig> servers) {
+    List<McpServerConfig> merged = servers.stream().map(server -> {
+      Map<String, String> previousEnv = state.mcpServers().stream()
+          .filter(existing -> existing.name().equals(server.name()))
+          .findFirst()
+          .map(McpServerConfig::env)
+          .orElse(Map.of());
+      return new McpServerConfig(server.name(), server.transport(), server.endpoint(), server.command(),
+          server.args(), ControlPlaneCrypto.mergeMaskedEnv(server.env(), previousEnv),
+          server.enabled(), server.description());
+    }).toList();
+    servers = merged;
     Set<String> names = new HashSet<>();
     for (McpServerConfig server : servers) {
       if (server.name().isBlank()) {

@@ -251,6 +251,35 @@ class ControlPlaneControllerTest {
   }
 
   @Test
+  void mcpSecretsAreMaskedOnGetAndRestoredOnPut() throws Exception {
+    mockMvc.perform(put("/api/v1/control/mcp/servers")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                [{"name":"weather","transport":"STDIO","command":"uvx","args":["mcp-weather"],
+                  "env":{"API_KEY":"t0p-secret"},"enabled":true,"description":"demo"}]
+                """))
+        .andExpect(status().isOk());
+
+    // GET /state and GET /mcp/servers never carry the real secret.
+    mockMvc.perform(get("/api/v1/control/mcp/servers"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].env.API_KEY").value("******"));
+    mockMvc.perform(get("/api/v1/control/state"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.mcpServers[0].env.API_KEY").value("******"));
+
+    // Echoing the masked response back keeps the stored secret intact.
+    mockMvc.perform(put("/api/v1/control/mcp/servers")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                [{"name":"weather","transport":"STDIO","command":"uvx","args":["mcp-weather"],
+                  "env":{"API_KEY":"******"},"enabled":true,"description":"demo"}]
+                """))
+        .andExpect(status().isOk());
+    assertThat(registry.state().mcpServers().get(0).env()).containsEntry("API_KEY", "t0p-secret");
+  }
+
+  @Test
   void modelsFallbackToTheReferencedConfiguration() throws Exception {
     mockMvc.perform(get("/api/v1/control/models"))
         .andExpect(status().isOk())
