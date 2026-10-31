@@ -114,7 +114,7 @@
 | prometheus | `prom/prometheus:v3.2.1` | 9090 | 抓取 app 的 `/actuator/prometheus` |
 | grafana | `grafana/grafana:11.5.2` | 3000 | 可视化：匿名 Admin 登录，预置 Tempo/Prometheus 数据源与 `agent-observability` 仪表盘 |
 
-- **卷**：`postgres-data` → 控制平面表存储、`orchestrator-config` → `/app/config`（JSON 状态：迁移源/回退后端）、`tempo-data` → Tempo 存储。
+- **卷**：compose 项目名 `orchestrator` 前缀到实际卷名——`orchestrator_postgres-data` → 控制平面表存储、`orchestrator_orchestrator-config` → `/app/config`（JSON 状态：迁移源/回退后端）、`orchestrator_tempo-data` → Tempo 存储。跨环境迁移时直接整卷拷贝（同版本 Postgres 数据文件可平移）。
 - **环境变量契约**：所有宿主相关值都经 compose 变量插值（`docker/.env.example` 有完整清单与默认值——复制为 `.env` 即可按环境覆盖，无需改动 compose 文件）：`SPRING_AI_OLLAMA_BASE_URL`（模型后端，部署到其他环境时指向可达的推理服务）、`APP_VERSION`（镜像 tag，与 pom 版本一致）、`APP_PORT`（宿主端口，Prometheus 经 compose 网络内 `app:8080` 抓取，不随端口映射变化）、`OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://tempo:4317`，gRPC 传输——HTTP 传输对 Tempo receiver 会 404）、`ORCHESTRATOR_CONTROL_STORE`（`db`：PostgreSQL / `file`：JSON）、`POSTGRES_DB|USER|PASSWORD`、`ORCHESTRATOR_CRYPTO_KEY`（可选，开启 MCP secret 的 AES-GCM 字段加密）、`ORCHESTRATOR_SPRING_EXCLUDE`（compose 置空以恢复 DataSource 自动配置——本地 file 模式默认排除它，避免无 JDBC url 启动失败）。
 - **可迁移部署**：整套服务以 `name: orchestrator` 固定项目名，镜像 `orchestrator:${APP_VERSION:-2.1.0}` 版本化命名——在任何有 Docker 的机器上 clone 仓库 + `docker compose up -d --build` 即得一致部署，或将镜像推送到 registry 后在其他环境直接 pull 启动；除 Ollama 地址外无宿主耦合。
 - **前置条件**：模型后端就绪（本地为宿主机 Ollama，默认 `qwen3-vl:4b` / 各 agent 覆盖为 `qwen:7b`，可用 `ollama pull` 调整）。
