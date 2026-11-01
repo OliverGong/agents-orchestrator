@@ -68,7 +68,8 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void unparseableModelOutputMapsTo502() throws Exception {
-    when(orchestrator.planTrip(any(), nullable(String.class))).thenThrow(new StreamReadException("Unexpected character ('`')"));
+    when(orchestrator.planTrip(any(), nullable(String.class), nullable(String.class)))
+        .thenThrow(new StreamReadException("Unexpected character ('`')"));
 
     mockMvc.perform(post("/api/trips/plan")
             .contentType(MediaType.APPLICATION_JSON)
@@ -82,7 +83,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void unreachableBackendMapsTo503() throws Exception {
-    when(orchestrator.planTrip(any(), nullable(String.class)))
+    when(orchestrator.planTrip(any(), nullable(String.class), nullable(String.class)))
         .thenThrow(new ResourceAccessException("Connection refused: localhost:11434"));
 
     mockMvc.perform(post("/api/trips/plan")
@@ -97,7 +98,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void backendClientErrorMapsTo503() throws Exception {
-    when(orchestrator.planTrip(any(), nullable(String.class)))
+    when(orchestrator.planTrip(any(), nullable(String.class), nullable(String.class)))
         .thenThrow(new RestClientException("404 model 'qwen:7b' not found"));
 
     mockMvc.perform(post("/api/trips/plan")

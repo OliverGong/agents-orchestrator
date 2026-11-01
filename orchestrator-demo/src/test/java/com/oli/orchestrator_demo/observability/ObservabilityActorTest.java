@@ -27,7 +27,7 @@ class ObservabilityActorTest {
 
   @Test
   void foldsEventsIntoARunTimeline() {
-    actor.tell(AgentObservabilityEvent.runStarted("run-1", "default-trip-planning", null, "SEQUENTIAL"));
+    actor.tell(AgentObservabilityEvent.runStarted("run-1", "default-trip-planning", null, null, "SEQUENTIAL", "{}"));
     actor.tell(AgentObservabilityEvent.stageCompleted("run-1", "research", "research", 0,
         List.of(), "SEQUENTIAL", "main", 5, null, null, "{\"in\":1}", "{\"out\":1}"));
     actor.tell(AgentObservabilityEvent.runCompleted("run-1", "{\"final\":true}"));
@@ -44,7 +44,7 @@ class ObservabilityActorTest {
 
   @Test
   void marksRunsFailedWhenAStageFails() {
-    actor.tell(AgentObservabilityEvent.runStarted("run-2", "tpl", null, "CONCURRENT"));
+    actor.tell(AgentObservabilityEvent.runStarted("run-2", "tpl", null, null, "CONCURRENT", "{}"));
     actor.tell(AgentObservabilityEvent.stageFailed("run-2", "budget", "budget", 1,
         List.of("itinerary"), "CONCURRENT", "vt", 3, "boom", null, null, "{\"in\":1}"));
     actor.tell(AgentObservabilityEvent.runFailed("run-2", "boom"));
@@ -71,7 +71,7 @@ class ObservabilityActorTest {
   @Test
   void evictsOldestRunsBeyondRetention() {
     for (int i = 0; i < ObservabilityActor.MAX_RETAINED_RUNS + 50; i++) {
-      actor.tell(AgentObservabilityEvent.runStarted("run-" + i, "tpl", null, "SEQUENTIAL"));
+      actor.tell(AgentObservabilityEvent.runStarted("run-" + i, "tpl", null, null, "SEQUENTIAL", "{}"));
     }
 
     until(() -> actor.timeline("run-" + (ObservabilityActor.MAX_RETAINED_RUNS + 49)).isPresent());

@@ -28,6 +28,11 @@ public final class NoopRunMetricsStore implements RunMetricsStore {
   }
 
   @Override
+  public List<RunStageMetrics> byRun(String runId) {
+    return List.of();
+  }
+
+  @Override
   public String name() {
     return "noop";
   }

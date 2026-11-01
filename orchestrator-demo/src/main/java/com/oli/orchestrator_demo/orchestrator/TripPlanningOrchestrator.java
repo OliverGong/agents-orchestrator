@@ -116,21 +116,29 @@ public class TripPlanningOrchestrator {
    * the observability actor as a replayable event timeline.
    */
   public OrchestratorContext planTrip(TripRequest request) {
-    return planTrip(request, null);
+    return planTrip(request, null, null);
+  }
+
+  /** Same workflow, attributed to the control-plane scenario (no business id). */
+  public OrchestratorContext planTrip(TripRequest request, String scenarioId) {
+    return planTrip(request, scenarioId, null);
   }
 
   /**
    * Same workflow, but attributed to the control-plane scenario it was started
    * from (nullable for plain ad-hoc runs): the scenario id rides on the
    * {@code RUN_STARTED} event, so the durable metrics store can aggregate
-   * per-scenario LM consumption and durations.
+   * per-scenario LM consumption and durations. The optional {@code businessId}
+   * is the caller's correlation key (v2.3): together with the unique
+   * {@code runId} it seeds the durable instance registry at request entry, so
+   * monitoring can reconstruct the full context of the instantiation.
    */
-  public OrchestratorContext planTrip(TripRequest request, String scenarioId) {
+  public OrchestratorContext planTrip(TripRequest request, String scenarioId, String businessId) {
     String runId = UUID.randomUUID().toString();
     // Read once per run: a control-plane template swap takes effect on the
     // next request without disturbing the ones already executing.
     WorkflowTemplate template = templateHolder.get();
-    log.info("Planning trip for request: {} (run {})", request, runId);
+    log.info("Planning trip for request: {} (run {}, business {})", request, runId, businessId);
 
     long workflowStartTime = System.currentTimeMillis();
 
@@ -139,7 +147,7 @@ public class TripPlanningOrchestrator {
         .lowCardinalityKeyValue("mode", template.mode().name())
         .start();
     observability.tell(AgentObservabilityEvent.runStarted(runId, template.name(), scenarioId,
-        template.mode().name()));
+        businessId, template.mode().name(), toJson(request)));
     orchestratorMetrics.runStarted(template.name(), template.mode().name());
     try (Observation.Scope scope = run.openScope()) {
       // Captured once inside the scope so every concurrent wave task inherits

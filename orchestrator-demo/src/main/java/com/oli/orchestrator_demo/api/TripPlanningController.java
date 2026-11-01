@@ -33,12 +33,17 @@ public class TripPlanningController {
    * @param scenarioId optional control-plane scenario the run is started from
    *        (attribution for the per-scenario LM metrics); {@code null} for
    *        ad-hoc runs.
+   * @param businessId optional caller-side correlation key of the business
+   *        trigger (v2.3): together with the unique run id it links the
+   *        instantiated run in the instance registry, so monitoring can
+   *        reconstruct the full context of the business request.
    */
   @PostMapping("/plan")
   public OrchestratorContext plan(@RequestBody TripRequest request,
-      @RequestParam(value = "scenarioId", required = false) String scenarioId) {
+      @RequestParam(value = "scenarioId", required = false) String scenarioId,
+      @RequestParam(value = "businessId", required = false) String businessId) {
     validate(request);
-    return orchestrator.planTrip(request, scenarioId);
+    return orchestrator.planTrip(request, scenarioId, businessId);
   }
 
   private static void validate(TripRequest request) {

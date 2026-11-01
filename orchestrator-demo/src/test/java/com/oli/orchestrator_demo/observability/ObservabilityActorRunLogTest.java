@@ -20,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.junit.jupiter.api.Test;
 
+import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.observability.AgentObservabilityEvent.LmUsage;
 import com.oli.orchestrator_demo.observability.RunTimeline.RunStatus;
 import com.oli.orchestrator_demo.teamlog.TeamLogEntry;
@@ -51,7 +52,7 @@ class ObservabilityActorRunLogTest {
 
   private ObservabilityActor actorWithLog(TeamLogStore logStore) {
     return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()),
-        new NoopRunMetricsStore(), logStore);
+        new NoopRunMetricsStore(), logStore, new ChatClientStubs.CollectingInstanceStore());
   }
 
   @Test
@@ -59,7 +60,8 @@ class ObservabilityActorRunLogTest {
     CollectingLogStore logStore = new CollectingLogStore();
     ObservabilityActor actor = actorWithLog(logStore);
 
-    actor.tell(AgentObservabilityEvent.runStarted("run-1", "parallel-trip-planning", "scn-a", "CONCURRENT"));
+    actor.tell(AgentObservabilityEvent.runStarted("run-1", "parallel-trip-planning", "scn-a", null,
+        "CONCURRENT", "{}"));
     actor.tell(AgentObservabilityEvent.toolCalled("run-1", "research", "research", 0,
         "weather", "getForecast", 120, "sunny 20C", null));
     actor.tell(AgentObservabilityEvent.stageCompleted("run-1", "research", "research", 0,
@@ -115,7 +117,7 @@ class ObservabilityActorRunLogTest {
     };
     ObservabilityActor actor = actorWithLog(failing);
 
-    actor.tell(AgentObservabilityEvent.runStarted("run-1", "tpl", "scn-a", "SEQUENTIAL"));
+    actor.tell(AgentObservabilityEvent.runStarted("run-1", "tpl", "scn-a", null, "SEQUENTIAL", "{}"));
 
     until(() -> actor.timeline("run-1").isPresent());
     assertThat(actor.recentRuns()).hasSize(1);

@@ -66,5 +66,11 @@ public interface RunMetricsStore {
   /** Aggregates over the window since {@code since}; scenario filter nullable. */
   List<StageMetricsSummary> aggregate(Instant since, String scenarioId);
 
+  /**
+   * All durable stage rows of one run (multi-agent / multi-model call details
+   * behind the instance detail view); empty when no durable rows exist.
+   */
+  List<RunStageMetrics> byRun(String runId);
+
   String name();
 }

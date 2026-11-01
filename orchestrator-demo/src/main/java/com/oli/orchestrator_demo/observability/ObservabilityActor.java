@@ -21,12 +21,23 @@
  *              failure degrades to a warning, never to a lost timeline. The
  *              scenario attribution recorded with each row comes from the
  *              run's {@code RUN_STARTED} event.
+ *
+ *              Since v2.3 the actor additionally drives the durable
+ *              {@link com.oli.orchestrator_demo.instance.InstanceStore
+ *              instance registry} in the same write-ahead order: the business
+ *              trigger (request entry with its business id and payload)
+ *              inserts the RUNNING instance row, and the terminal events move
+ *              it to COMPLETED / FAILED — the trigger-to-outcome correlation
+ *              that survives beyond the in-memory retention cap and service
+ *              restarts. Store failures degrade to warnings, exactly like the
+ *              other write-ahead sinks.
  * @Author OliverGong
  * @Date Oct 29, 2026
- * @Version 2.2
+ * @Version 2.3
  */
 package com.oli.orchestrator_demo.observability;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -41,6 +52,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import com.oli.orchestrator_demo.instance.InstanceStore;
+import com.oli.orchestrator_demo.instance.RunInstance;
 import com.oli.orchestrator_demo.teamlog.NoopTeamLogStore;
 import com.oli.orchestrator_demo.teamlog.TeamLogEntry;
 import com.oli.orchestrator_demo.teamlog.TeamLogStore;
@@ -60,24 +73,26 @@ public class ObservabilityActor {
   private final Map<String, RunTimeline> timelines = new ConcurrentHashMap<>();
   /** Actor-thread-only insertion order used to evict the oldest runs. */
   private final ArrayDeque<String> insertionOrder = new ArrayDeque<>();
-  /** Actor-thread-only scenario attribution per run (from RUN_STARTED). */
-  private final Map<String, String> runScenarios = new HashMap<>();
+  /** Actor-thread-only run attribution (from RUN_STARTED): scenario + business id. */
+  private final Map<String, RunMeta> runMetas = new HashMap<>();
   private final ObservabilitySsePublisher ssePublisher;
   private final RunMetricsStore metricsStore;
   private final TeamLogStore teamLogStore;
+  private final InstanceStore instanceStore;
   private final Thread actorThread = Thread.ofVirtual().name("observability-actor").start(this::consume);
   private volatile boolean accepting = true;
 
-  public ObservabilityActor(ObservabilitySsePublisher ssePublisher, RunMetricsStore metricsStore) {
-    this(ssePublisher, metricsStore, new NoopTeamLogStore());
+  /** Per-run attribution captured at request entry (RUN_STARTED). */
+  private record RunMeta(String scenarioId, String businessId) {
   }
 
   @org.springframework.beans.factory.annotation.Autowired
   public ObservabilityActor(ObservabilitySsePublisher ssePublisher, RunMetricsStore metricsStore,
-      TeamLogStore teamLogStore) {
+      TeamLogStore teamLogStore, InstanceStore instanceStore) {
     this.ssePublisher = ssePublisher;
     this.metricsStore = metricsStore;
     this.teamLogStore = teamLogStore;
+    this.instanceStore = instanceStore;
     // Retry events are published from inside agent calls (no bean access);
     // the static bus routes them into the same mailbox as direct producers.
     ObservabilityEventBus.subscribe(this::tell);
@@ -132,19 +147,19 @@ public class ObservabilityActor {
     recordLog(event);
     recordMetrics(event);
     if (event.type() == AgentObservabilityEvent.Type.RUN_STARTED) {
+      recordInstanceStart(event);
       insertionOrder.addLast(event.runId());
-      if (event.scenarioId() != null) {
-        runScenarios.put(event.runId(), event.scenarioId());
-      }
+      runMetas.put(event.runId(), new RunMeta(event.scenarioId(), event.businessId()));
       while (insertionOrder.size() > MAX_RETAINED_RUNS) {
         String evicted = insertionOrder.pollFirst();
         timelines.remove(evicted);
-        runScenarios.remove(evicted);
+        runMetas.remove(evicted);
       }
     }
     else if (event.type() == AgentObservabilityEvent.Type.RUN_COMPLETED
         || event.type() == AgentObservabilityEvent.Type.RUN_FAILED) {
-      runScenarios.remove(event.runId());
+      recordInstanceFinish(event);
+      runMetas.remove(event.runId());
     }
     timelines.compute(event.runId(), (runId, timeline) -> fold(runId, timeline, event));
     // Forwarded from the actor thread, so SSE clients observe the same
@@ -169,8 +184,9 @@ public class ObservabilityActor {
     }
     try {
       AgentObservabilityEvent.LmUsage usage = event.usage();
+      RunMeta meta = runMetas.get(event.runId());
       metricsStore.record(new RunMetricsStore.RunStageMetrics(
-          event.runId(), runScenarios.get(event.runId()), event.stageName(), event.agentName(),
+          event.runId(), meta == null ? null : meta.scenarioId(), event.stageName(), event.agentName(),
           usage == null ? null : usage.model(), event.waveIndex(), event.attempt(), event.type().name(),
           event.durationMs(), usage == null ? null : usage.promptTokens(),
           usage == null ? null : usage.completionTokens(), usage == null ? null : usage.totalTokens(),
@@ -179,6 +195,42 @@ public class ObservabilityActor {
     catch (RuntimeException ex) {
       log.warn("Run metrics persistence failed for run {} stage {}: {}",
           event.runId(), event.stageName(), ex.getMessage());
+    }
+  }
+
+  /**
+   * Write-ahead instance lifecycle: the business trigger inserts the RUNNING
+   * row (with the request payload from the RUN_STARTED event), the terminal
+   * events move it to COMPLETED / FAILED. A failing store degrades to a
+   * warning; ghost terminal events (no instance row) are ignored.
+   */
+  private void recordInstanceStart(AgentObservabilityEvent event) {
+    try {
+      instanceStore.start(new RunInstance(event.runId(), event.businessId(), event.scenarioId(),
+          event.templateName(), event.mode(), RunInstance.TRIGGER_API, RunInstance.RUNNING,
+          event.inputContextJson(), event.timestamp(), null, null, null));
+    }
+    catch (RuntimeException ex) {
+      log.warn("Instance registry start failed for run {}: {}", event.runId(), ex.getMessage());
+    }
+  }
+
+  private void recordInstanceFinish(AgentObservabilityEvent event) {
+    try {
+      RunTimeline timeline = timelines.get(event.runId());
+      if (timeline == null) {
+        return;
+      }
+      long durationMs = Duration.between(timeline.startedAt(), event.timestamp()).toMillis();
+      if (event.type() == AgentObservabilityEvent.Type.RUN_COMPLETED) {
+        instanceStore.complete(event.runId(), event.timestamp(), durationMs);
+      }
+      else {
+        instanceStore.fail(event.runId(), event.timestamp(), event.errorMessage());
+      }
+    }
+    catch (RuntimeException ex) {
+      log.warn("Instance registry finish failed for run {}: {}", event.runId(), ex.getMessage());
     }
   }
 
@@ -201,7 +253,9 @@ public class ObservabilityActor {
 
   /** Maps one observability event to its durable team-log entry. */
   private TeamLogEntry toLogEntry(AgentObservabilityEvent event) {
-    String scenarioId = event.scenarioId() != null ? event.scenarioId() : runScenarios.get(event.runId());
+    RunMeta meta = runMetas.get(event.runId());
+    String scenarioId = event.scenarioId() != null ? event.scenarioId()
+        : meta == null ? null : meta.scenarioId();
     String level = TeamLogEntry.INFO;
     String message = event.type().name();
     switch (event.type()) {

@@ -41,6 +41,11 @@ class ObservabilityActorMetricsTest {
     }
 
     @Override
+    public List<RunStageMetrics> byRun(String runId) {
+      return List.of();
+    }
+
+    @Override
     public String name() {
       return "collecting";
     }
@@ -51,7 +56,7 @@ class ObservabilityActorMetricsTest {
     CollectingStore store = new CollectingStore();
     ObservabilityActor actor = ChatClientStubs.actor(store);
 
-    actor.tell(AgentObservabilityEvent.runStarted("run-1", "tpl", "scn-a", "SEQUENTIAL"));
+    actor.tell(AgentObservabilityEvent.runStarted("run-1", "tpl", "scn-a", null, "SEQUENTIAL", "{}"));
     actor.tell(AgentObservabilityEvent.stageCompleted("run-1", "research", "research", 0,
         List.of(), "SEQUENTIAL", "main", 100, 1, new LmUsage(120, 45, 165, "qwen3:8b", 1),
         "{\"in\":1}", "{\"out\":1}"));
@@ -88,6 +93,11 @@ class ObservabilityActorMetricsTest {
       }
 
       @Override
+      public List<RunMetricsStore.RunStageMetrics> byRun(String runId) {
+        return List.of();
+      }
+
+      @Override
       public String name() {
         return "failing";
       }
@@ -99,7 +109,7 @@ class ObservabilityActorMetricsTest {
         List.of(), "SEQUENTIAL", "main", 1, null, null, "{}", "{}"));
 
     // Known run with a failing store: the timeline still folds.
-    actor.tell(AgentObservabilityEvent.runStarted("run-1", "tpl", null, "SEQUENTIAL"));
+    actor.tell(AgentObservabilityEvent.runStarted("run-1", "tpl", null, null, "SEQUENTIAL", "{}"));
     actor.tell(AgentObservabilityEvent.stageCompleted("run-1", "research", "research", 0,
         List.of(), "SEQUENTIAL", "main", 1, null, null, "{}", "{}"));
 

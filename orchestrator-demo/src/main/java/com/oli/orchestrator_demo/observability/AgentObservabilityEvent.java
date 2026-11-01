@@ -23,9 +23,16 @@
  *              {@code UsageCaptureAdvisor} and accumulated on the
  *              {@link LmUsageCollector} thread-local, so a stage event holds
  *              the full consumption of all its attempts.
+ *
+ *              Since v2.3 the {@code RUN_STARTED} event also carries the
+ *              business trigger of the iPaaS-style instantiation: the caller's
+ *              {@code businessId} (correlating key alongside the unique
+ *              {@code runId}) and the request payload as JSON (riding the
+ *              {@code inputContextJson} slot), from which the durable instance
+ *              registry seeds the instance row.
  * @Author OliverGong
  * @Date Oct 29, 2026
- * @Version 2.2
+ * @Version 2.3
  */
 package com.oli.orchestrator_demo.observability;
 
@@ -38,6 +45,7 @@ public record AgentObservabilityEvent(
   String runId,
   String templateName,
   String scenarioId,
+  String businessId,
   String stageName,
   String agentName,
   Integer waveIndex,
@@ -87,17 +95,24 @@ public record AgentObservabilityEvent(
     parallelPeers = parallelPeers == null ? List.of() : List.copyOf(parallelPeers);
   }
 
+  /**
+   * The business trigger of a run (request entry): the caller's business id
+   * rides along the unique run id and the request payload (JSON) occupies the
+   * {@code inputContextJson} slot — together they seed the durable instance
+   * registry row.
+   */
   public static AgentObservabilityEvent runStarted(String runId, String templateName, String scenarioId,
-      String mode) {
+      String businessId, String mode, String requestJson) {
     return new AgentObservabilityEvent(Type.RUN_STARTED, Instant.now(), runId, templateName,
-        scenarioId, null, null, null, null, mode, null, null, null, null, null, null, null, null);
+        scenarioId, businessId, null, null, null, null, mode, null, null, null, null, null,
+        requestJson, null, null);
   }
 
   public static AgentObservabilityEvent stageCompleted(String runId, String stageName, String agentName,
       int waveIndex, List<String> parallelPeers, String mode, String threadName, long durationMs,
       Integer attempt, LmUsage usage, String inputContextJson, String outputContextJson) {
     return new AgentObservabilityEvent(Type.STAGE_COMPLETED, Instant.now(), runId, null,
-        null, stageName, agentName, waveIndex, parallelPeers, mode, threadName, durationMs, null, attempt,
+        null, null, stageName, agentName, waveIndex, parallelPeers, mode, threadName, durationMs, null, attempt,
         usage, inputContextJson, outputContextJson, null);
   }
 
@@ -105,7 +120,7 @@ public record AgentObservabilityEvent(
       int waveIndex, List<String> parallelPeers, String mode, String threadName, long durationMs,
       String errorMessage, Integer attempt, LmUsage usage, String inputContextJson) {
     return new AgentObservabilityEvent(Type.STAGE_FAILED, Instant.now(), runId, null,
-        null, stageName, agentName, waveIndex, parallelPeers, mode, threadName, durationMs, errorMessage,
+        null, null, stageName, agentName, waveIndex, parallelPeers, mode, threadName, durationMs, errorMessage,
         attempt, usage, inputContextJson, null, null);
   }
 
@@ -117,7 +132,7 @@ public record AgentObservabilityEvent(
   public static AgentObservabilityEvent stageRetried(String runId, String stageName, String agentName,
       Integer waveIndex, String threadName, int attempt, String errorMessage) {
     return new AgentObservabilityEvent(Type.STAGE_RETRIED, Instant.now(), runId, null,
-        null, stageName, agentName, waveIndex, null, null, threadName, null,
+        null, null, stageName, agentName, waveIndex, null, null, threadName, null,
         "attempt %d failed to parse model output: %s".formatted(attempt, errorMessage), attempt,
         null, null, null, null);
   }
@@ -125,12 +140,13 @@ public record AgentObservabilityEvent(
   /** Reuses the {@code outputContextJson} slot to carry the final context. */
   public static AgentObservabilityEvent runCompleted(String runId, String finalContextJson) {
     return new AgentObservabilityEvent(Type.RUN_COMPLETED, Instant.now(), runId, null,
-        null, null, null, null, null, null, null, null, null, null, null, null, finalContextJson, null);
+        null, null, null, null, null, null, null, null, null, null, null, null, null,
+        finalContextJson, null);
   }
 
   public static AgentObservabilityEvent runFailed(String runId, String errorMessage) {
     return new AgentObservabilityEvent(Type.RUN_FAILED, Instant.now(), runId, null,
-        null, null, null, null, null, null, null, null, errorMessage, null, null, null, null, null);
+        null, null, null, null, null, null, null, null, null, errorMessage, null, null, null, null, null);
   }
 
   /**
@@ -145,7 +161,7 @@ public record AgentObservabilityEvent(
     ToolCallDetail detail = new ToolCallDetail(serverName, toolName, durationMs,
         errorMessage == null ? "OK" : "ERROR", resultSummary, errorMessage);
     return new AgentObservabilityEvent(Type.TOOL_CALLED, Instant.now(), runId, null,
-        null, stageName, agentName, waveIndex, null, null, null, durationMs, errorMessage, null,
+        null, null, stageName, agentName, waveIndex, null, null, null, durationMs, errorMessage, null,
         null, null, null, detail);
   }
 }
