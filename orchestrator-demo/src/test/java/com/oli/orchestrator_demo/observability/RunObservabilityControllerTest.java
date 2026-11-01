@@ -8,7 +8,7 @@
  * @Date Oct 29, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.api;
+package com.oli.orchestrator_demo.observability;
 
 import static com.oli.orchestrator_demo.Await.until;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,8 +23,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
-import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.observability.RunTimeline.RunStatus;
 
 class RunObservabilityControllerTest {

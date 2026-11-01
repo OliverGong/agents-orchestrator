@@ -78,12 +78,11 @@
 
 ```
 com.oli.orchestrator_demo
-├── api                          # REST 层
-│   ├── TripPlanningController   # REST 入口：POST /api/trips/plan
-│   ├── RunObservabilityController # GET /api/trips/runs[/id]：运行时间线与上下文回放
-│   ├── ControlPlaneController   # GET/PUT /api/v1/control/*：控制平面读写（v1，见 9.3）
-│   ├── ObservabilitySseController # GET /api/v1/events/stream：SSE 实时事件流（v1，见 9.5）
-│   └── GlobalExceptionHandler   # 异常 → 400/502/503/500 结构化映射
+├── api                          # REST 横切（v3.0：控制器已归位各自领域包）
+│   ├── GlobalExceptionHandler   # 异常 → 400/502/503/500 结构化映射
+│   └── ApiCacheControlConfig    # /api/** 统一 Cache-Control: no-cache（v3.0）
+├── trip                         # 业务触发 REST（v3.0 归位）
+│   └── TripPlanningController   # REST 入口：POST /api/trips/plan
 ├── agent                        # Agent SPI 与实现
 │   ├── Agent<I, O>              # Agent SPI：name() + execute(I)
 │   ├── AbstractContextAgent<R>  # 模板方法基类：respond() + merge() + 解析重试
@@ -340,7 +339,7 @@ ChatClient 上，在响应返回给转换器前按序执行三步净化：
 - `inputContextJson` / `outputContextJson`：阶段前后黑板快照（Jackson 3
   序列化，截断至 20KB）——**整个 Agent 上下文可回放**。
 
-`RunObservabilityController`（api 包）暴露只读视图：`GET /api/trips/runs`
+`RunObservabilityController`（observability 包）暴露只读视图：`GET /api/trips/runs`
 （运行列表摘要）与 `GET /api/trips/runs/{runId}`（按依赖波次分组，
 `parallel=true` 标记并发波次，未知 runId 返回 404）。
 
@@ -572,8 +571,8 @@ management.metrics.distribution.percentiles-histogram.orchestrator.run.duration=
 | `ItineraryAgentTest`（2 例） | agent | 消费调研+预算；DayPlan 列表解析；prompt 含双上游；**并行模板**：预算未就绪时 prompt 注入 "not on the blackboard yet / stay conservative" 提示 |
 | `ReviewAgentTest` | agent | 消费全部三类上游；最终结论；prompt 含行程 |
 | `AbstractContextAgentTest`（3 例） | agent | 首次解析失败重试成功；重试耗尽后抛 `JacksonException`；首次成功不重试 |
-| `TripPlanningControllerTest` | api | POST JSON → 200；入参绑定；全量上下文序列化 |
-| `RunObservabilityControllerTest`（2 例） | api | GET /api/trips/runs[/id]：时间线按波次分组 + parallel 标记 + 上下文 JSON；未知 runId → 404 |
+| `TripPlanningControllerTest` | trip | POST JSON → 200；入参绑定；全量上下文序列化 |
+| `RunObservabilityControllerTest`（2 例） | observability | GET /api/trips/runs[/id]：时间线按波次分组 + parallel 标记 + 上下文 JSON；未知 runId → 404 |
 | `ResponseSanitizerAdvisorTest`（10 例） | agent | 纯 JSON 透传；剥 Markdown 围栏；prose 中提取 JSON；纯文本不动；null/blank 容错；**回归**：围栏输出 → `entity()` 成功；裸数组按 Schema 单数组字段包装；多属性 Schema 与无 Schema 时不动；真实链路裸数组 → `ItineraryResponse` 解析成功 |
 | `GlobalExceptionHandlerTest`（6 例） | api | 校验失败 → 400；畸形 body → 400；`JacksonException` → 502；`RestClientException`/`ResourceAccessException` → 503；未知路由 → 404 |
 | `AgentConfigRegistryTest`（6 例） | control | 播种默认态并持久化；重启重载并重新热应用模板；updateAgent 校验（未知 agent/空 prompt/悬空 MCP 引用）+ 版本单调 + 持久化跨"重启"保留；updateWorkflow 校验失败不 bump 版本、成功热切换；MCP 记录唯一名/传输/端点校验 |

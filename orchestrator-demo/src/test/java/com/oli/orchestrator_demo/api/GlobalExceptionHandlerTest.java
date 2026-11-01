@@ -30,6 +30,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.oli.orchestrator_demo.orchestrator.TripPlanningOrchestrator;
+import com.oli.orchestrator_demo.trip.TripPlanningController;
 import tools.jackson.core.exc.StreamReadException;
 
 class GlobalExceptionHandlerTest {

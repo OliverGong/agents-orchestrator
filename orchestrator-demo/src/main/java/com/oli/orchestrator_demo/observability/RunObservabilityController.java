@@ -11,7 +11,7 @@
  * @Date Oct 29, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.api;
+package com.oli.orchestrator_demo.observability;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -25,10 +25,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
-import com.oli.orchestrator_demo.observability.ObservabilityActor;
-import com.oli.orchestrator_demo.observability.RunTimeline;
 
 @RestController
 @RequestMapping("/api/trips/runs")
@@ -67,8 +63,8 @@ public class RunObservabilityController {
         events.stream().filter(event -> event.type() == AgentObservabilityEvent.Type.STAGE_FAILED).count());
   }
 
-  /** Package-visible so the instance detail view reuses the same projection. */
-  static RunDetails toDetails(RunTimeline timeline) {
+  /** Public so the instance detail view (instance package) reuses the same projection. */
+  public static RunDetails toDetails(RunTimeline timeline) {
     // Tool-call and retry events are emitted during stage execution, i.e.
     // before the stage's own STAGE_* event; attribute them by (wave, stage, agent).
     Map<String, List<RunDetails.ToolCallView>> pendingToolCalls = new LinkedHashMap<>();

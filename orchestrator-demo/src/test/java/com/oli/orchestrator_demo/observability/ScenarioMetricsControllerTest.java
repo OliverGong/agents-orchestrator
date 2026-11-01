@@ -10,7 +10,7 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.api;
+package com.oli.orchestrator_demo.observability;
 
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;

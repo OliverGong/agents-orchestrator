@@ -7,7 +7,7 @@
  * @Date Oct 29, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.api;
+package com.oli.orchestrator_demo.trip;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

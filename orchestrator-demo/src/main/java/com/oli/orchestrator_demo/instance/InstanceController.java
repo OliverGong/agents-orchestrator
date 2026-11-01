@@ -16,7 +16,7 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.api;
+package com.oli.orchestrator_demo.instance;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -29,10 +29,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.oli.orchestrator_demo.instance.InstanceStore;
-import com.oli.orchestrator_demo.instance.RunInstance;
 import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.observability.RunMetricsStore;
+import com.oli.orchestrator_demo.observability.RunObservabilityController;
 import com.oli.orchestrator_demo.teamlog.TeamLogEntry;
 import com.oli.orchestrator_demo.teamlog.TeamLogStore;
 
