@@ -22,9 +22,9 @@
 | v2.1 | `90f76a8` + console | **场景元模型（Scenario Plane）**：场景 = 请求模板 + 工作流覆盖 + Agent 覆盖 + MCP 映射 + 产物类型，`ScenarioRegistry` 单写者 + `ScenarioStore` 接缝（file / `cp_scenario*` 表，跟随同一 store 开关）；`activate` 将覆盖热应用到控制平面（动态实例化）；`dry-run` 零 token 推演（模板校验 + 波次展开 + 黑板槽位流）；**解析重试事件链**：`STAGE_RETRIED` 经 RunContext 归因进时间线 / SSE / 回放；**控制台 v2.1**：左侧三组导航（场景运行·推演·配置 / agents·workflow·MCP / 回放·观测）+ 运行回放时间线 / DAG / 泳道三视图（原生 SVG）+ retry 链可视化 |
 | v2.2 | `b4b7121` → `050e587` | **观测落库 + LM 指标**（M1）：`ObservabilityActor` WAL 顺序先落库再推送，`obs_run_metrics` 记录每场景每阶段的 LM 耗时 / prompt·completion·total tokens / 模型 / 重试（`UsageCaptureAdvisor` 采集），场景维度指标 API；**元信息补录**（M2）：`meta/` 平面——运行时配置（modelBackend / 超时 / 波次并发 / temperature / topP）、发布门户注册表、按场景发布配置（file / `mp_*` 表），左侧「元信息补录」页三卡；**团队日志**（M3）：`team_log` 持久化运行时日志（RUN / AUDIT / SYSTEM，不限于业务日志）+ 控制面/元数据/场景面 14 个变更端点全量审计 + Log Explorer 筛选页；**发布管道**（M4）：可移植 JSON 发布包（场景快照 + dry-run 证据 + 门户/版本元数据，SHA-256）追加到 `rl_release` 注册表，发布记录随时导出；**导航-画布联动**（M5）：全局上下文条 + 生命周期闭合链 推演→激活·运行→回放→场景指标，激活场景持久化（`activeScenarioId`），运行/回放携带场景归因 |
 | v2.3 | `6a14f2f` → `f8bcc76` | **业务触发层 + 实例注册表**（M1/M2）：每次业务触发（`POST /api/trips/plan`，可携带调用方 `businessId`）在请求进入时实例化一条 RUNNING 记录（唯一 runId + businessId），终态由 `ObservabilityActor` WAL 写入 `instance/` 注册表（JSONL / `obs_run_instance` 表，跟随 store 开关）；`GET /api/v1/instances` 按 businessId / 场景 / 状态 / 关键字 / 时间窗检索，`GET /api/v1/instances/{runId}` 聚合完整上下文（注册表行 + 可回放时间线 + 每阶段多 Agent/多模型 LM 明细 + 关联团队日志）；**控制台闭环**（M3）：左侧「可观测」新增「实例追踪」页（数据溯源入口），运行表单支持业务 ID，日志页 runId/场景可点击互链，实例 ↔ 回放 ↔ 日志 ↔ 指标双向跳转 |
-| v3.0（开发中） | `b132679` → | **控制器归位**（M1）：controllers 迁入各自领域包 `trip/` `observability/` `instance/`，`api/` 仅留横切（异常映射 + 缓存策略）；**前端解耦**（M2）：`console/` 独立 TypeScript 控制台工程（Vue 3 + Vite + Pinia + Vue Router + Naive UI，strict 构建链），契约 DTO 单一事实源（`types/api.ts`）、11 页面全量迁移（DAG/泳道 SVG 组件化移植）、legacy 全局变量 → route query 跨页上下文、独立 nginx 容器（compose `console` 服务，SPA fallback + SSE 关缓冲反代）；`static/` legacy 保留为零构建回退并标注弃用（v3.1 移除）；**目录重组**（M3）：后端重组为「shared 横切内核 + contract 契约 + 领域模块三层（web/ 包根 / infra，端口-适配器）」、前端 feature-based 分区 + `@` 路径别名（MVC 映射与 AOP/SOP/EIP 落位见 ARCHITECTURE §15）；**工具链**（M4）：console 切换 pnpm（corepack 按 `packageManager` 钉版 + Dockerfile store cache mount）+ Playwright E2E 功能闭环（16 spec，网络级 mock 后端 + SSE 回放）；分支/hotfix 策略见 `docs/BRANCHING.md` |
+| v3.0（开发中） | `b132679` → | **控制器归位**（M1）：controllers 迁入各自领域包 `trip/` `observability/` `instance/`，`api/` 仅留横切（异常映射 + 缓存策略）；**前端解耦**（M2）：`console/` 独立 TypeScript 控制台工程（Vue 3 + Vite + Pinia + Vue Router + Naive UI，strict 构建链），契约 DTO 单一事实源（`types/api.ts`）、11 页面全量迁移（DAG/泳道 SVG 组件化移植）、legacy 全局变量 → route query 跨页上下文、独立 nginx 容器（compose `console` 服务，SPA fallback + SSE 关缓冲反代）；`static/` legacy 保留为零构建回退并标注弃用（v3.1 移除）；**目录重组**（M3）：后端重组为「shared 横切内核 + contract 契约 + 领域模块三层（web/ 包根 / infra，端口-适配器）」、前端 feature-based 分区 + `@` 路径别名（MVC 映射与 AOP/SOP/EIP 落位见 ARCHITECTURE §15）；**工具链**（M4）：console 切换 pnpm（corepack 按 `packageManager` 钉版 + Dockerfile store cache mount）+ Playwright E2E 功能闭环（16 spec，网络级 mock 后端 + SSE 回放）；**契约子包化**（M5）：`kernel.contract` 按角色细分 `spi/model/config/port` 四导航子包（单模块语义不变，R2 守护互引视为包内），前端样式资产归位 `shared/styles`（与 `kernel/shared` 同构）；分支/hotfix 策略见 `docs/BRANCHING.md` |
 
-当前测试规模：**209 个用例全绿**（`./mvnw test`，DB 相关用例跑 H2 内存库），覆盖编排、控制平面校验、场景注册表与零 token 推演、MCP 注册表与工具插桩、观测控制器与落库指标、运行实例注册表、元数据平面、团队日志、发布管道、存储后端与加密；前端另有 **16 个 Playwright E2E**（`cd console && pnpm test:e2e`，网络级 mock 后端 + SSE 回放，无需真实服务），覆盖 11 条路由冒烟与推演 / 运行 / 回放 / 日志筛选功能闭环。
+当前测试规模：**214 个用例全绿**（`./mvnw test`，DB 相关用例跑 H2 内存库），覆盖编排、控制平面校验、场景注册表与零 token 推演、MCP 注册表与工具插桩、观测控制器与落库指标、运行实例注册表、元数据平面、团队日志、发布管道、存储后端与加密；前端另有 **16 个 Playwright E2E**（`cd console && pnpm test:e2e`，网络级 mock 后端 + SSE 回放，无需真实服务），覆盖 11 条路由冒烟与推演 / 运行 / 回放 / 日志筛选功能闭环。
 
 ## 2. 体系架构
 
@@ -33,53 +33,57 @@
         static/ legacy 原生 JS 同源直连，保留为零构建回退至 v3.1）
         │
         ▼
-┌────────────────── Spring Boot 4.1.2（Java 25 虚拟线程）──────────────────┐
-│ trip/       TripPlanningController（v3.0 领域包归位）                     │
-│ observability/  RunObservabilityController · ObservabilitySseController  │
-│ instance/   InstanceController                                            │
-│ api/        GlobalExceptionHandler · ApiCacheControlConfig（横切）        │
-│   │ POST /api/trips/plan              │ GET /api/trips/runs[/{id}]       │
-│   ▼                                   ▲                                  │
-│ orchestrator/  TripPlanningOrchestrator ── 依赖波次执行（wave）           │
-│   │  · 工作流模板：SEQUENTIAL / CONCURRENT，模板热切换                    │
-│   │  · 槽位契约闭环校验（AgentDescriptorRegistry）                        │
-│   ▼                                                                      │
-│ agent/  Research / Budget / Itinerary / Review                           │
-│   │  AbstractContextAgent 模板基类：prompt 组装 · 结构化输出 · 解析重试     │
-│   │  ChatOptions（模型 · 温度，控制平面热更新）+ MCP 工具注入               │
-│   ▼                                                                      │
-│ Spring AI 2.0.1 ChatModel ──► Ollama（默认）/ OpenAI                      │
-│                                                                          │
-│ control/ 控制平面（version 戳，逐次调用读取 → 即时生效）                    │
-│   AgentConfigRegistry（单写者）· AgentDescriptorRegistry · WorkflowConfig  │
-│   └─ ControlPlaneStore：file（JSON，默认/seed/回退）│ db（PostgreSQL）      │
-│      DbControlPlaneStore：cp_* 规范化表 · 单事务写（WAL 崩溃安全）          │
-│      CachedControlPlaneStore：Caffeine，version 戳失效 + TTL               │
-│      ControlPlaneCrypto：AES-256-GCM 字段加密（env）+ GET 脱敏/PUT 还原     │
-│                                                                          │
-│ scenario/ 场景平面（v2.1，镜像控制平面模式）                                 │
-│   ScenarioRegistry（单写者）· DryRunEngine（零 token 推演）                 │
-│   └─ ScenarioStore：file（scenarios.json）│ db（cp_scenario* 两表）         │
-│      Scenario = 请求模板 + workflow/agent/MCP 覆盖 + 产物类型；             │
-│      activate → 覆盖热应用到控制平面（动态实例化，v2.2 记录 activeScenarioId）│
-│                                                                          │
-│ meta/ 元信息补录平面（v2.2）：运行时配置 · 发布门户 · 按场景发布配置           │
-│   └─ MetaStore：file（meta-plane.json）│ db（mp_* 四表）                    │
-│ release/ 发布管道（v2.2）：可移植 JSON 包（SHA-256）→ 发布注册表              │
-│   └─ ReleaseStore：file（release-registry.json）│ db（rl_release 表）       │
-│ teamlog/ 团队日志（v2.2）：RUN / AUDIT / SYSTEM 先落库再推送（WAL 顺序）      │
-│   └─ TeamLogStore：file（team-log.jsonl）│ db（team_log 表）                │
-│ instance/ 运行实例注册表（v2.3）：业务触发 → 唯一 runId + businessId 实例化    │
-│   └─ InstanceStore：file（run-instances.jsonl）│ db（obs_run_instance 表）   │
-│                                                                          │
-│ mcp/ MCP 动态连接层（解耦核心）                                            │
-│   McpConnectionRegistry：版本 diff reconcile · 异步建连 · 30s 冷却重试     │
-│   ├─ Streamable HTTP（默认） ├─ SSE（SDK 已弃用，保留兼容） ├─ STDIO 子进程 │
-│   InstrumentedMcpTool：计时 · mcp.tool.call.duration 指标 · RunContext 归因│
-│                                                                          │
-│ observability/  ObservabilityActor（时间线折叠）· RunContext · SSE         │
-│   Micrometer ─► /actuator/prometheus    OpenTelemetry ─► OTLP gRPC :4317  │
-└──────────────────────────────────────────────────────────────────────────┘
+┌─ Spring Boot 4.1.2（Java 25 虚拟线程）· v3.1 四 zone 分组 ─────────────────────┐
+│ core.trip/web/         TripPlanningController（web 入口）                      │
+│ ops.observability/web/ RunObservabilityController · ObservabilitySseController │
+│ ops.instance/web/      InstanceController                                      │
+│ kernel.shared/web/     GlobalExceptionHandler · ApiCacheControlConfig（横切）  │
+│   │ POST /api/trips/plan              │ GET /api/trips/runs[/{id}]             │
+│   ▼                                   ▲                                        │
+│ core.trip/  TripPlanningOrchestrator ── 依赖波次执行（wave）                   │
+│   │  · 工作流模板：SEQUENTIAL / CONCURRENT，模板热切换                         │
+│   │  · 槽位契约闭环校验（AgentDescriptorRegistry）                             │
+│   ▼                                                                            │
+│ core.agent/  Research / Budget / Itinerary / Review                            │
+│   │  AbstractContextAgent 模板基类：prompt 组装 · 结构化输出 · 解析重试        │
+│   │  ChatOptions（模型 · 温度，控制平面热更新）+ MCP 工具注入                  │
+│   ▼                                                                            │
+│ Spring AI 2.0.1 ChatModel ──► Ollama（默认）/ OpenAI                           │
+│                                                                                │
+│ kernel.contract/ 契约面（单模块 4 导航子包，跨域依赖只经契约）：               │
+│   spi/ Agent SPI（Agent<I,O> + AgentDescriptor）· port/ 跨域端口接口           │
+│   model/ 黑板+运行数据 · config/ 控制面配置（R1–R5 守护测试固化）              │
+│                                                                                │
+│ governance.control/ 控制平面（version 戳，逐次调用读取 → 即时生效）            │
+│   AgentConfigRegistry（单写者）· AgentDescriptorRegistry · WorkflowConfig      │
+│   └─ ControlPlaneStore：file（JSON，默认/seed/回退）│ db（PostgreSQL）         │
+│      DbControlPlaneStore：cp_* 规范化表 · 单事务写（WAL 崩溃安全）             │
+│      CachedControlPlaneStore：Caffeine，version 戳失效 + TTL                   │
+│      ControlPlaneCrypto：AES-256-GCM 字段加密（env）+ GET 脱敏/PUT 还原        │
+│                                                                                │
+│ governance.scenario/ 场景平面（v2.1，镜像控制平面模式）                        │
+│   ScenarioRegistry（单写者）· DryRunEngine（零 token 推演）                    │
+│   └─ ScenarioStore：file（scenarios.json）│ db（cp_scenario* 两表）            │
+│      Scenario = 请求模板 + workflow/agent/MCP 覆盖 + 产物类型；                │
+│      activate → 覆盖热应用到控制平面（动态实例化，v2.2 记录 activeScenarioId） │
+│                                                                                │
+│ governance.meta/ 元信息补录（v2.2）：运行时配置 · 发布门户 · 按场景发布配置    │
+│   └─ MetaStore：file（meta-plane.json）│ db（mp_* 四表）                       │
+│ governance.release/ 发布管道（v2.2）：可移植 JSON 包（SHA-256）→ 注册表        │
+│   └─ ReleaseStore：file（release-registry.json）│ db（rl_release 表）          │
+│ governance.teamlog/ 团队日志（v2.2）：RUN/AUDIT/SYSTEM 先落库再推送（WAL）     │
+│   └─ TeamLogStore：file（team-log.jsonl）│ db（team_log 表）                   │
+│ ops.instance/ 运行实例注册表（v2.3）：业务触发 → runId + businessId 实例化     │
+│   └─ InstanceStore：file（run-instances.jsonl）│ db（obs_run_instance 表）     │
+│                                                                                │
+│ core.mcp/ MCP 动态连接层（解耦核心）                                           │
+│   McpConnectionRegistry：版本 diff reconcile · 异步建连 · 30s 冷却重试         │
+│   ├─ Streamable HTTP（默认） ├─ SSE（SDK 已弃用，保留兼容） ├─ STDIO 子进程    │
+│   InstrumentedMcpTool：计时 · mcp.tool.call.duration 指标 · RunContext 归因    │
+│                                                                                │
+│ ops.observability/  ObservabilityActor（时间线折叠）· RunContext · SSE         │
+│   Micrometer ─► /actuator/prometheus    OpenTelemetry ─► OTLP gRPC :4317       │
+└─────────────────────────────────────────────────────────────────────────────────┘
         │                                        │
         ▼                                        ▼
  Prometheus :9090（指标抓取）            Tempo :4317（链路） → Grafana :3000（预置仪表盘）

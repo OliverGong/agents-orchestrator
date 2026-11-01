@@ -1,6 +1,7 @@
 # 目录结构架构设计（Directory Architecture）
 
-> 适用版本：v3.0+（zone 分组层引入于 feat/v3.0-console-decoupling）
+> 适用版本：v3.0+（zone 分组层引入于 feat/v3.0-console-decoupling；contract 子包化
+> `spi/model/config/port` 与前端样式归位 `shared/styles` 于同分支后续提交）
 > 配套文档：[ARCHITECTURE.md](../ARCHITECTURE.md) §3（包树速览）/ §7.3（守护测试）/ §15（组织方法论）
 > 本文档回答一个问题：**这套目录为什么长这样，以及如何让它一直长这样。**
 
@@ -36,7 +37,7 @@
 Level 1  zone        kernel / core / governance / ops        （+ 装配根，顶层 ≤5 条目）
 Level 2  module      每 zone 2~5 个模块                       （每模块一句话职责）
 Level 3  layer       web/（表现）· 包根（核心）· infra/（适配）  （模块内三层，见 §5）
-Level 4  subdomain   包根类数 >~12 时按内聚子域开子包            （advisor/ events/ …）
+Level 4  subdomain   包根类数 >~12 时按内聚子域开子包            （advisor/ events/ contract 的 spi/model/config/port）
 Level 5  class       类级细节归 §4 与各版本章节                 （树中不展开）
 ```
 
@@ -50,7 +51,7 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 
 | Zone | 本质职责 | 模块（2~5 个） | 依赖约束 |
 |---|---|---|---|
-| `kernel/` | 无业务语义的公共内核——服务于**所有人** | `shared`（横切件：web 异常/缓存 · aop 切面 · context 归因）<br>`contract`（契约面：黑板 + DTO · Agent SPI · AgentDescriptor） | **零业务依赖**（R1/R2 守护）；准入门槛：被 ≥2 个域使用 |
+| `kernel/` | 无业务语义的公共内核——服务于**所有人** | `shared`（横切件：web 异常/缓存 · aop 切面 · context 归因）<br>`contract`（契约面单模块，4 导航子包：`spi/` Agent SPI · `model/` 黑板+运行数据 · `config/` 控制面配置 · `port/` 跨域端口） | **零业务依赖**（R1/R2 守护）；准入门槛：被 ≥2 个域使用 |
 | `core/` | 编排运行时——回答"**系统是什么**" | `trip`（应用入口：plan → 按模板波次执行）<br>`agent`（协作方：4 业务 Agent · 模板基类 · advisor · config）<br>`workflow`（协作模板：stage/dependsOn/mode · 热切换）<br>`mcp`（外部集成：MCP 注册表 · 插桩工具） | 依赖 kernel；跨域经 contract 端口 |
 | `governance/` | 治理面——回答"**系统如何被管**"（SOP 数字化） | `control`（控制面：人格/模型/校准/MCP 热配置）<br>`scenario`（作业指导书：推演 → 激活 → 运行）<br>`meta`（元信息补录）<br>`release`（发布流水线）<br>`teamlog`（审计轨迹） | 依赖 kernel；经端口消费 core |
 | `ops/` | 观测运维——回答"**系统如何被看**" | `observability`（事件总线 · SSE · 指标 · 健康）<br>`instance`（运行实例注册与业务关联） | 依赖 kernel/core/governance（读侧组合） |
@@ -96,7 +97,9 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 - **配置就近**：模块的配置类进 `模块/config/`（如 `core.agent/config/`），不做集中
   `config/` 包——删除模块时配置随之消失，不留幽灵 Bean。
 - **SPI 下沉**：被 ≥2 个模块实现或引用的接口下沉 `kernel/contract/`，打破跨域循环
-  （先例：`Agent<I,O>`、`AgentDescriptor`）。
+  （先例：`Agent<I,O>`、`AgentDescriptor`）。下沉类型按角色落位到 contract 的四个
+  导航子包：接口进 `port/`（Reader/Sink/Gateway/Store）、Agent SPI 进 `spi/`、
+  控制面配置数据 record 进 `config/`、领域/运行数据 record 进 `model/`。
 
 ## 6. 前端对齐（console/）
 
@@ -105,8 +108,11 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 | 前端分区 | 职责 | 对应后端 |
 |---|---|---|
 | `src/app/` | 装配：main.ts、App.vue 壳、router、全局 store | 装配 ≈ `*StoreConfig` |
-| `src/shared/` | http/sse 客户端、契约 DTO、通用组件 | ≈ `kernel/contract/` + `kernel/shared/` |
+| `src/shared/` | http/sse 客户端、契约 DTO、通用组件、全局样式（`styles/base.css`）、工具 | ≈ `kernel/contract/` + `kernel/shared/` |
 | `src/features/<域>/` | 页面特性（scenario / metadata / observability 三组） | ≈ 后端 zone（core/governance/ops）内模块 |
+
+> 样式等横切资产归 `shared/`（与后端 `kernel/shared` 同构），`app/` 只留装配——
+> 判断依据与后端一致：这段资产的本质职责服务于谁？所有页面 → `shared/`；仅装配用 → `app/`。
 
 ## 7. 演进指南：新模块接入清单
 
@@ -135,7 +141,7 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 | 规则 | 断言 | 守护的文档章节 |
 |---|---|---|
 | R1 | `kernel/shared/` 零业务模块 import | §4 kernel 约束 |
-| R2 | `kernel/contract/` 只 import 自身 | §5 SPI 下沉判据 |
+| R2 | `kernel/contract/` 只 import 自身（`spi/model/config/port` 子包同属单模块，互引视为包内） | §5 SPI 下沉判据 |
 | R3 | 模块依赖图（zone 限定名）无环，**零豁免** | §8 反转记录 |
 | R4 | `infra/` 适配器不被跨模块引用 | §5 三层依赖方向 |
 | R5 | `web/` 不触碰任何 `infra/` 适配器 | §5 三层依赖方向 |
@@ -152,10 +158,13 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 新环必须按 §7 决策树反转消化，不得重新引入豁免。
 
 **阈值备忘**：包根核心层类数 >~12 → 按内聚子域开子包（先例：agent → advisor/config，
-observability → events/metrics/health）；子包不承载新的跨域依赖方向。
+observability → events/metrics/health，contract → spi/model/config/port 四角色子包）；
+子包不承载新的跨域依赖方向——contract 子包间互引仍按单模块判定（R2）。
 
 ## 9. 效果验证
 
-- 全量 **214 个测试离线全绿**（含 5 条架构守护规则），重组前后行为等价；
-- 顶层 4 zone × 2~5 模块，§1 的"13 个包扫不完"问题消除；
-- 前端 16 个 Playwright E2E spec 不受影响（契约经 `types/api.ts` 镜像，未触碰）。
+- 全量 **214 个测试离线全绿**（含 5 条架构守护规则），重组与子包化前后行为等价；
+- 顶层 4 zone × 2~5 模块，§1 的"13 个包扫不完"问题消除；contract 21 个契约类型
+  按角色归组 4 个导航子包（spi 2 / model 8 / config 5 / port 6），单文件目录不再铺开；
+- 前端 16 个 Playwright E2E spec 不受影响（契约经 `types/api.ts` 镜像，未触碰）；
+  `pnpm build`（vue-tsc strict + vite）与 E2E 全绿。

@@ -16,7 +16,8 @@
 分区（详见第 3 节与第 15 节），console 切换 **pnpm** 工作流并引入 **Playwright
 E2E 功能闭环**（mock 后端，见 §15.5）；随后按 **3~5 抽象法则**把顶层归组为
 **kernel / core / governance / ops** 四 zone（§3），依赖规则由**架构守护测试**固化
-（零依赖 fitness functions，§7.3/§15.6），核心层超阈值按内聚子域再细分。
+（零依赖 fitness functions，§7.3/§15.6），核心层与 contract 契约面超阈值
+按内聚子域再细分（contract → `spi/` `model/` `config/` `port/` 四子包，§15.3）。
 
 ## 1. 总体架构
 
@@ -108,7 +109,7 @@ com.oli.orchestrator_demo
 ├── OrchestratorDemoApplication      # 装配根：组件扫描四 zone，自身不含业务
 ├── kernel/                          # 内核层：零业务语义（R1 守护：禁 import 业务模块）
 │   ├── shared                       # 横切件：web 异常/缓存 · aop 执行切面 · context 运行归因
-│   └── contract                     # 契约面：黑板 + DTO 数据 · Agent SPI · 跨域端口（Reader/Sink/Gateway）
+│   └── contract                     # 契约面（单模块，子包仅导航）：spi/ Agent SPI · model/ 黑板+运行数据 · config/ 控制面配置 · port/ 跨域端口
 ├── core/                            # 编排核心：旅行规划问题域的运行时
 │   ├── trip                         # 应用入口：POST /api/trips/plan → 按模板波次执行
 │   ├── agent                        # 协作方：4 业务 Agent · 模板基类 · advisor/ 链 · config/
@@ -133,7 +134,7 @@ com.oli.orchestrator_demo
 - `V`（视图）= `console/` 前端 SPA（见 §15.4），经 REST/SSE 与 `web/` 层同构对齐；
 - 横切关注点（异常映射、缓存控制、AOP）统一收拢 `kernel/shared/`，不与任何业务域耦合；
 - **drill down 路径**：zone（本树）→ 模块三层（本约定）→ 内聚子域子包
-  （§15.3：advisor/config、events/metrics/health）→ 类（§4 与各版本章节）。
+  （§15.3：advisor/config、events/metrics/health、contract 的 spi/model/config/port）→ 类（§4 与各版本章节）。
 
 **前端工作区**（v3.0，feature-based，与后端模块树并列，见 §14 / §15.4）：
 
@@ -141,12 +142,12 @@ com.oli.orchestrator_demo
 orchestrator-demo/console                 # Vue 3 + TypeScript SPA（pnpm 工作区）
 ├── src/app/                              # 应用装配层：main.ts · App.vue（壳）
 │   ├── router/index.ts                   # 11 路由（history 模式）+ 通配兜底
-│   ├── stores/session.ts · control.ts    # 跨 feature 全局状态（Pinia）
-│   └── styles/base.css
-├── src/shared/                           # 跨领域复用资产
+│   └── stores/session.ts · control.ts    # 跨 feature 全局状态（Pinia）
+├── src/shared/                           # 跨领域复用资产（横切件 ≈ kernel/shared + 契约 ≈ kernel/contract）
 │   ├── api/http.ts · sse.ts              # 类型化 fetch + EventSource 单例
 │   ├── types/api.ts · dag.ts             # REST/SSE 契约 DTO 单一事实源（镜像后端 record）
 │   ├── components/DagDiagram · SwimlaneChart · JsonDetails
+│   ├── styles/base.css                   # 全局样式（横切资产，与后端 kernel/shared 同构归位）
 │   └── utils/format.ts
 ├── src/features/                         # 领域特性（1:1 对应侧栏分组与后端模块）
 │   ├── scenario/                         # RunView · DryRunView · ScenariosView
@@ -299,8 +300,8 @@ ChatClient 上，在响应返回给转换器前按序执行三步净化：
 ### 4.8 AOP：Agent 执行切面（aop 包）
 
 `AgentExecutionAspect`（`@Aspect` + `@Around`）以切点
-`execution(* com.oli.orchestrator_demo.kernel.contract.Agent+.execute(..))` 织入**所有** Agent 调用
-（SPI 在 kernel/contract 包，故切点指向契约接口）：
+`execution(* com.oli.orchestrator_demo.kernel.contract.spi.Agent+.execute(..))` 织入**所有** Agent 调用
+（SPI 在 kernel/contract/spi 包，故切点指向契约接口）：
 
 - 成功：`{agent} completed in {n} ms`（INFO）；
 - 失败：`{agent} failed after {n} ms: {message}`（WARN）后原样重抛；
@@ -614,7 +615,7 @@ docker compose -f docker/docker-compose.yml up  # 可选：Grafana + Tempo + Pro
 | 规则 | 断言 |
 |---|---|
 | R1 | `kernel/shared/` 零业务模块 import（业务 SPI 一律在 `kernel/contract/`） |
-| R2 | `kernel/contract/` 只 import 自身（纯净数据面 + SPI 包） |
+| R2 | `kernel/contract/` 只 import 自身（纯净数据面 + SPI 包；`spi/model/config/port` 子包同属单模块，互引视为包内） |
 | R3 | 模块依赖图（zone 限定名，如 core.agent）无环（**零豁免**，反转记录见 §15.6.2） |
 | R4 | `infra/` 适配器不被跨模块引用（端口与适配器本地性） |
 | R5 | `web/` 表现层不触碰任何 `infra/` 适配器 |
@@ -1285,17 +1286,23 @@ v3.0 采用 **package-by-feature**（按业务域分包）+ **模块内三层**�
 - **配置就近归属**：`AgentConfiguration` / `AgentModelProperties` /
   `ModelHttpClientConfig` 位于 `core.agent/config/` 而非集中 `config/`——配置属于拥有它的模块，
   删除模块时配置随之消失，不会留下幽灵 Bean。
-- **kernel/contract/ 稳定契约包**：`OrchestratorContext`、`TripRequest`、四个响应 record、
-  跨域数据 record（`AgentRuntimeConfig`、`McpServerConfig`、`RunInstance` 等）与两族 SPI——
-  **Agent SPI**（`Agent<I,O>`、`AgentDescriptor`）与**跨域端口**（`ModelDefaultsReader`、
-  `ControlPlaneReader`、`McpConnectionGateway`、`RunInstanceSink`、`RunStatusReader`）——
+- **kernel/contract/ 稳定契约包（四子包）**：契约整体仍是**单模块**（R2 守护
+  "只 import 自身"，子包互引视为包内），子包按角色导航——
+  `spi/`：**Agent SPI**（`Agent<I,O>` + 自描述元数据 `AgentDescriptor`）；
+  `model/`：契约数据模型（黑板 `OrchestratorContext`、`TripRequest`、四个响应 record、
+  运行数据 `OrchestratorSnapshot`/`RunInstance`）；
+  `config/`：控制面配置数据 record（`AgentRuntimeConfig`、`AgentDefaults`、
+  `CalibrationRule`、`McpServerConfig`、`McpServerStatus`）；
+  `port/`：跨域端口接口（`AgentRuntimeStore`、`ModelDefaultsReader`、`ControlPlaneReader`、
+  `McpConnectionGateway`、`RunInstanceSink`、`RunStatusReader`）——
   数据面打破潜在循环，端口反转打破治理/观测域指向运行时实现的逆向依赖；
   契约类型变更必然是一次显式的跨域决策。
 - **kernel/shared/ 横切内核**：异常映射、缓存控制、AOP、`RunContext` 运行归因上下文——
   无业务语义、零业务模块 import（R1 守护），进入 shared 需满足"被 ≥2 个域使用"的门槛。
 - **核心层内聚子域再分层**：包根核心层类数超阈值（经验值 ~12）时按内聚子域细分
-  （`agent/` → `advisor/` `config/`；`observability/` → `events/` `metrics/` `health/`）；
-  细分只是包内导航辅助，不改变三层依赖方向。
+  （`agent/` → `advisor/` `config/`；`observability/` → `events/` `metrics/` `health/`；
+  `contract/` → `spi/` `model/` `config/` `port/`，21 个契约类型按角色归组）；
+  细分只是包内导航辅助，不改变依赖边界——contract 子包间互引仍按单模块判定（R2）。
 - **依赖方向总规则**：`web → 包根 ← infra`；跨域只经 `kernel/contract/` 或对方 `web/`
   端口；`kernel/` 两包不依赖任何业务模块。规则由 §7.3 守护测试固化。
 
@@ -1305,8 +1312,8 @@ v3.0 采用 **package-by-feature**（按业务域分包）+ **模块内三层**�
 
 | 分区 | 职责 | 与后端的对应 |
 | --- | --- | --- |
-| `src/app/` | 应用装配：main.ts（naive-ui 全局注册）、App.vue 壳、router、跨 feature 全局 store、全局样式 | 装配 ≈ `*StoreConfig` |
-| `src/shared/` | 复用资产：类型化 `http`/`sse` 客户端、契约 DTO（`types/api.ts` 镜像后端 record，单一事实源）、通用组件（DagDiagram/SwimlaneChart/JsonDetails）、格式化工具 | ≈ `kernel/contract/` + `kernel/shared/` |
+| `src/app/` | 应用装配：main.ts（naive-ui 全局注册）、App.vue 壳、router、跨 feature 全局 store | 装配 ≈ `*StoreConfig` |
+| `src/shared/` | 复用资产：类型化 `http`/`sse` 客户端、契约 DTO（`types/api.ts` 镜像后端 record，单一事实源）、通用组件（DagDiagram/SwimlaneChart/JsonDetails）、全局样式（`styles/base.css`）、格式化工具 | ≈ `kernel/contract/` + `kernel/shared/` |
 | `src/features/<域>/` | 页面级特性（scenario / metadata / observability），1:1 对应侧栏分组与后端 zone 模块 | ≈ 后端 zone（core / governance / ops）内模块 |
 
 - **`@` 路径别名**（vite `resolve.alias` + tsconfig `paths`）：所有跨目录 import 走
