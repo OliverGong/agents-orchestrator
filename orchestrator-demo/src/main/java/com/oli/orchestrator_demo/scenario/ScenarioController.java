@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.oli.orchestrator_demo.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.control.ControlPlaneState;
+import com.oli.orchestrator_demo.teamlog.TeamLogRecorder;
 
 @RestController
 @RequestMapping("/api/v1/scenarios")
@@ -33,10 +34,13 @@ public class ScenarioController {
 
   private final ScenarioRegistry registry;
   private final AgentConfigRegistry controlPlane;
+  private final TeamLogRecorder teamLog;
 
-  public ScenarioController(ScenarioRegistry registry, AgentConfigRegistry controlPlane) {
+  public ScenarioController(ScenarioRegistry registry, AgentConfigRegistry controlPlane,
+      TeamLogRecorder teamLog) {
     this.registry = registry;
     this.controlPlane = controlPlane;
+    this.teamLog = teamLog;
   }
 
   @GetMapping
@@ -52,17 +56,23 @@ public class ScenarioController {
 
   @PostMapping
   public ScenarioState create(@RequestBody Scenario scenario) {
-    return registry.create(scenario);
+    ScenarioState state = registry.create(scenario);
+    teamLog.audit("scenario-plane", "SCENARIO_CREATED", "scenario:" + scenario.id(), scenario);
+    return state;
   }
 
   @PutMapping("/{id}")
   public ScenarioState update(@PathVariable String id, @RequestBody Scenario scenario) {
-    return registry.update(id, scenario);
+    ScenarioState state = registry.update(id, scenario);
+    teamLog.audit("scenario-plane", "SCENARIO_UPDATED", "scenario:" + id, scenario);
+    return state;
   }
 
   @DeleteMapping("/{id}")
   public ScenarioState delete(@PathVariable String id) {
-    return registry.delete(id);
+    ScenarioState state = registry.delete(id);
+    teamLog.audit("scenario-plane", "SCENARIO_DELETED", "scenario:" + id, null);
+    return state;
   }
 
   /** Token-free rehearsal: validation + wave expansion + slot flows. */
@@ -75,6 +85,7 @@ public class ScenarioController {
   @PostMapping("/{id}/activate")
   public ControlPlaneState activate(@PathVariable String id) {
     registry.activate(id);
+    teamLog.audit("scenario-plane", "SCENARIO_ACTIVATED", "scenario:" + id, null);
     return controlPlane.maskedState();
   }
 }

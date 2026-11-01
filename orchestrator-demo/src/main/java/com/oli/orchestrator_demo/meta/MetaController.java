@@ -12,6 +12,8 @@
  */
 package com.oli.orchestrator_demo.meta;
 
+import com.oli.orchestrator_demo.teamlog.TeamLogRecorder;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,9 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class MetaController {
 
   private final MetaRegistry registry;
+  private final TeamLogRecorder teamLog;
 
-  public MetaController(MetaRegistry registry) {
+  public MetaController(MetaRegistry registry, TeamLogRecorder teamLog) {
     this.registry = registry;
+    this.teamLog = teamLog;
   }
 
   @GetMapping
@@ -38,7 +42,9 @@ public class MetaController {
 
   @PutMapping("/runtime")
   public MetaState updateRuntime(@RequestBody MetaState.RuntimeConfig runtime) {
-    return registry.updateRuntime(runtime);
+    MetaState state = registry.updateRuntime(runtime);
+    teamLog.audit("meta-plane", "RUNTIME_UPDATED", "meta.runtime", runtime);
+    return state;
   }
 
   @PostMapping("/portals")
@@ -46,12 +52,16 @@ public class MetaController {
     if (portal.id() == null || portal.id().isBlank()) {
       throw new IllegalArgumentException("portal id must not be blank");
     }
-    return registry.savePortal(portal);
+    MetaState state = registry.savePortal(portal);
+    teamLog.audit("meta-plane", "PORTAL_SAVED", "meta.portal:" + portal.id(), portal);
+    return state;
   }
 
   @DeleteMapping("/portals/{id}")
   public MetaState deletePortal(@PathVariable String id) {
-    return registry.deletePortal(id);
+    MetaState state = registry.deletePortal(id);
+    teamLog.audit("meta-plane", "PORTAL_DELETED", "meta.portal:" + id, null);
+    return state;
   }
 
   @PutMapping("/releases/{scenarioId}")
@@ -61,12 +71,16 @@ public class MetaController {
       throw new IllegalArgumentException(
           "portal '%s' does not exist or is disabled".formatted(release.portalId()));
     }
-    return registry.saveRelease(new MetaState.ReleaseConfig(scenarioId, release.portalId(),
+    MetaState state = registry.saveRelease(new MetaState.ReleaseConfig(scenarioId, release.portalId(),
         release.version(), release.changelog(), release.artifactType()));
+    teamLog.audit("meta-plane", "RELEASE_SAVED", "meta.release:" + scenarioId, release);
+    return state;
   }
 
   @DeleteMapping("/releases/{scenarioId}")
   public MetaState deleteRelease(@PathVariable String scenarioId) {
-    return registry.deleteRelease(scenarioId);
+    MetaState state = registry.deleteRelease(scenarioId);
+    teamLog.audit("meta-plane", "RELEASE_DELETED", "meta.release:" + scenarioId, null);
+    return state;
   }
 }

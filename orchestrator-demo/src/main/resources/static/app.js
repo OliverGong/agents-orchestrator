@@ -25,6 +25,7 @@ document.querySelectorAll('.nav-item').forEach((btn) => btn.addEventListener('cl
   if (btn.dataset.page === 'agents' || btn.dataset.page === 'workflow' || btn.dataset.page === 'mcp') refreshControl();
   if (btn.dataset.page === 'meta') refreshMeta();
   if (btn.dataset.page === 'runs') refreshRuns();
+  if (btn.dataset.page === 'logs') refreshLogs();
   if (btn.dataset.page === 'metrics') refreshObservability();
 }));
 
@@ -1156,6 +1157,67 @@ async function saveScenarioEditor() {
   } catch (e) {
     msg.textContent = '保存失败: ' + e.message; msg.className = 'hint';
   }
+}
+
+/* ---------------- team log explorer page (团队日志) ---------------- */
+$('#logs-refresh').addEventListener('click', refreshLogs);
+$('#logs-apply').addEventListener('click', refreshLogs);
+
+let logsTimer = null;
+$('#logs-auto').addEventListener('change', (ev) => {
+  clearInterval(logsTimer);
+  if (ev.target.checked) logsTimer = setInterval(refreshLogs, 10000);
+});
+
+let logEntries = [];
+
+async function refreshLogs() {
+  const params = new URLSearchParams();
+  if ($('#logs-category').value) params.set('category', $('#logs-category').value);
+  if ($('#logs-level').value) params.set('level', $('#logs-level').value);
+  params.set('window', $('#logs-window').value);
+  const runId = $('#logs-runid').value.trim();
+  const scenarioId = $('#logs-scenario').value.trim();
+  const q = $('#logs-q').value.trim();
+  if (runId) params.set('runId', runId);
+  if (scenarioId) params.set('scenarioId', scenarioId);
+  if (q) params.set('q', q);
+  params.set('limit', '300');
+  try {
+    logEntries = await getJson('/api/v1/logs?' + params.toString());
+  } catch { logEntries = []; }
+  const levelBadge = (lv) =>
+    lv === 'ERROR' ? 'badge-failed' : (lv === 'WARN' ? 'badge-running' : 'badge-ok');
+  $('#logs-table tbody').innerHTML = logEntries.map((e, i) => `
+    <tr class="log-row" data-idx="${i}">
+      <td class="mono">${esc(fmtDateTime(e.ts))}</td>
+      <td><span class="badge">${esc(e.category)}</span></td>
+      <td><span class="badge ${levelBadge(e.level)}">${esc(e.level)}</span></td>
+      <td class="mono">${esc(e.source)}</td>
+      <td class="mono">${e.runId ? esc(e.runId.slice(0, 8)) : '—'}</td>
+      <td class="mono">${esc(e.scenarioId || '—')}</td>
+      <td class="mono">${esc(e.action)}</td>
+      <td>${esc(e.message)}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="hint">当前筛选条件下暂无日志。</td></tr>';
+  $('#logs-summary').textContent = `共 ${logEntries.length} 条（最新在前，最多 300 条）`;
+  document.querySelectorAll('.log-row').forEach((row) =>
+    row.addEventListener('click', () => showLogDetail(logEntries[Number(row.dataset.idx)])));
+}
+
+function showLogDetail(entry) {
+  if (!entry) return;
+  $('#log-detail-card').hidden = false;
+  $('#log-detail-title').textContent = `${entry.category}/${entry.level} · ${entry.action}`;
+  $('#log-detail').textContent = JSON.stringify({
+    id: entry.id, ts: entry.ts, category: entry.category, level: entry.level,
+    source: entry.source, runId: entry.runId, scenarioId: entry.scenarioId,
+    action: entry.action, message: entry.message,
+    detail: entry.detail ? tryParseJson(entry.detail) : null,
+  }, null, 2);
+}
+
+function tryParseJson(text) {
+  try { return JSON.parse(text); } catch { return text; }
 }
 
 /* ---------------- meta maintenance page (元信息补录) ---------------- */

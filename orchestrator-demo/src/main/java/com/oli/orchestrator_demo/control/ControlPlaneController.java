@@ -35,6 +35,7 @@ import org.springframework.web.client.RestClient;
 
 import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.mcp.McpServerStatus;
+import com.oli.orchestrator_demo.teamlog.TeamLogRecorder;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -47,14 +48,17 @@ public class ControlPlaneController {
 
   private final AgentConfigRegistry registry;
   private final McpConnectionRegistry mcpRegistry;
+  private final TeamLogRecorder teamLog;
   private final Environment environment;
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
 
   public ControlPlaneController(AgentConfigRegistry registry, McpConnectionRegistry mcpRegistry,
-      Environment environment, RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
+      TeamLogRecorder teamLog, Environment environment, RestClient.Builder restClientBuilder,
+      ObjectMapper objectMapper) {
     this.registry = registry;
     this.mcpRegistry = mcpRegistry;
+    this.teamLog = teamLog;
     this.environment = environment;
     this.restClient = restClientBuilder.build();
     this.objectMapper = objectMapper;
@@ -79,7 +83,9 @@ public class ControlPlaneController {
 
   @PutMapping("/agents/{name}")
   public ControlPlaneState updateAgent(@PathVariable String name, @RequestBody AgentRuntimeConfig update) {
-    return registry.updateAgent(name, update);
+    ControlPlaneState state = registry.updateAgent(name, update);
+    teamLog.audit("control-plane", "AGENT_UPDATED", "agent:" + name, update);
+    return state;
   }
 
   /** The effective slot-contract descriptor of the agent (persisted override or built-in). */
@@ -92,7 +98,9 @@ public class ControlPlaneController {
   @PutMapping("/agents/{name}/descriptor")
   public ControlPlaneState updateDescriptor(@PathVariable String name, @RequestBody AgentDescriptor update) {
     try {
-      return registry.updateDescriptor(name, update);
+      ControlPlaneState state = registry.updateDescriptor(name, update);
+      teamLog.audit("control-plane", "AGENT_DESCRIPTOR_UPDATED", "agent:" + name, update);
+      return state;
     }
     catch (IllegalStateException ex) {
       // Slot-closure violations of the active template are configuration
@@ -109,7 +117,9 @@ public class ControlPlaneController {
   @PutMapping("/workflow")
   public ControlPlaneState updateWorkflow(@RequestBody WorkflowControlState workflow) {
     try {
-      return registry.updateWorkflow(workflow);
+      ControlPlaneState state = registry.updateWorkflow(workflow);
+      teamLog.audit("control-plane", "WORKFLOW_UPDATED", "workflow", workflow);
+      return state;
     }
     catch (IllegalStateException ex) {
       // Template validation failures (unknown references, dependency order,
@@ -125,7 +135,9 @@ public class ControlPlaneController {
 
   @PutMapping("/mcp/servers")
   public ControlPlaneState updateMcpServers(@RequestBody List<McpServerConfig> servers) {
-    return registry.updateMcpServers(servers);
+    ControlPlaneState state = registry.updateMcpServers(servers);
+    teamLog.audit("control-plane", "MCP_SERVERS_UPDATED", "mcp", servers);
+    return state;
   }
 
   /** Live connection state (and discovered tools) of every recorded MCP server. */
@@ -137,7 +149,9 @@ public class ControlPlaneController {
   /** Manual reconnect of one MCP server, bypassing the failure cooldown. */
   @PostMapping("/mcp/servers/{name}/reconnect")
   public McpServerStatus reconnectMcpServer(@PathVariable String name) {
-    return mcpRegistry.reconnect(name);
+    McpServerStatus status = mcpRegistry.reconnect(name);
+    teamLog.audit("control-plane", "MCP_RECONNECTED", "mcp:" + name, status);
+    return status;
   }
 
   /**

@@ -43,6 +43,8 @@ import com.oli.orchestrator_demo.config.AgentModelProperties;
 import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
+import com.oli.orchestrator_demo.teamlog.NoopTeamLogStore;
+import com.oli.orchestrator_demo.teamlog.TeamLogRecorder;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.workflow.WorkflowProperties;
 
@@ -81,8 +83,9 @@ class ControlPlaneControllerTest {
         config -> { throw new IllegalStateException("no MCP in tests"); });
 
     mockMvc = MockMvcBuilders.standaloneSetup(
-        new ControlPlaneController(registry, mcpRegistry, environment, RestClient.builder(),
-            JsonMapper.builder().build()))
+        new ControlPlaneController(registry, mcpRegistry,
+            new TeamLogRecorder(new NoopTeamLogStore(), JsonMapper.builder().build()),
+            environment, RestClient.builder(), JsonMapper.builder().build()))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
   }

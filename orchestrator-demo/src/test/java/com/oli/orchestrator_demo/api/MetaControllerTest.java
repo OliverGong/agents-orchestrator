@@ -35,6 +35,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.oli.orchestrator_demo.meta.MetaController;
 import com.oli.orchestrator_demo.meta.MetaRegistry;
 import com.oli.orchestrator_demo.meta.MetaState;
+import com.oli.orchestrator_demo.teamlog.NoopTeamLogStore;
+import com.oli.orchestrator_demo.teamlog.TeamLogRecorder;
+
+import tools.jackson.databind.json.JsonMapper;
 
 class MetaControllerTest {
 
@@ -44,7 +48,8 @@ class MetaControllerTest {
   @BeforeEach
   void setUp() {
     registry = Mockito.mock(MetaRegistry.class);
-    mockMvc = MockMvcBuilders.standaloneSetup(new MetaController(registry))
+    mockMvc = MockMvcBuilders.standaloneSetup(
+        new MetaController(registry, new TeamLogRecorder(new NoopTeamLogStore(), JsonMapper.builder().build())))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
   }

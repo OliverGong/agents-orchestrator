@@ -41,6 +41,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import com.oli.orchestrator_demo.teamlog.NoopTeamLogStore;
+import com.oli.orchestrator_demo.teamlog.TeamLogEntry;
+import com.oli.orchestrator_demo.teamlog.TeamLogStore;
+
 import jakarta.annotation.PreDestroy;
 
 @Component
@@ -60,12 +64,20 @@ public class ObservabilityActor {
   private final Map<String, String> runScenarios = new HashMap<>();
   private final ObservabilitySsePublisher ssePublisher;
   private final RunMetricsStore metricsStore;
+  private final TeamLogStore teamLogStore;
   private final Thread actorThread = Thread.ofVirtual().name("observability-actor").start(this::consume);
   private volatile boolean accepting = true;
 
   public ObservabilityActor(ObservabilitySsePublisher ssePublisher, RunMetricsStore metricsStore) {
+    this(ssePublisher, metricsStore, new NoopTeamLogStore());
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public ObservabilityActor(ObservabilitySsePublisher ssePublisher, RunMetricsStore metricsStore,
+      TeamLogStore teamLogStore) {
     this.ssePublisher = ssePublisher;
     this.metricsStore = metricsStore;
+    this.teamLogStore = teamLogStore;
     // Retry events are published from inside agent calls (no bean access);
     // the static bus routes them into the same mailbox as direct producers.
     ObservabilityEventBus.subscribe(this::tell);
@@ -117,6 +129,7 @@ public class ObservabilityActor {
 
   /** Single-threaded state transition: the whole mutable state lives here. */
   private void apply(AgentObservabilityEvent event) {
+    recordLog(event);
     recordMetrics(event);
     if (event.type() == AgentObservabilityEvent.Type.RUN_STARTED) {
       insertionOrder.addLast(event.runId());
@@ -167,6 +180,69 @@ public class ObservabilityActor {
       log.warn("Run metrics persistence failed for run {} stage {}: {}",
           event.runId(), event.stageName(), ex.getMessage());
     }
+  }
+
+  /**
+   * Write-ahead run log: every lifecycle / stage / tool event lands in the
+   * team log before the fold and the SSE push (same WAL ordering as the
+   * metrics rows), so the runtime team's Log Explorer covers the whole
+   * observability review — not only business logs. A failing store degrades
+   * to a warning, never to a lost timeline.
+   */
+  private void recordLog(AgentObservabilityEvent event) {
+    try {
+      teamLogStore.append(toLogEntry(event));
+    }
+    catch (RuntimeException ex) {
+      log.warn("Team log append failed for run {} event {}: {}",
+          event.runId(), event.type(), ex.getMessage());
+    }
+  }
+
+  /** Maps one observability event to its durable team-log entry. */
+  private TeamLogEntry toLogEntry(AgentObservabilityEvent event) {
+    String scenarioId = event.scenarioId() != null ? event.scenarioId() : runScenarios.get(event.runId());
+    String level = TeamLogEntry.INFO;
+    String message = event.type().name();
+    switch (event.type()) {
+      case RUN_STARTED -> message = "run started with template '%s' (%s)".formatted(
+          event.templateName(), event.mode() == null ? "workflow" : event.mode());
+      case STAGE_COMPLETED -> message = stageLine(event,
+          "completed in %d ms".formatted(event.durationMs() == null ? 0 : event.durationMs()));
+      case STAGE_FAILED -> {
+        level = TeamLogEntry.ERROR;
+        message = stageLine(event, "failed: " + event.errorMessage());
+      }
+      case STAGE_RETRIED -> {
+        level = TeamLogEntry.WARN;
+        message = stageLine(event, "retrying (attempt %d): %s".formatted(
+            event.attempt() == null ? 1 : event.attempt(), event.errorMessage()));
+      }
+      case TOOL_CALLED -> {
+        AgentObservabilityEvent.ToolCallDetail tool = event.toolCall();
+        if (tool != null && tool.errorMessage() != null) {
+          level = TeamLogEntry.WARN;
+        }
+        message = tool == null ? "tool call recorded"
+            : "MCP %s/%s %s in %d ms".formatted(tool.serverName(), tool.toolName(),
+                tool.outcome(), tool.durationMs());
+      }
+      case RUN_COMPLETED -> message = "run completed";
+      case RUN_FAILED -> {
+        level = TeamLogEntry.ERROR;
+        message = "run failed: " + event.errorMessage();
+      }
+    }
+    return new TeamLogEntry(null, event.timestamp(), TeamLogEntry.RUN, level, "orchestrator",
+        event.runId(), scenarioId, event.type().name(), message, event.errorMessage());
+  }
+
+  private static String stageLine(AgentObservabilityEvent event, String tail) {
+    AgentObservabilityEvent.LmUsage usage = event.usage();
+    String tokens = usage == null ? "" : " · tokens %d (prompt %d / completion %d)".formatted(
+        usage.totalTokens(), usage.promptTokens(), usage.completionTokens());
+    return "stage '%s' via agent '%s' %s%s".formatted(
+        event.stageName(), event.agentName(), tail, tokens);
   }
 
   private RunTimeline fold(String runId, RunTimeline timeline, AgentObservabilityEvent event) {

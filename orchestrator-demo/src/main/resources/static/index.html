@@ -25,6 +25,7 @@
       <button class="nav-item" data-page="meta">元信息补录</button>
       <div class="nav-group">可观测</div>
       <button class="nav-item" data-page="runs">运行回放</button>
+      <button class="nav-item" data-page="logs">团队日志</button>
       <button class="nav-item" data-page="metrics">系统观测</button>
     </nav>
     <div class="side-footer">
@@ -276,6 +277,56 @@
       <div id="run-detail"></div>
     </section>
 
+    <!-- ============ 页面: 团队日志（可观测） ============ -->
+    <section id="page-logs" class="page-panel">
+      <div class="card">
+        <h2>团队日志（Log Explorer）
+          <button id="logs-refresh" class="mini-btn" type="button">刷新</button>
+          <label class="auto-refresh"><input id="logs-auto" type="checkbox"> 自动刷新 (10s)</label></h2>
+        <p class="hint">运行时团队的持久化日志（<code>team_log</code> 表 / <code>config/team-log.jsonl</code>），
+            不限于业务日志：运行生命周期、MCP 工具调用、控制/元数据/场景面的每次变更审计与系统通知，
+            先落库再推送（WAL 顺序），重启不丢。点击行查看详情。</p>
+        <div class="row">
+          <label>类别
+            <select id="logs-category">
+              <option value="">全部</option>
+              <option>RUN</option>
+              <option>AUDIT</option>
+              <option>SYSTEM</option>
+            </select></label>
+          <label>级别
+            <select id="logs-level">
+              <option value="">全部</option>
+              <option>INFO</option>
+              <option>WARN</option>
+              <option>ERROR</option>
+            </select></label>
+          <label>时间窗口
+            <select id="logs-window">
+              <option value="1h">近 1 小时</option>
+              <option value="24h" selected>近 24 小时</option>
+              <option value="7d">近 7 天</option>
+              <option value="all">全部</option>
+            </select></label>
+          <label>Run ID<input id="logs-runid" placeholder="精确匹配（可留空）"></label>
+          <label>场景 ID<input id="logs-scenario" placeholder="精确匹配（可留空）"></label>
+          <label>关键字<input id="logs-q" placeholder="消息/动作/来源/详情"></label>
+          <button id="logs-apply" class="accent-btn" type="button">应用筛选</button>
+        </div>
+        <table class="data-table" id="logs-table">
+          <thead><tr>
+            <th>时间</th><th>类别</th><th>级别</th><th>来源</th><th>Run</th><th>场景</th><th>动作</th><th>消息</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="logs-summary" class="hint"></div>
+      </div>
+      <div class="card" id="log-detail-card" hidden>
+        <h2>日志详情 <span id="log-detail-title" class="badge"></span></h2>
+        <pre id="log-detail" class="json"></pre>
+      </div>
+    </section>
+
     <!-- ============ 页面: 系统观测（可观测） ============ -->
     <section id="page-metrics" class="page-panel">
       <div class="card">
@@ -315,6 +366,6 @@
   </div>
 </div>
 
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
