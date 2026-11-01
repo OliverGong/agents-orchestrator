@@ -6,12 +6,13 @@
  *              {@code /api/v1/control/workflow}, validated against the
  *              registered agents (declared-order dependencies, no cycles)
  *              and hot-applied to the running orchestrator via
- *              {@link com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder}.
+ *              {@link com.oli.orchestrator_demo.workflow.WorkflowTemplateHolder}.
  * @Author OliverGong
  * @Date Oct 30, 2026
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.control;
+import com.oli.orchestrator_demo.workflow.WorkflowTemplateHolder;
 
 import java.util.List;
 

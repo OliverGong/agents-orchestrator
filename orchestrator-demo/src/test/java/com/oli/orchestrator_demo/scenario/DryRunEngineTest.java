@@ -26,12 +26,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.oli.orchestrator_demo.config.AgentModelProperties;
+import com.oli.orchestrator_demo.agent.AgentModelProperties;
 import com.oli.orchestrator_demo.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.control.AgentDescriptor;
-import com.oli.orchestrator_demo.control.FileControlPlaneStore;
+import com.oli.orchestrator_demo.control.infra.FileControlPlaneStore;
 import com.oli.orchestrator_demo.control.WorkflowControlState;
-import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
+import com.oli.orchestrator_demo.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.workflow.WorkflowProperties;
 
 import tools.jackson.databind.json.JsonMapper;

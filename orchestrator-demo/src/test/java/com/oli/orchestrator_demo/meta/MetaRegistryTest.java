@@ -11,6 +11,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.meta;
+import com.oli.orchestrator_demo.meta.infra.FileMetaStore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

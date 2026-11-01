@@ -17,7 +17,7 @@ import org.springframework.boot.actuate.info.Info;
 import org.springframework.boot.actuate.info.InfoContributor;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.orchestrator.TripPlanningOrchestrator;
+import com.oli.orchestrator_demo.trip.TripPlanningOrchestrator;
 import com.oli.orchestrator_demo.workflow.StageSpec;
 
 @Component

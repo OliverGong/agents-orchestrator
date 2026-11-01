@@ -26,6 +26,7 @@
  * @Version 1.1
  */
 package com.oli.orchestrator_demo.agent;
+import com.oli.orchestrator_demo.shared.aop.AgentExecutionAspect;
 
 import java.util.List;
 
@@ -42,7 +43,7 @@ import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
-import com.oli.orchestrator_demo.model.OrchestratorContext;
+import com.oli.orchestrator_demo.contract.OrchestratorContext;
 import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.observability.LmUsageCollector;
 import com.oli.orchestrator_demo.observability.ObservabilityEventBus;
@@ -101,7 +102,7 @@ public abstract class AbstractContextAgent<R> implements Agent<OrchestratorConte
 
   /**
    * The agent's self-declared slot contract (title, human description, and
-   * which {@link com.oli.orchestrator_demo.model.OrchestratorContext} slots it
+   * which {@link com.oli.orchestrator_demo.contract.OrchestratorContext} slots it
    * produces, consumes and tolerates to be missing). Collected at startup by
    * the control plane and used for the logical-closure validation of
    * collaboration templates. Deliberately not final: like {@link #name()},

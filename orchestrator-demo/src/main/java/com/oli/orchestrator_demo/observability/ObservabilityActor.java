@@ -54,7 +54,7 @@ import org.springframework.stereotype.Component;
 
 import com.oli.orchestrator_demo.instance.InstanceStore;
 import com.oli.orchestrator_demo.instance.RunInstance;
-import com.oli.orchestrator_demo.teamlog.NoopTeamLogStore;
+import com.oli.orchestrator_demo.teamlog.infra.NoopTeamLogStore;
 import com.oli.orchestrator_demo.teamlog.TeamLogEntry;
 import com.oli.orchestrator_demo.teamlog.TeamLogStore;
 

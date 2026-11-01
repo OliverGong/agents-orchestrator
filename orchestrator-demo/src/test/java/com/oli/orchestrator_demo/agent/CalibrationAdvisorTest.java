@@ -23,8 +23,8 @@ import com.oli.orchestrator_demo.control.AgentDefaults;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.control.CalibrationRule;
-import com.oli.orchestrator_demo.model.OrchestratorContext;
-import com.oli.orchestrator_demo.model.TripRequest;
+import com.oli.orchestrator_demo.contract.OrchestratorContext;
+import com.oli.orchestrator_demo.contract.TripRequest;
 
 class CalibrationAdvisorTest {
 

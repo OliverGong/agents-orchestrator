@@ -2,7 +2,7 @@
  * @ClassName Agent
  * @Description A single step of the orchestration workflow. Every agent is a
  *              small, single-responsibility unit of work defined on the
- *              abstract {@link com.oli.orchestrator_demo.model.OrchestratorContext}.
+ *              abstract {@link com.oli.orchestrator_demo.contract.OrchestratorContext}.
  *              Agents are resolved by their {@link #name()} when a
  *              collaboration template references them.
  * @Author OliverGong
@@ -10,6 +10,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.agent;
+import com.oli.orchestrator_demo.contract.OrchestratorContext;
 
 public interface Agent<I, O> {
 

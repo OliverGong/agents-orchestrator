@@ -17,11 +17,11 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.model.BudgetResponse;
-import com.oli.orchestrator_demo.model.ItineraryResponse;
-import com.oli.orchestrator_demo.model.OrchestratorContext;
-import com.oli.orchestrator_demo.model.ResearchResponse;
-import com.oli.orchestrator_demo.model.TripRequest;
+import com.oli.orchestrator_demo.contract.BudgetResponse;
+import com.oli.orchestrator_demo.contract.ItineraryResponse;
+import com.oli.orchestrator_demo.contract.OrchestratorContext;
+import com.oli.orchestrator_demo.contract.ResearchResponse;
+import com.oli.orchestrator_demo.contract.TripRequest;
 
 class ItineraryAgentTest {
 

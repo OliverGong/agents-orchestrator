@@ -9,6 +9,8 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.observability;
+import com.oli.orchestrator_demo.Await;
+import com.oli.orchestrator_demo.observability.web.RunObservabilityController;
 
 import static com.oli.orchestrator_demo.Await.until;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;

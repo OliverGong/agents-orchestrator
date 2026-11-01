@@ -28,13 +28,13 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import com.oli.orchestrator_demo.Await;
-import com.oli.orchestrator_demo.config.AgentModelProperties;
+import com.oli.orchestrator_demo.agent.AgentModelProperties;
 import com.oli.orchestrator_demo.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.control.FileControlPlaneStore;
+import com.oli.orchestrator_demo.control.infra.FileControlPlaneStore;
 import com.oli.orchestrator_demo.control.McpServerConfig;
 import com.oli.orchestrator_demo.observability.ObservabilityActor;
-import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
+import com.oli.orchestrator_demo.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.workflow.WorkflowProperties;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

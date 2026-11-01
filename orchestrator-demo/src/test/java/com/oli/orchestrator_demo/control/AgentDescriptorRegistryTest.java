@@ -28,7 +28,7 @@ import com.oli.orchestrator_demo.agent.BudgetAgent;
 import com.oli.orchestrator_demo.agent.ItineraryAgent;
 import com.oli.orchestrator_demo.agent.ResearchAgent;
 import com.oli.orchestrator_demo.agent.ReviewAgent;
-import com.oli.orchestrator_demo.config.AgentModelProperties;
+import com.oli.orchestrator_demo.agent.AgentModelProperties;
 
 class AgentDescriptorRegistryTest {
 

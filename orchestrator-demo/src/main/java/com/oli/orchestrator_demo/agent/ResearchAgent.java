@@ -18,9 +18,9 @@ import com.oli.orchestrator_demo.control.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
-import com.oli.orchestrator_demo.model.OrchestratorContext;
-import com.oli.orchestrator_demo.model.ResearchResponse;
-import com.oli.orchestrator_demo.model.TripRequest;
+import com.oli.orchestrator_demo.contract.OrchestratorContext;
+import com.oli.orchestrator_demo.contract.ResearchResponse;
+import com.oli.orchestrator_demo.contract.TripRequest;
 
 @Component
 public class ResearchAgent extends AbstractContextAgent<ResearchResponse> {

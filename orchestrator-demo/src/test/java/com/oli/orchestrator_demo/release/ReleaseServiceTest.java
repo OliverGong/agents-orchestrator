@@ -14,6 +14,8 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.release;
+import com.oli.orchestrator_demo.release.infra.FileReleaseStore;
+import com.oli.orchestrator_demo.scenario.DryRunEngine;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,15 +31,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.oli.orchestrator_demo.config.AgentModelProperties;
+import com.oli.orchestrator_demo.agent.AgentModelProperties;
 import com.oli.orchestrator_demo.control.AgentConfigRegistry;
-import com.oli.orchestrator_demo.control.FileControlPlaneStore;
-import com.oli.orchestrator_demo.meta.FileMetaStore;
+import com.oli.orchestrator_demo.control.infra.FileControlPlaneStore;
+import com.oli.orchestrator_demo.meta.infra.FileMetaStore;
 import com.oli.orchestrator_demo.meta.MetaRegistry;
 import com.oli.orchestrator_demo.meta.MetaState;
-import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
+import com.oli.orchestrator_demo.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.scenario.DryRunReport;
-import com.oli.orchestrator_demo.scenario.FileScenarioStore;
+import com.oli.orchestrator_demo.scenario.infra.FileScenarioStore;
 import com.oli.orchestrator_demo.scenario.ScenarioRegistry;
 import com.oli.orchestrator_demo.teamlog.TeamLogEntry;
 import com.oli.orchestrator_demo.teamlog.TeamLogRecorder;

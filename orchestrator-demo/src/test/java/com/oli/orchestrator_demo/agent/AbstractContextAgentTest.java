@@ -19,9 +19,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import com.oli.orchestrator_demo.control.AgentDescriptor;
-import com.oli.orchestrator_demo.model.OrchestratorContext;
-import com.oli.orchestrator_demo.model.ResearchResponse;
-import com.oli.orchestrator_demo.model.TripRequest;
+import com.oli.orchestrator_demo.contract.OrchestratorContext;
+import com.oli.orchestrator_demo.contract.ResearchResponse;
+import com.oli.orchestrator_demo.contract.TripRequest;
 import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.observability.ObservabilityEventBus;
 import com.oli.orchestrator_demo.observability.RunContext;

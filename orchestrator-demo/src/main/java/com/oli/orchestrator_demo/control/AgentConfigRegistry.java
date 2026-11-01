@@ -30,8 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.config.AgentModelProperties;
-import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
+import com.oli.orchestrator_demo.agent.AgentModelProperties;
+import com.oli.orchestrator_demo.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.workflow.StageSpec;
 import com.oli.orchestrator_demo.workflow.WorkflowProperties;

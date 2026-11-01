@@ -21,9 +21,9 @@ import org.springframework.boot.actuate.info.Info;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.agent.Agent;
-import com.oli.orchestrator_demo.model.OrchestratorContext;
-import com.oli.orchestrator_demo.orchestrator.TripPlanningOrchestrator;
-import com.oli.orchestrator_demo.orchestrator.WorkflowTemplateHolder;
+import com.oli.orchestrator_demo.contract.OrchestratorContext;
+import com.oli.orchestrator_demo.trip.TripPlanningOrchestrator;
+import com.oli.orchestrator_demo.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.workflow.WorkflowProperties;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

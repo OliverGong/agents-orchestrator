@@ -19,6 +19,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.agent;
+import com.oli.orchestrator_demo.contract.ItineraryResponse;
 
 import java.util.ArrayList;
 import java.util.List;

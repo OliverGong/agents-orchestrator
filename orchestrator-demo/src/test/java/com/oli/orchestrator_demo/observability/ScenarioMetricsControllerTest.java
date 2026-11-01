@@ -11,6 +11,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.observability;
+import com.oli.orchestrator_demo.observability.web.ScenarioMetricsController;
 
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;

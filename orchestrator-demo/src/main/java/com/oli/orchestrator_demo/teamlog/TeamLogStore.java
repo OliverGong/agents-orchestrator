@@ -12,6 +12,8 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.teamlog;
+import com.oli.orchestrator_demo.teamlog.infra.DbTeamLogStore;
+import com.oli.orchestrator_demo.teamlog.infra.FileTeamLogStore;
 
 import java.time.Instant;
 import java.util.List;

@@ -20,7 +20,7 @@ import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.orchestrator.TripPlanningOrchestrator;
+import com.oli.orchestrator_demo.trip.TripPlanningOrchestrator;
 import com.oli.orchestrator_demo.workflow.StageSpec;
 import com.oli.orchestrator_demo.workflow.WorkflowTemplate;
 

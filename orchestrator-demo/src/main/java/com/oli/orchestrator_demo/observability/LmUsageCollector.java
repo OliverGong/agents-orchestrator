@@ -16,6 +16,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.observability;
+import com.oli.orchestrator_demo.agent.UsageCaptureAdvisor;
 
 public final class LmUsageCollector {
 
