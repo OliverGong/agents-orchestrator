@@ -85,6 +85,21 @@ E2E 功能闭环**（mock 后端，见 §15.5）。
 
 ## 3. 包结构
 
+**工程根目录布局**（`orchestrator-demo/`，Maven 单模块 + 独立前端工程）：
+
+```
+orchestrator-demo/
+├── pom.xml · mvnw · .mvn/               # Maven 构建与 wrapper（钉 Java 25 / Spring Boot 4）
+├── Dockerfile · .dockerignore           # 后端多阶段镜像（jar → 容器，见 §9）
+├── config/                              # 运行时可变状态（gitignore）：控制面/场景/团队日志的文件存储后端（§10）
+├── console/                             # 前端 TypeScript 控制台工程（独立 pnpm 工作区，见 §14 / §15.4）
+├── docker/                              # 可视化栈：compose + Grafana/Prometheus/Tempo 预置（§9）
+├── docs/                                # 工程文档（BRANCHING.md 分支策略）
+├── src/main/java/com/oli/orchestrator_demo/   # 后端源码（下方领域包树）
+├── src/main/resources/                  # application.properties + static/（v2 零构建回退控制台，v3.1 移除）
+└── src/test/java/                       # 测试源码（与 main 同包镜像，见 §7）
+```
+
 ```
 com.oli.orchestrator_demo
 ├── shared                       # 横切内核（跨领域、无业务语义；v3.0 从 api/ + aop/ 收拢）
