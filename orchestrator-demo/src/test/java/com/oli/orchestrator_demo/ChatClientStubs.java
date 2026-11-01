@@ -36,9 +36,9 @@ import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.instance.InstanceStore;
 import com.oli.orchestrator_demo.instance.RunInstance;
 import com.oli.orchestrator_demo.observability.infra.NoopRunMetricsStore;
-import com.oli.orchestrator_demo.observability.ObservabilityActor;
-import com.oli.orchestrator_demo.observability.ObservabilitySsePublisher;
-import com.oli.orchestrator_demo.observability.RunMetricsStore;
+import com.oli.orchestrator_demo.observability.events.ObservabilityActor;
+import com.oli.orchestrator_demo.observability.events.ObservabilitySsePublisher;
+import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore;
 import com.oli.orchestrator_demo.teamlog.infra.NoopTeamLogStore;
 
 import tools.jackson.databind.json.JsonMapper;

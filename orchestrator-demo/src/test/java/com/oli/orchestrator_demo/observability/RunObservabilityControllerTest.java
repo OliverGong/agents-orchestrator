@@ -9,6 +9,9 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.observability;
+import com.oli.orchestrator_demo.observability.events.RunTimeline;
+import com.oli.orchestrator_demo.observability.events.ObservabilityActor;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.Await;
 import com.oli.orchestrator_demo.observability.web.RunObservabilityController;
 
@@ -25,7 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.observability.RunTimeline.RunStatus;
+import com.oli.orchestrator_demo.observability.events.RunTimeline.RunStatus;
 
 class RunObservabilityControllerTest {
 

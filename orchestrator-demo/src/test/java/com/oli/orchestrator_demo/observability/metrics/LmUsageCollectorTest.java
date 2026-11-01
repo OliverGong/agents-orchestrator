@@ -9,7 +9,8 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.observability;
+package com.oli.orchestrator_demo.observability.metrics;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

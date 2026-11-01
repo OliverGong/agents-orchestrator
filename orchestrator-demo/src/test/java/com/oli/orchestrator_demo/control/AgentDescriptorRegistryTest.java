@@ -11,6 +11,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.control;
+import com.oli.orchestrator_demo.contract.AgentDescriptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -28,7 +29,7 @@ import com.oli.orchestrator_demo.agent.BudgetAgent;
 import com.oli.orchestrator_demo.agent.ItineraryAgent;
 import com.oli.orchestrator_demo.agent.ResearchAgent;
 import com.oli.orchestrator_demo.agent.ReviewAgent;
-import com.oli.orchestrator_demo.agent.AgentModelProperties;
+import com.oli.orchestrator_demo.agent.config.AgentModelProperties;
 
 class AgentDescriptorRegistryTest {
 

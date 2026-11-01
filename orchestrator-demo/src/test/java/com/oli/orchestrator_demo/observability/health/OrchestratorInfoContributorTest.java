@@ -9,7 +9,9 @@
  * @Date Oct 29, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.observability;
+package com.oli.orchestrator_demo.observability.health;
+import com.oli.orchestrator_demo.observability.metrics.OrchestratorMetrics;
+import com.oli.orchestrator_demo.observability.events.ObservabilityActor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,7 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.actuate.info.Info;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.agent.Agent;
+import com.oli.orchestrator_demo.contract.Agent;
 import com.oli.orchestrator_demo.contract.OrchestratorContext;
 import com.oli.orchestrator_demo.trip.TripPlanningOrchestrator;
 import com.oli.orchestrator_demo.workflow.WorkflowTemplateHolder;

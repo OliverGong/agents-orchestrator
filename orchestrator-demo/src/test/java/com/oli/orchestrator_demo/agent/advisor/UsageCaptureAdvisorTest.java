@@ -10,7 +10,7 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.agent;
+package com.oli.orchestrator_demo.agent.advisor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -30,8 +30,8 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
-import com.oli.orchestrator_demo.observability.LmUsageCollector;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.metrics.LmUsageCollector;
 
 class UsageCaptureAdvisorTest {
 

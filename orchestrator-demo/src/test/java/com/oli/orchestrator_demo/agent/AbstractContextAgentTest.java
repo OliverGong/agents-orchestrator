@@ -8,6 +8,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.agent;
+import com.oli.orchestrator_demo.contract.Agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -18,13 +19,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
-import com.oli.orchestrator_demo.control.AgentDescriptor;
+import com.oli.orchestrator_demo.contract.AgentDescriptor;
 import com.oli.orchestrator_demo.contract.OrchestratorContext;
 import com.oli.orchestrator_demo.contract.ResearchResponse;
 import com.oli.orchestrator_demo.contract.TripRequest;
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
-import com.oli.orchestrator_demo.observability.ObservabilityEventBus;
-import com.oli.orchestrator_demo.observability.RunContext;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.events.ObservabilityEventBus;
+import com.oli.orchestrator_demo.shared.context.RunContext;
 import tools.jackson.core.exc.StreamReadException;
 
 class AbstractContextAgentTest {

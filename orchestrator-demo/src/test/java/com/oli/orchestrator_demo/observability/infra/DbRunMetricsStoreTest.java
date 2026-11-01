@@ -10,7 +10,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.observability.infra;
-import com.oli.orchestrator_demo.observability.RunMetricsStore;
+import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

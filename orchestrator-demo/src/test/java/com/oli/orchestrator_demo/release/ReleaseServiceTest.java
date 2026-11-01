@@ -31,7 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.oli.orchestrator_demo.agent.AgentModelProperties;
+import com.oli.orchestrator_demo.agent.config.AgentModelProperties;
 import com.oli.orchestrator_demo.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.control.infra.FileControlPlaneStore;
 import com.oli.orchestrator_demo.meta.infra.FileMetaStore;

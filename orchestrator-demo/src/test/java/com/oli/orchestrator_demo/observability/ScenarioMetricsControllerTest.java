@@ -29,8 +29,8 @@ import org.mockito.Mockito;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import com.oli.orchestrator_demo.observability.RunMetricsStore;
-import com.oli.orchestrator_demo.observability.RunMetricsStore.StageMetricsSummary;
+import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore;
+import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore.StageMetricsSummary;
 
 class ScenarioMetricsControllerTest {
 

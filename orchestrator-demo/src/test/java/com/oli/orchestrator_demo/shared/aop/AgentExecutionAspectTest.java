@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 
-import com.oli.orchestrator_demo.agent.Agent;
+import com.oli.orchestrator_demo.contract.Agent;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;

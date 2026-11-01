@@ -33,7 +33,7 @@ import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
-import com.oli.orchestrator_demo.agent.Agent;
+import com.oli.orchestrator_demo.contract.Agent;
 import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.contract.BudgetResponse;
 import com.oli.orchestrator_demo.contract.ItineraryResponse;
@@ -41,12 +41,12 @@ import com.oli.orchestrator_demo.contract.OrchestratorContext;
 import com.oli.orchestrator_demo.contract.ResearchResponse;
 import com.oli.orchestrator_demo.contract.ReviewResponse;
 import com.oli.orchestrator_demo.contract.TripRequest;
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent.Type;
-import com.oli.orchestrator_demo.observability.ObservabilityActor;
-import com.oli.orchestrator_demo.observability.OrchestratorMetrics;
-import com.oli.orchestrator_demo.observability.RunTimeline;
-import com.oli.orchestrator_demo.observability.RunTimeline.RunStatus;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent.Type;
+import com.oli.orchestrator_demo.observability.events.ObservabilityActor;
+import com.oli.orchestrator_demo.observability.metrics.OrchestratorMetrics;
+import com.oli.orchestrator_demo.observability.events.RunTimeline;
+import com.oli.orchestrator_demo.observability.events.RunTimeline.RunStatus;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.workflow.WorkflowProperties;
 

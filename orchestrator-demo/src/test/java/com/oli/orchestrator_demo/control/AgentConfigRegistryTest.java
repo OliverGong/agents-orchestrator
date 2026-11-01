@@ -13,6 +13,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.control;
+import com.oli.orchestrator_demo.contract.AgentDescriptor;
 import com.oli.orchestrator_demo.control.infra.DbControlPlaneStore;
 import com.oli.orchestrator_demo.control.infra.FileControlPlaneStore;
 
@@ -35,7 +36,7 @@ import com.oli.orchestrator_demo.agent.BudgetAgent;
 import com.oli.orchestrator_demo.agent.ItineraryAgent;
 import com.oli.orchestrator_demo.agent.ResearchAgent;
 import com.oli.orchestrator_demo.agent.ReviewAgent;
-import com.oli.orchestrator_demo.agent.AgentModelProperties;
+import com.oli.orchestrator_demo.agent.config.AgentModelProperties;
 import com.oli.orchestrator_demo.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.workflow.StageSpec;

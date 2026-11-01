@@ -12,7 +12,7 @@
  * @Version 2.0
  */
 package com.oli.orchestrator_demo.control.infra;
-import com.oli.orchestrator_demo.control.AgentDescriptor;
+import com.oli.orchestrator_demo.contract.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.CalibrationRule;
 import com.oli.orchestrator_demo.control.ControlPlaneCrypto;

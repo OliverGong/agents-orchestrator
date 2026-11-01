@@ -12,7 +12,7 @@
 package com.oli.orchestrator_demo.instance.web;
 import com.oli.orchestrator_demo.Await;
 import com.oli.orchestrator_demo.instance.web.InstanceController;
-import com.oli.orchestrator_demo.observability.RunTimeline;
+import com.oli.orchestrator_demo.observability.events.RunTimeline;
 
 import static com.oli.orchestrator_demo.Await.until;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,11 +29,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.ChatClientStubs.CollectingInstanceStore;
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.observability.infra.NoopRunMetricsStore;
-import com.oli.orchestrator_demo.observability.ObservabilityActor;
-import com.oli.orchestrator_demo.observability.RunMetricsStore;
-import com.oli.orchestrator_demo.observability.RunTimeline.RunStatus;
+import com.oli.orchestrator_demo.observability.events.ObservabilityActor;
+import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore;
+import com.oli.orchestrator_demo.observability.events.RunTimeline.RunStatus;
 import com.oli.orchestrator_demo.teamlog.TeamLogEntry;
 import com.oli.orchestrator_demo.teamlog.TeamLogStore;
 

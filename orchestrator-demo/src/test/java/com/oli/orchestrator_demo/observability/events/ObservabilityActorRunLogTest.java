@@ -10,7 +10,7 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.observability;
+package com.oli.orchestrator_demo.observability.events;
 import com.oli.orchestrator_demo.Await;
 import com.oli.orchestrator_demo.observability.infra.NoopRunMetricsStore;
 
@@ -23,8 +23,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent.LmUsage;
-import com.oli.orchestrator_demo.observability.RunTimeline.RunStatus;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent.LmUsage;
+import com.oli.orchestrator_demo.observability.events.RunTimeline.RunStatus;
 import com.oli.orchestrator_demo.teamlog.TeamLogEntry;
 import com.oli.orchestrator_demo.teamlog.TeamLogStore;
 

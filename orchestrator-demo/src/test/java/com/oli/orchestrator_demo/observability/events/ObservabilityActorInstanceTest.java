@@ -10,7 +10,8 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.observability;
+package com.oli.orchestrator_demo.observability.events;
+import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore;
 import com.oli.orchestrator_demo.Await;
 import com.oli.orchestrator_demo.observability.infra.NoopRunMetricsStore;
 
@@ -27,7 +28,7 @@ import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.ChatClientStubs.CollectingInstanceStore;
 import com.oli.orchestrator_demo.instance.InstanceStore;
 import com.oli.orchestrator_demo.instance.RunInstance;
-import com.oli.orchestrator_demo.observability.RunTimeline.RunStatus;
+import com.oli.orchestrator_demo.observability.events.RunTimeline.RunStatus;
 
 class ObservabilityActorInstanceTest {
 
