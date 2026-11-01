@@ -153,6 +153,16 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 docker/ 根 5 条目、grafana 2 子目录（dashboards 1 / provisioning 2）、
 prometheus 与 tempo 各 1 配置文件。新增资产时按上表落位，条目超限先分组。
 
+**构建生成物维护**（console `dist/`、`test-results/`，后端 `target/`）：
+生成物是哈希命名的构建产物，**不重组、不跟踪**，按"本地生成"类别管理——
+
+- gitignore 三层覆盖：console/.gitignore（node_modules/dist/test-results）·
+  orchestrator-demo/.gitignore（target//dist/）· 仓库根（.DS_Store 全局）；
+- 统一清理入口：console `pnpm clean`（dist + test-results + playwright-report），
+  后端 `./mvnw clean`（target/）；
+- 条目数法则不适用于产物目录内部（文件数随构建浮动），只约束其**落位**——
+  生成物只能出现在上表"本地生成"位置，其他位置出现即视为散落资产问题。
+
 ## 7. 演进指南：新模块接入清单
 
 1. **选 zone 归属**（§4 判定问题）：零业务语义且被 ≥2 域用 → `kernel/`；
