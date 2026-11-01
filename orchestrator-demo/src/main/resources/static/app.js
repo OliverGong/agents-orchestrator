@@ -1274,7 +1274,10 @@ async function refreshMeta() {
       <td class="mono">${esc(r.version || '—')}</td>
       <td><span class="badge">${esc(r.artifactType || '—')}</span></td>
       <td>${esc(r.changelog || '—')}</td>
-      <td><button class="mini-btn release-del" data-id="${esc(r.scenarioId)}" type="button">删除</button></td>
+      <td>
+        <button class="mini-btn release-publish" data-id="${esc(r.scenarioId)}" type="button">发布</button>
+        <button class="mini-btn release-del" data-id="${esc(r.scenarioId)}" type="button">删除</button>
+      </td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" class="hint">尚无场景发布配置。</td></tr>';
   rbody.querySelectorAll('.release-del').forEach((btn) =>
@@ -1285,6 +1288,8 @@ async function refreshMeta() {
         refreshMeta();
       } catch (e) { alert('删除失败: ' + e.message); }
     }));
+  rbody.querySelectorAll('.release-publish').forEach((btn) =>
+    btn.addEventListener('click', () => publishScenario(btn.dataset.id)));
 
   // Release form selects: scenarios (reusing the shared cache) + enabled portals.
   if (!scenarioCache.length) {
@@ -1294,7 +1299,34 @@ async function refreshMeta() {
     `<option value="${esc(s.id)}">${esc(s.name)}（${esc(s.id)}）</option>`).join('');
   $('#mrl-portal').innerHTML = (metaState.portals || []).filter((p) => p.enabled).map((p) =>
     `<option value="${esc(p.id)}">${esc(p.name)}（${esc(p.id)}）</option>`).join('');
+
+  // Release registry: the durable record of every publish (newest first).
+  let releases = [];
+  try { releases = await getJson('/api/v1/releases') || []; } catch { releases = []; }
+  const regBody = $('#registry-table tbody');
+  regBody.innerHTML = releases.map((r) => `
+    <tr>
+      <td class="mono">${esc(r.id)}</td>
+      <td class="mono">${esc(r.scenarioId)}</td>
+      <td>${esc(r.portalId || '—')}</td>
+      <td class="mono">${esc(r.releaseVersion || '—')}</td>
+      <td><span class="badge">${esc(r.artifactType || '—')}</span></td>
+      <td>${fmtDateTime(r.publishedAt)}</td>
+      <td class="mono" title="${esc(r.packageHash || '')}">${esc((r.packageHash || '—').slice(0, 12))}…</td>
+      <td><a class="mini-btn" href="/api/v1/releases/${esc(r.id)}/package" download>导出</a></td>
+    </tr>`).join('') || '<tr><td colspan="8" class="hint">尚无发布记录。</td></tr>';
 }
+
+async function publishScenario(scenarioId) {
+  if (!confirm(`发布场景 ${scenarioId} 到其配置的门户？`)) return;
+  try {
+    const record = await postJson(`/api/v1/releases/${encodeURIComponent(scenarioId)}/publish`, {});
+    alert(`已发布：注册表记录 #${record.id}（版本 ${record.releaseVersion || '—'}）`);
+    refreshMeta();
+  } catch (e) { alert('发布失败: ' + e.message); }
+}
+
+$('#registry-refresh').addEventListener('click', refreshMeta);
 
 $('#meta-runtime-form').addEventListener('submit', async (ev) => {
   ev.preventDefault();

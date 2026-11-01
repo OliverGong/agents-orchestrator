@@ -258,6 +258,19 @@
             </div>
           </form>
         </div>
+
+        <div class="card">
+          <h2>发布注册表 <button id="registry-refresh" class="mini-btn" type="button">刷新</button></h2>
+          <p class="hint">每次「发布」将场景快照 + dry-run 证据 + 门户/版本元数据打包为可移植 JSON
+              （SHA-256 哈希）追加到持久注册表（<code>rl_release</code> 表 / <code>config/release-registry.json</code>），
+              并写团队日志审计。包内容可随时重新导出。</p>
+          <table class="data-table" id="registry-table">
+            <thead><tr>
+              <th>ID</th><th>场景</th><th>门户</th><th>版本</th><th>产物</th><th>发布时间</th><th>包哈希</th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -366,6 +379,6 @@
   </div>
 </div>
 
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>
