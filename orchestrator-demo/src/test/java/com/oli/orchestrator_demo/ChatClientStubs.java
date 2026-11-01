@@ -32,14 +32,14 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
-import com.oli.orchestrator_demo.control.AgentRuntimeStore;
-import com.oli.orchestrator_demo.instance.InstanceStore;
-import com.oli.orchestrator_demo.instance.RunInstance;
-import com.oli.orchestrator_demo.observability.infra.NoopRunMetricsStore;
-import com.oli.orchestrator_demo.observability.events.ObservabilityActor;
-import com.oli.orchestrator_demo.observability.events.ObservabilitySsePublisher;
-import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore;
-import com.oli.orchestrator_demo.teamlog.infra.NoopTeamLogStore;
+import com.oli.orchestrator_demo.governance.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.ops.instance.InstanceStore;
+import com.oli.orchestrator_demo.ops.instance.RunInstance;
+import com.oli.orchestrator_demo.ops.observability.infra.NoopRunMetricsStore;
+import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;
+import com.oli.orchestrator_demo.ops.observability.events.ObservabilitySsePublisher;
+import com.oli.orchestrator_demo.ops.observability.metrics.RunMetricsStore;
+import com.oli.orchestrator_demo.governance.teamlog.infra.NoopTeamLogStore;
 
 import tools.jackson.databind.json.JsonMapper;
 

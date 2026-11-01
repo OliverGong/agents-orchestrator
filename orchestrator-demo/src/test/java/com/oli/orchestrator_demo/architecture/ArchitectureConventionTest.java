@@ -1,5 +1,5 @@
 package com.oli.orchestrator_demo.architecture;
-import com.oli.orchestrator_demo.contract.Agent;
+import com.oli.orchestrator_demo.kernel.contract.Agent;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *  R1 shared/ (cross-cutting kernel) imports no business domain at all
  *     (business SPIs live in contract/).
  *  R2 contract/ (stable execution contract) imports nothing in-process.
- *  R3 the module dependency graph (top-level packages) is acyclic.
+ *  R3 the module dependency graph (zone-qualified modules, e.g. core.agent)
+ *     is acyclic.
  *  R4 infra/ adapters are only referenced from their own module
  *     (assembly configs and tests included).
  *  R5 web/ presentation classes never touch any infra/ adapter.
@@ -44,10 +45,17 @@ class ArchitectureConventionTest {
 
     private static final String ROOT_PKG = "com.oli.orchestrator_demo";
 
-    /** Top-level packages excluding the two non-domain kernels. */
-    private static final Set<String> DOMAINS = Set.of(
-            "agent", "control", "instance", "meta", "mcp", "observability",
-            "release", "scenario", "teamlog", "trip", "workflow");
+    /** The four zones grouping the modules (see ARCHITECTURE §3: 4 zones,
+     *  2-5 modules each — the 3-to-5 abstraction rule). */
+    private static final Set<String> ZONES = Set.of("kernel", "core", "governance", "ops");
+
+    /** Zone-qualified modules; tests and the application root are not modules. */
+    private static final Set<String> MODULES = Set.of(
+            "kernel.shared", "kernel.contract",
+            "core.trip", "core.agent", "core.workflow", "core.mcp",
+            "governance.control", "governance.scenario", "governance.meta",
+            "governance.release", "governance.teamlog",
+            "ops.observability", "ops.instance");
 
     private static final Pattern IMPORT = Pattern.compile(
             "^\\s*import\\s+(?:static\\s+)?(" + Pattern.quote(ROOT_PKG) + "\\.[\\w.]+)\\s*;", Pattern.MULTILINE);
@@ -82,9 +90,12 @@ class ArchitectureConventionTest {
     @Test
     void sharedKernelOnlyTouchesTheSpiSeam() throws IOException {
         List<String> violations = sources().stream()
-                .filter(s -> s.pkg().startsWith("shared."))
+                .filter(s -> s.pkg().startsWith("kernel.shared."))
                 .flatMap(s -> s.imports().stream()
-                        .filter(i -> DOMAINS.contains(topOf(i)))
+                        .filter(i -> {
+                            String m = moduleOf(i);
+                            return MODULES.contains(m) && !m.startsWith("kernel.");
+                        })
                         .map(i -> s.pkg() + " -> " + i))
                 .toList();
         assertTrue(violations.isEmpty(), "shared/ must stay decoupled from business domains: " + violations);
@@ -94,32 +105,33 @@ class ArchitectureConventionTest {
     @Test
     void contractPackageImportsNothingOutsideItself() throws IOException {
         List<String> violations = sources().stream()
-                .filter(s -> s.pkg().startsWith("contract."))
+                .filter(s -> s.pkg().startsWith("kernel.contract."))
                 .flatMap(s -> s.imports().stream()
-                        .filter(i -> !topOf(i.substring(ROOT_PKG.length() + 1)).equals("contract"))
+                        .filter(i -> !moduleOf(i).equals("kernel.contract"))
                         .map(i -> s.pkg() + " -> " + i))
                 .toList();
         assertTrue(violations.isEmpty(), "contract/ must not import in-process types: " + violations);
     }
 
-    /** R3 — the top-level module graph has no dependency cycles, modulo the
-     *  documented waivers below (each with an inversion plan in §15.6). */
+    /** R3 — the module graph (zone-qualified, e.g. core.agent) has no cycles,
+     *  modulo the documented waivers below (inversion plans in §15.6). */
     @Test
     void moduleDependencyGraphIsAcyclic() throws IOException {
         // Waived cycles — see ARCHITECTURE §15.6 for the inversion plan.
-        // agent ⇄ control: descriptor introspection vs runtime-config read-back.
-        // mcp ⇄ control: registry reads control-plane state vs status endpoint composition.
-        // instance ⇄ observability: replay read-side composition vs run-instance writes.
-        // observability ⇄ trip: health probes read live orchestrator state vs
-        //   the orchestrator publishing events/metrics into observability.
-        Set<String> waived = Set.of("agent|control", "control|mcp", "instance|observability",
-                "observability|trip");
+        // core.agent ⇄ governance.control: descriptor introspection vs config read-back.
+        // governance.control ⇄ core.mcp: registry reads control-plane state vs
+        //   status endpoint composition.
+        // ops.instance ⇄ ops.observability: replay read-side composition vs
+        //   run-instance writes.
+        // ops.observability ⇄ core.trip: health probes read live orchestrator
+        //   state vs the orchestrator publishing events/metrics.
+        Set<String> waived = Set.of("core.agent|governance.control", "core.mcp|governance.control",
+                "ops.instance|ops.observability", "core.trip|ops.observability");
         Map<String, Set<String>> graph = new HashMap<>();
         for (Source s : sources()) {
-            String from = topOf(s.pkg());
+            String from = moduleOf(s.pkg());
             for (String i : s.imports()) {
-                // strip the root package so topOf() yields the module name
-                String to = topOf(i.substring(ROOT_PKG.length() + 1));
+                String to = moduleOf(i);
                 if (!to.equals(from) && !waived.contains(pair(from, to))) {
                     graph.computeIfAbsent(from, k -> new HashSet<>()).add(to);
                 }
@@ -166,8 +178,18 @@ class ArchitectureConventionTest {
         return dot < 0 ? pkg : pkg.substring(0, dot);
     }
 
+    /** Zone-qualified module of a package or FQCN (e.g. "kernel.shared");
+     *  root-level classes (the application assembly) map to themselves. */
+    private static String moduleOf(String pkgOrFqcn) {
+        String rel = pkgOrFqcn.startsWith(ROOT_PKG + ".")
+                ? pkgOrFqcn.substring(ROOT_PKG.length() + 1) : pkgOrFqcn;
+        String[] parts = rel.split("\\.");
+        return parts.length >= 2 && ZONES.contains(parts[0])
+                ? parts[0] + "." + parts[1] : parts[0];
+    }
+
     private static boolean sameModule(String consumerPkg, String importedFqcn) {
-        return topOf(consumerPkg).equals(topOf(importedFqcn));
+        return moduleOf(consumerPkg).equals(moduleOf(importedFqcn));
     }
 
     /** DFS cycle detection; returns the closed walk (e.g. [mcp, control, mcp],
