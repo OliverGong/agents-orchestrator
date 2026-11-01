@@ -414,29 +414,24 @@ curl http://localhost:8080/api/trips/runs/{runId}    # 完整时间线：波次 
 `parallelPeers` 与失败信息；`finalContext` 为运行终态。进程内保留最近 100 次
 运行，重启即清零（长期存储走 Tempo/Prometheus，见 4.9）。
 
-### 5.3 前端控制台（`static/`）
+### 5.3 前端控制台（`console/`）
 
-应用自带一个**零依赖、零构建**的单页控制台（原生 HTML/CSS/JS，位于
-`src/main/resources/static/`，启动即由 Boot 作为欢迎页提供，
-**http://localhost:8080/**），把整个工程闭环在一个界面里：
+**v3.0 起前端不再内嵌于后端**：原 `src/main/resources/static/` 下的零依赖单页
+（v2.1 遗留）已删除，控制台解耦为独立的 **Vue 3 + TypeScript 工程**
+（`console/`，独立 nginx 容器，默认 http://localhost:8081/），与后端仅以
+REST/SSE 契约通信。页面清单、技术选型与工程结构见 **§14 与 §15.4**；
+路由到视图的映射见 `console/src/app/router/index.ts`。
 
-| Tab | 内容 | 依赖端点 |
+主要页面与依赖端点：
+
+| 页面 | 内容 | 依赖端点 |
 |---|---|---|
-| 规划工作台 | 用户请求表单（工作流入口）→「本次请求」回显 → **实时执行进度**（轮询运行时间线，逐阶段显示完成/失败徽章与耗时；v1 另有 SSE 实时黑板卡，见 9.5）→ 四张结果卡片（行程结论/逐日行程/预算核算/景点调研），失败时渲染结构化错误卡（400/404/502/503/500） | `POST /api/trips/plan`、`GET /api/trips/runs[/{id}]` |
-| 运行回放 | 运行列表（状态/耗时/阶段数）→ 点开单次运行：**用户最初提出的请求** + 依赖波次与每阶段输入/输出黑板快照（折叠 JSON）+ 终态上下文 | `GET /api/trips/runs[/{id}]` |
-| 系统观测 | 过程指标卡片（运行发起/成功/失败、阶段计数、运行总时长、保留时间线）、Agent 维度表格（`agent.execution.duration` 按标签查询）、健康检查与工作流配置 JSON 面板、Grafana/Tempo/Prometheus 链接 | `/actuator/health`、`/actuator/info`、`/actuator/metrics/{name}?tag=…` |
-| 控制平面（v1） | Agent 卡片编辑（system prompt/模型/温度/校准规则/MCP 引用）+ 工作流编辑器（mode/阶段/agent/依赖，增删行）+ MCP 服务面板 + 版本徽章与刷新 | `/api/v1/control/*` |
-
-v2.1 起控制台重构为**左侧导航布局**（三组八项），替代 v0–v1 的顶部 tab：
-
-| 导航组 | 页面 | 内容 |
-|---|---|---|
-| 场景 | 场景运行 | 顶栏场景选择与**激活**（覆盖热应用到控制平面，激活徽章）+ 原规划工作台全部能力 |
-| 场景 | 场景推演 | dry-run 报告：校验徽章与问题清单、**依赖 DAG（SVG）**、波次展开（有效模型/温度/槽位/pending-safe）、黑板槽位流表 |
-| 场景 | 场景配置 | 场景 CRUD 表格 + 编辑器（请求模板 / workflow 覆盖 JSON / agent 覆盖 JSON / MCP 依赖复选 / 产物类型 / 启停） |
-| 元数据 | Agent 配置 / 工作流编排 / MCP 服务器 | 原「控制平面」tab 的三块内容原样承接（id 不变） |
-| 可观测 | 运行回放 | 详情升级为**三视图切换**：时间线（含 `↻ retry` 第 N 次尝试链与工具明细）/ **DAG 依赖图**（模板精确依赖，回退波次推导，节点带状态填色与 ⚠retry 徽章）/ **泳道图**（agent 泳道 × 时间轴，⚠ 重试时刻定位、▲工具刻度，无完成时间戳时退化为顺序布局） |
-| 可观测 | 系统观测 | 原「系统观测」tab 原样承接 |
+| 场景运行 | 场景选择与**激活**（覆盖热应用到控制平面）+ 规划工作台 + 实时执行进度（轮询）+ SSE 实时黑板卡 + 四张结果卡片，完成后一键跳转回放/实例/指标 | `POST /api/trips/plan`、`GET /api/trips/runs[/{id}]`、`/api/v1/events/stream` |
+| 场景推演 | dry-run 报告：校验徽章与问题清单、依赖 DAG（SVG）、波次展开、黑板槽位流表 | `POST /api/v1/scenarios/{id}/dry-run` |
+| 场景配置 | 场景 CRUD 表格 + 编辑器 | `/api/v1/scenarios` |
+| 元数据三页 | Agent 配置 / 工作流编排 / MCP 服务器 | `/api/v1/control/*` |
+| 运行回放 | 三视图切换：时间线 / DAG 依赖图 / 泳道图 | `GET /api/trips/runs[/{id}]` |
+| 实例追踪 / 团队日志 / 场景指标 | 运行实例溯源、RUN/AUDIT/SYSTEM 日志、按场景 LM 耗时与 token 消耗 | `/api/v1/instances`、`/api/v1/logs`、`/api/v1/metrics/lm` |
 
 实现要点（改错即复发）：
 
@@ -444,13 +439,10 @@ v2.1 起控制台重构为**左侧导航布局**（三组八项），替代 v0�
   运行列表找到 `RUNNING` 的运行并拉取详情——事件时间线由 `ObservabilityActor`
   边执行边折叠，因此无需 WebSocket 即可看到阶段逐个完成。
 - **数据刷新**：`ObservabilityActor` 时间线与 Micrometer 指标都是即时快照，
-  「运行回放」「系统观测」tab 在**每次切换时自动重新拉取**（页面加载时的
+  「运行回放」「系统观测」页面在**每次切换时自动重新拉取**（页面加载时的
   旧数据无意义）。
 - **Actuator 统计名**：`/actuator/metrics` 的 Timer 测量统计名是 `TOTAL_TIME`
   （不是 `TOTAL`），Gauge 是 `VALUE`；读错名字会渲染成 0/「—」。
-- **静态资源缓存**：开发期改动 `static/` 后普通刷新可能命中启发式缓存——
-  已配置 `spring.web.resources.cache.cachecontrol.no-cache=true` 强制再验证，
-  且 HTML 引用带版本参数（`app.js?v=N`），改动后记得同步递增。
 
 ## 6. 配置（application.properties / application.yaml）
 
@@ -1199,9 +1191,9 @@ DAG 与泳道 SVG 以 computed 布局原样移植（波次列 + 贝塞尔依赖�
   而非整体不可用）。
 - **可扩展性**：SPA 静态资源可独立前置 CDN/负载均衡，后端按需扩容。
 
-**内嵌 jar（legacy 路径）保留为零构建回退**：`static/` 原样保留并在
-`index.html` 头部标注弃用（v3.1 移除计划），本地 `./mvnw spring-boot:run`
-不依赖 Node 工具链仍可用。
+**内嵌 jar（legacy 路径）已随 v3.1 移除**：`src/main/resources/static/` 已
+删除，本地 `./mvnw spring-boot:run` 仅提供 REST/SSE API；控制台一律经
+`console/` 工程（`pnpm dev` / nginx 容器）访问。
 
 **CORS：两种形态下浏览器都只见单一来源**——开发期 Vite dev server 将
 `/api` `/actuator` 代理到 `localhost:8080`，生产期 nginx 反代到 `app:8080`，
@@ -1236,8 +1228,9 @@ DAG 与泳道 SVG 以 computed 布局原样移植（波次列 + 贝塞尔依赖�
   Vite 代理写死 `localhost:8080`。
 - **SSE 代理**：任何前置代理层（nginx/网关/CDN）都必须对
   `/api/v1/events/stream` 关闭缓冲并拉长读超时，否则事件将成块延迟。
-- **移除计划**：v3.1 删除 `static/` legacy 控制台（保留期间仅修致命
-  缺陷，不新增功能）。
+- **legacy 移除（v3.1 已完成）**：`static/` legacy 控制台已删除，
+  `spring.web.resources.cache.cachecontrol.no-cache` 死配置随之清理；
+  后端不再承载任何 UI 资源。
 
 
 ## 15. 目录组织原则（v3.0 重组方法论）

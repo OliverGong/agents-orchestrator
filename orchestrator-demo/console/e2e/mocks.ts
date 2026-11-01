@@ -314,7 +314,7 @@ export async function installBackendMocks(page: Page): Promise<void> {
     if (p === '/api/v1/scenarios' && method === 'GET') return json(route, scenariosState)
     if (p === '/api/v1/scenarios' && method === 'POST') return json(route, scenariosState)
     if (/^\/api\/v1\/scenarios\/[^/]+\/dry-run$/.test(p)) return json(route, dryRunReport)
-    if (/^\/api\/v1\/scenarios\/[^/]+\/activate$/.test(p)) return json(route, scenariosState)
+    if (/^\/api\/v1\/scenarios\/[^/]+\/activate$/.test(p)) return json(route, controlState)
 
     if (p === '/api/v1/control/models') return json(route, { models: ['qwen3:8b'] })
     if (p === '/api/v1/control/mcp/status') return json(route, mcpStatuses)
