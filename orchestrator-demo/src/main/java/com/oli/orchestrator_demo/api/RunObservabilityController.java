@@ -91,10 +91,15 @@ public class RunObservabilityController {
           List<RunDetails.ToolCallView> toolCalls =
               pendingToolCalls.getOrDefault(key, List.of());
           List<RunDetails.RetryView> retries = pendingRetries.getOrDefault(key, List.of());
+          AgentObservabilityEvent.LmUsage usage = event.usage();
           stagesByWave.computeIfAbsent(event.waveIndex(), wave -> new ArrayList<>())
               .add(new RunDetails.StageView(event.stageName(), event.agentName(), event.type().name(),
                   event.threadName(), event.durationMs(), event.errorMessage(), event.inputContextJson(),
-                  event.outputContextJson(), event.parallelPeers(), toolCalls, retries, event.timestamp()));
+                  event.outputContextJson(), event.parallelPeers(), toolCalls, retries,
+                  usage == null ? null
+                      : new RunDetails.LmUsageView(usage.promptTokens(), usage.completionTokens(),
+                          usage.totalTokens(), usage.model(), usage.retries()),
+                  event.timestamp()));
         }
         default -> { /* run-level events carry no stage view */ }
       }
@@ -127,12 +132,18 @@ public class RunObservabilityController {
     }
 
     /** One executed stage with its context snapshots, the MCP tool calls it
-     *  triggered, its parse-retry chain and the completion timestamp (the
-     *  swimlane view derives the start from durationMs). */
+     *  triggered, its parse-retry chain, the aggregated LM usage of all its
+     *  attempts and the completion timestamp (the swimlane view derives the
+     *  start from durationMs). */
     public record StageView(String stageName, String agentName, String outcome, String threadName,
         Long durationMs, String errorMessage, String inputContext, String outputContext,
         List<String> parallelPeers, List<ToolCallView> toolCalls, List<RetryView> retries,
-        Instant completedAt) {
+        LmUsageView usage, Instant completedAt) {
+    }
+
+    /** Aggregated token consumption of one stage across all its attempts. */
+    public record LmUsageView(long promptTokens, long completionTokens, long totalTokens,
+        String model, int retries) {
     }
 
     /** One MCP tool invocation attributed to the surrounding stage. */

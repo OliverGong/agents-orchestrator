@@ -44,6 +44,7 @@ import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.LmUsageCollector;
 import com.oli.orchestrator_demo.observability.ObservabilityEventBus;
 import com.oli.orchestrator_demo.observability.RunContext;
 import tools.jackson.core.JacksonException;
@@ -83,7 +84,8 @@ public abstract class AbstractContextAgent<R> implements Agent<OrchestratorConte
     this.chatClient = chatModel == null ? null : ChatClient.builder(chatModel)
         .defaultAdvisors(new SimpleLoggerAdvisor(),
             new CalibrationAdvisor(name, runtimeStore),
-            new ResponseSanitizerAdvisor())
+            new ResponseSanitizerAdvisor(),
+            new UsageCaptureAdvisor())
         .build();
   }
 
@@ -136,6 +138,8 @@ public abstract class AbstractContextAgent<R> implements Agent<OrchestratorConte
    * outside a workflow run) the event is silently dropped.
    */
   private void publishRetry(int attempt, String errorMessage) {
+    // The retry re-samples the model: count it into the stage's LM usage.
+    LmUsageCollector.recordRetry();
     RunContext.Attribution attribution = RunContext.current();
     if (attribution == null) {
       return;

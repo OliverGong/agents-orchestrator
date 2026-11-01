@@ -27,8 +27,10 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.observability.NoopRunMetricsStore;
 import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.observability.ObservabilitySsePublisher;
+import com.oli.orchestrator_demo.observability.RunMetricsStore;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -58,7 +60,13 @@ public final class ChatClientStubs {
 
   /** An observability actor wired with a real (emitter-less) SSE publisher. */
   public static ObservabilityActor actor() {
-    return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()));
+    return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()),
+        new NoopRunMetricsStore());
+  }
+
+  /** An observability actor wired with the given (test) metrics store. */
+  public static ObservabilityActor actor(RunMetricsStore metricsStore) {
+    return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()), metricsStore);
   }
 
   /**

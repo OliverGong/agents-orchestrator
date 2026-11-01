@@ -190,6 +190,14 @@
           </tr></thead>
           <tbody></tbody>
         </table>
+        <h3>LM 消耗（按场景/阶段聚合，近 7 天 · obs_run_metrics）</h3>
+        <table class="data-table" id="lm-table">
+          <thead><tr>
+            <th>场景</th><th>阶段</th><th>Agent</th><th>模型</th><th>阶段次数</th><th>失败</th><th>重试</th>
+            <th>平均耗时 (ms)</th><th>最大耗时 (ms)</th><th>Prompt</th><th>Completion</th><th>总 tokens</th><th>最近</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
       <div class="grid-2">
         <div class="card"><h2>健康检查 (/actuator/health)</h2><div id="health-panel" class="mono-panel">加载中…</div></div>
@@ -208,6 +216,6 @@
   </div>
 </div>
 
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

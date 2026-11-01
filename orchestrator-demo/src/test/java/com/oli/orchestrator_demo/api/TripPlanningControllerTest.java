@@ -53,7 +53,8 @@ class TripPlanningControllerTest {
             new ItineraryResponse.DayPlan(1, "Senso-ji", "Ueno Park", "Ramen tasting", new BigDecimal("250")))))
         .withReviewResponse(new ReviewResponse(
             true, "A well balanced trip", List.of(), List.of("Book tickets in advance")));
-    when(orchestrator.planTrip(any(TripRequest.class))).thenReturn(planned);
+    when(orchestrator.planTrip(any(TripRequest.class), org.mockito.ArgumentMatchers.nullable(String.class)))
+        .thenReturn(planned);
 
     mockMvc.perform(post("/api/trips/plan")
             .contentType(MediaType.APPLICATION_JSON)

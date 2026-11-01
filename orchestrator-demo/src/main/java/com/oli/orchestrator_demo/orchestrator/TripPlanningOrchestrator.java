@@ -46,6 +46,7 @@ import com.oli.orchestrator_demo.agent.Agent;
 import com.oli.orchestrator_demo.model.OrchestratorContext;
 import com.oli.orchestrator_demo.model.TripRequest;
 import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.LmUsageCollector;
 import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.observability.OrchestratorMetrics;
 import com.oli.orchestrator_demo.observability.RunContext;
@@ -115,6 +116,16 @@ public class TripPlanningOrchestrator {
    * the observability actor as a replayable event timeline.
    */
   public OrchestratorContext planTrip(TripRequest request) {
+    return planTrip(request, null);
+  }
+
+  /**
+   * Same workflow, but attributed to the control-plane scenario it was started
+   * from (nullable for plain ad-hoc runs): the scenario id rides on the
+   * {@code RUN_STARTED} event, so the durable metrics store can aggregate
+   * per-scenario LM consumption and durations.
+   */
+  public OrchestratorContext planTrip(TripRequest request, String scenarioId) {
     String runId = UUID.randomUUID().toString();
     // Read once per run: a control-plane template swap takes effect on the
     // next request without disturbing the ones already executing.
@@ -127,7 +138,8 @@ public class TripPlanningOrchestrator {
         .lowCardinalityKeyValue("template", template.name())
         .lowCardinalityKeyValue("mode", template.mode().name())
         .start();
-    observability.tell(AgentObservabilityEvent.runStarted(runId, template.name(), template.mode().name()));
+    observability.tell(AgentObservabilityEvent.runStarted(runId, template.name(), scenarioId,
+        template.mode().name()));
     orchestratorMetrics.runStarted(template.name(), template.mode().name());
     try (Observation.Scope scope = run.openScope()) {
       // Captured once inside the scope so every concurrent wave task inherits
@@ -215,23 +227,28 @@ public class TripPlanningOrchestrator {
     // the thread-local is set/cleared around the stage, on whichever thread
     // (request or virtual) happens to execute it.
     RunContext.set(new RunContext.Attribution(runId, stage.name(), agent.name(), waveIndex));
+    LmUsageCollector.begin();
     try {
       OrchestratorContext output = agent.execute(context);
+      AgentObservabilityEvent.LmUsage usage = LmUsageCollector.drain();
       observability.tell(AgentObservabilityEvent.stageCompleted(runId, stage.name(), agent.name(), waveIndex,
           parallelPeers, mode.name(), threadName, System.currentTimeMillis() - startTime,
+          usage == null ? null : usage.retries(), usage,
           toJson(context), toJson(output)));
       orchestratorMetrics.stageCompleted(agent.name(), mode.name());
       return output;
     }
     catch (RuntimeException ex) {
+      AgentObservabilityEvent.LmUsage usage = LmUsageCollector.drain();
       observability.tell(AgentObservabilityEvent.stageFailed(runId, stage.name(), agent.name(), waveIndex,
           parallelPeers, mode.name(), threadName, System.currentTimeMillis() - startTime,
-          describe(ex), toJson(context)));
+          describe(ex), usage == null ? null : usage.retries(), usage, toJson(context)));
       orchestratorMetrics.stageFailed(agent.name(), mode.name());
       throw ex;
     }
     finally {
       RunContext.clear();
+      LmUsageCollector.clear();
     }
   }
 

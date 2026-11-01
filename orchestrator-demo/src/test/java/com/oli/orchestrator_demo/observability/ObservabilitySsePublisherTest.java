@@ -28,7 +28,7 @@ class ObservabilitySsePublisherTest {
   @Test
   void publishWithoutSubscribersIsANoOp() {
     assertThatCode(() -> publisher.publish(AgentObservabilityEvent.runStarted(
-        "run-1", "default-trip-planning", "SEQUENTIAL"))).doesNotThrowAnyException();
+        "run-1", "default-trip-planning", null, "SEQUENTIAL"))).doesNotThrowAnyException();
   }
 
   @Test
@@ -40,7 +40,7 @@ class ObservabilitySsePublisherTest {
     // response is attached (the send is buffered/failed silently).
     assertThatCode(() -> publisher.publish(AgentObservabilityEvent.stageCompleted(
         "run-1", "research", "research", 0, List.of(), "SEQUENTIAL", "main", 5,
-        "{\"in\":1}", "{\"out\":1}"))).doesNotThrowAnyException();
+        null, null, "{\"in\":1}", "{\"out\":1}"))).doesNotThrowAnyException();
 
     // Completing the stream detaches it: further publishes stay a no-op.
     emitter.complete();

@@ -12,6 +12,7 @@ package com.oli.orchestrator_demo.api;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.oli.orchestrator_demo.model.OrchestratorContext;
@@ -28,10 +29,16 @@ public class TripPlanningController {
     this.orchestrator = orchestrator;
   }
 
+  /**
+   * @param scenarioId optional control-plane scenario the run is started from
+   *        (attribution for the per-scenario LM metrics); {@code null} for
+   *        ad-hoc runs.
+   */
   @PostMapping("/plan")
-  public OrchestratorContext plan(@RequestBody TripRequest request) {
+  public OrchestratorContext plan(@RequestBody TripRequest request,
+      @RequestParam(value = "scenarioId", required = false) String scenarioId) {
     validate(request);
-    return orchestrator.planTrip(request);
+    return orchestrator.planTrip(request, scenarioId);
   }
 
   private static void validate(TripRequest request) {

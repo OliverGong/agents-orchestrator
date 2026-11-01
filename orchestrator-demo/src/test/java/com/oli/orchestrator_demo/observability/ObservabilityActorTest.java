@@ -27,9 +27,9 @@ class ObservabilityActorTest {
 
   @Test
   void foldsEventsIntoARunTimeline() {
-    actor.tell(AgentObservabilityEvent.runStarted("run-1", "default-trip-planning", "SEQUENTIAL"));
+    actor.tell(AgentObservabilityEvent.runStarted("run-1", "default-trip-planning", null, "SEQUENTIAL"));
     actor.tell(AgentObservabilityEvent.stageCompleted("run-1", "research", "research", 0,
-        List.of(), "SEQUENTIAL", "main", 5, "{\"in\":1}", "{\"out\":1}"));
+        List.of(), "SEQUENTIAL", "main", 5, null, null, "{\"in\":1}", "{\"out\":1}"));
     actor.tell(AgentObservabilityEvent.runCompleted("run-1", "{\"final\":true}"));
 
     until(() -> actor.timeline("run-1").map(t -> t.status() == RunStatus.COMPLETED).orElse(false));
@@ -44,9 +44,9 @@ class ObservabilityActorTest {
 
   @Test
   void marksRunsFailedWhenAStageFails() {
-    actor.tell(AgentObservabilityEvent.runStarted("run-2", "tpl", "CONCURRENT"));
+    actor.tell(AgentObservabilityEvent.runStarted("run-2", "tpl", null, "CONCURRENT"));
     actor.tell(AgentObservabilityEvent.stageFailed("run-2", "budget", "budget", 1,
-        List.of("itinerary"), "CONCURRENT", "vt", 3, "boom", "{\"in\":1}"));
+        List.of("itinerary"), "CONCURRENT", "vt", 3, "boom", null, null, "{\"in\":1}"));
     actor.tell(AgentObservabilityEvent.runFailed("run-2", "boom"));
 
     until(() -> actor.timeline("run-2").map(t -> t.status() == RunStatus.FAILED).orElse(false));
@@ -62,7 +62,7 @@ class ObservabilityActorTest {
   @Test
   void dropsEventsForUnknownRuns() {
     actor.tell(AgentObservabilityEvent.stageCompleted("ghost", "research", "research", 0,
-        List.of(), "SEQUENTIAL", "main", 1, "{}", "{}"));
+        List.of(), "SEQUENTIAL", "main", 1, null, null, "{}", "{}"));
 
     // Nothing may ever be stored for a run that was never started.
     assertThat(actor.recentRuns()).isEmpty();
@@ -71,7 +71,7 @@ class ObservabilityActorTest {
   @Test
   void evictsOldestRunsBeyondRetention() {
     for (int i = 0; i < ObservabilityActor.MAX_RETAINED_RUNS + 50; i++) {
-      actor.tell(AgentObservabilityEvent.runStarted("run-" + i, "tpl", "SEQUENTIAL"));
+      actor.tell(AgentObservabilityEvent.runStarted("run-" + i, "tpl", null, "SEQUENTIAL"));
     }
 
     until(() -> actor.timeline("run-" + (ObservabilityActor.MAX_RETAINED_RUNS + 49)).isPresent());

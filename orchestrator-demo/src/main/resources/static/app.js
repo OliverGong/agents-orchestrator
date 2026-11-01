@@ -571,6 +571,21 @@ async function refreshObservability() {
   $('#agent-table tbody').innerHTML = rows.join('')
     || '<tr><td colspan="6" class="hint">未获取到 agent 列表。</td></tr>';
 
+  /* durable per-scenario LM metrics (obs_run_metrics aggregation, 7d window) */
+  try {
+    const lm = await getJson('/api/v1/metrics/lm?window=7d');
+    $('#lm-table tbody').innerHTML = lm.map((m) => `
+      <tr><td>${esc(m.scenarioId ?? '—')}</td><td>${esc(m.stage)}</td><td>${esc(m.agent)}</td>
+        <td>${esc(m.model ?? '—')}</td><td class="num">${m.stageCount}</td><td class="num">${m.failedCount}</td>
+        <td class="num">${m.retries}</td><td class="num">${fmtNum(m.avgDurationMs)}</td>
+        <td class="num">${fmtNum(m.maxDurationMs)}</td><td class="num">${m.promptTokens}</td>
+        <td class="num">${m.completionTokens}</td><td class="num"><b>${m.totalTokens}</b></td>
+        <td>${esc(fmtDateTime(m.lastRunAt))}</td></tr>`).join('')
+      || '<tr><td colspan="13" class="hint">暂无落库指标（db 模式下运行场景后此处会出现每个阶段/模型的耗时与 token 汇总）。</td></tr>';
+  } catch {
+    $('#lm-table tbody').innerHTML = '<tr><td colspan="13" class="hint">LM 指标端点不可达（file 模式无落库）。</td></tr>';
+  }
+
   /* health & info panels */
   if (health) {
     const orch = health.components && health.components.orchestrator;
@@ -1246,6 +1261,19 @@ function fmtTime(iso) {
   const d = new Date(iso);
   return d.toLocaleTimeString('zh-CN', { hour12: false })
     + '.' + String(d.getMilliseconds()).padStart(3, '0');
+}
+
+/** Full date-time for durable history rows (e.g. LM metrics last-run). */
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', { hour12: false });
+}
+
+/** Compact number: one decimal for large averages, integers unchanged. */
+function fmtNum(v) {
+  if (v == null) return '—';
+  return Number(v) >= 1000 ? Number(v).toFixed(0) : Number.isInteger(Number(v)) ? v : Number(v).toFixed(1);
 }
 
 /* ---------------- observability stack links ----------------

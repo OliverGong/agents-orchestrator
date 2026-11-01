@@ -12,14 +12,24 @@
  *              metrics in Prometheus) with a queryable, per-run view of the
  *              whole agent context exposed via
  *              {@code GET /api/trips/runs/{runId}}.
+ *
+ *              Since v2.2 the actor is also the write-ahead sink for the
+ *              durable stage metrics: every stage event lands in the
+ *              {@link RunMetricsStore} <em>before</em> the timeline fold and
+ *              the SSE fan-out, so the per-scenario LM history (durations,
+ *              retries, token consumption) survives service restarts; a store
+ *              failure degrades to a warning, never to a lost timeline. The
+ *              scenario attribution recorded with each row comes from the
+ *              run's {@code RUN_STARTED} event.
  * @Author OliverGong
  * @Date Oct 29, 2026
- * @Version 1.0
+ * @Version 2.2
  */
 package com.oli.orchestrator_demo.observability;
 
 import java.util.ArrayDeque;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,12 +56,16 @@ public class ObservabilityActor {
   private final Map<String, RunTimeline> timelines = new ConcurrentHashMap<>();
   /** Actor-thread-only insertion order used to evict the oldest runs. */
   private final ArrayDeque<String> insertionOrder = new ArrayDeque<>();
+  /** Actor-thread-only scenario attribution per run (from RUN_STARTED). */
+  private final Map<String, String> runScenarios = new HashMap<>();
   private final ObservabilitySsePublisher ssePublisher;
+  private final RunMetricsStore metricsStore;
   private final Thread actorThread = Thread.ofVirtual().name("observability-actor").start(this::consume);
   private volatile boolean accepting = true;
 
-  public ObservabilityActor(ObservabilitySsePublisher ssePublisher) {
+  public ObservabilityActor(ObservabilitySsePublisher ssePublisher, RunMetricsStore metricsStore) {
     this.ssePublisher = ssePublisher;
+    this.metricsStore = metricsStore;
     // Retry events are published from inside agent calls (no bean access);
     // the static bus routes them into the same mailbox as direct producers.
     ObservabilityEventBus.subscribe(this::tell);
@@ -103,16 +117,56 @@ public class ObservabilityActor {
 
   /** Single-threaded state transition: the whole mutable state lives here. */
   private void apply(AgentObservabilityEvent event) {
-    timelines.compute(event.runId(), (runId, timeline) -> fold(runId, timeline, event));
+    recordMetrics(event);
     if (event.type() == AgentObservabilityEvent.Type.RUN_STARTED) {
       insertionOrder.addLast(event.runId());
+      if (event.scenarioId() != null) {
+        runScenarios.put(event.runId(), event.scenarioId());
+      }
       while (insertionOrder.size() > MAX_RETAINED_RUNS) {
-        timelines.remove(insertionOrder.pollFirst());
+        String evicted = insertionOrder.pollFirst();
+        timelines.remove(evicted);
+        runScenarios.remove(evicted);
       }
     }
+    else if (event.type() == AgentObservabilityEvent.Type.RUN_COMPLETED
+        || event.type() == AgentObservabilityEvent.Type.RUN_FAILED) {
+      runScenarios.remove(event.runId());
+    }
+    timelines.compute(event.runId(), (runId, timeline) -> fold(runId, timeline, event));
     // Forwarded from the actor thread, so SSE clients observe the same
     // per-run event order the timeline was folded with.
     ssePublisher.publish(event);
+  }
+
+  /**
+   * Write-ahead stage metrics: persisted before the fold and the SSE push. A
+   * failing store degrades to a warning — observability persistence must
+   * never break the run timeline.
+   */
+  private void recordMetrics(AgentObservabilityEvent event) {
+    if (event.type() != AgentObservabilityEvent.Type.STAGE_COMPLETED
+        && event.type() != AgentObservabilityEvent.Type.STAGE_FAILED) {
+      return;
+    }
+    // Ghost stage events (no RUN_STARTED) are dropped by the fold — keep the
+    // durable rows consistent with the timelines.
+    if (!timelines.containsKey(event.runId())) {
+      return;
+    }
+    try {
+      AgentObservabilityEvent.LmUsage usage = event.usage();
+      metricsStore.record(new RunMetricsStore.RunStageMetrics(
+          event.runId(), runScenarios.get(event.runId()), event.stageName(), event.agentName(),
+          usage == null ? null : usage.model(), event.waveIndex(), event.attempt(), event.type().name(),
+          event.durationMs(), usage == null ? null : usage.promptTokens(),
+          usage == null ? null : usage.completionTokens(), usage == null ? null : usage.totalTokens(),
+          event.timestamp()));
+    }
+    catch (RuntimeException ex) {
+      log.warn("Run metrics persistence failed for run {} stage {}: {}",
+          event.runId(), event.stageName(), ex.getMessage());
+    }
   }
 
   private RunTimeline fold(String runId, RunTimeline timeline, AgentObservabilityEvent event) {

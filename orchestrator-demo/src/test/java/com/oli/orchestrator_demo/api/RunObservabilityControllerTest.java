@@ -46,13 +46,17 @@ class RunObservabilityControllerTest {
   @Test
   void exposesRunTimelineGroupedByWaves() throws Exception {
     String runId = "run-1";
-    observability.tell(AgentObservabilityEvent.runStarted(runId, "configured", "CONCURRENT"));
+    observability.tell(AgentObservabilityEvent.runStarted(runId, "configured", "scn-tokyo", "CONCURRENT"));
     observability.tell(AgentObservabilityEvent.stageCompleted(runId, "research", "research", 0,
-        List.of(), "CONCURRENT", "vt-research", 11, "{\"destination\":\"Tokyo\"}", "{\"researchResponse\":{}}"));
+        List.of(), "CONCURRENT", "vt-research", 11, 1,
+        new AgentObservabilityEvent.LmUsage(120, 45, 165, "qwen3:8b", 1),
+        "{\"destination\":\"Tokyo\"}", "{\"researchResponse\":{}}"));
     observability.tell(AgentObservabilityEvent.stageCompleted(runId, "budget", "budget", 1,
-        List.of("itinerary"), "CONCURRENT", "vt-budget", 21, "{\"destination\":\"Tokyo\"}", "{\"budgetResponse\":{}}"));
+        List.of("itinerary"), "CONCURRENT", "vt-budget", 21, null, null,
+        "{\"destination\":\"Tokyo\"}", "{\"budgetResponse\":{}}"));
     observability.tell(AgentObservabilityEvent.stageCompleted(runId, "itinerary", "itinerary", 1,
-        List.of("budget"), "CONCURRENT", "vt-itinerary", 25, "{\"destination\":\"Tokyo\"}", "{\"itineraryResponse\":{}}"));
+        List.of("budget"), "CONCURRENT", "vt-itinerary", 25, null, null,
+        "{\"destination\":\"Tokyo\"}", "{\"itineraryResponse\":{}}"));
     observability.tell(AgentObservabilityEvent.runCompleted(runId, "{\"reviewResponse\":{}}"));
 
     until(() -> observability.timeline(runId).map(t -> t.status() == RunStatus.COMPLETED).orElse(false));
