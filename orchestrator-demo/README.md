@@ -3,9 +3,9 @@
 多 Agent 旅行规划编排服务 —— 以「编排者 + 黑板」模式演示 Spring AI 2.0 的多 Agent 协作、
 运行时控制平面、场景平面、MCP 动态工具接入与端到端可观测性（Traces / Metrics / 运行时间线回放）。
 
-- 技术基线：Java 25 · Spring Boot 4.1.2 · Spring AI 2.0.1（BOM）· MCP Java SDK
-- Maven 坐标：`com.oli:orchestrator:2.3.0`（版本经 `/actuator/info` 暴露，控制台侧栏可见）
-- 功能版本：**v2.3**，主干 `main`
+- 技术基线：Java 25 · Spring Boot 4.1.2 · Spring AI 2.0.1（BOM）· MCP Java SDK · Vue 3 + TypeScript（v3.0 控制台）
+- Maven 坐标：`com.oli:orchestrator:3.0.0-SNAPSHOT`（版本经 `/actuator/info` 暴露，控制台侧栏可见）
+- 功能版本：**v3.0（开发中，`feat/v3.0-console-decoupling` 分支）**，主干 `main`
 - 深入设计细节见 [ARCHITECTURE.md](./ARCHITECTURE.md)（本文为其索引入口）
 
 ---
@@ -22,18 +22,22 @@
 | v2.1 | `90f76a8` + console | **场景元模型（Scenario Plane）**：场景 = 请求模板 + 工作流覆盖 + Agent 覆盖 + MCP 映射 + 产物类型，`ScenarioRegistry` 单写者 + `ScenarioStore` 接缝（file / `cp_scenario*` 表，跟随同一 store 开关）；`activate` 将覆盖热应用到控制平面（动态实例化）；`dry-run` 零 token 推演（模板校验 + 波次展开 + 黑板槽位流）；**解析重试事件链**：`STAGE_RETRIED` 经 RunContext 归因进时间线 / SSE / 回放；**控制台 v2.1**：左侧三组导航（场景运行·推演·配置 / agents·workflow·MCP / 回放·观测）+ 运行回放时间线 / DAG / 泳道三视图（原生 SVG）+ retry 链可视化 |
 | v2.2 | `b4b7121` → `050e587` | **观测落库 + LM 指标**（M1）：`ObservabilityActor` WAL 顺序先落库再推送，`obs_run_metrics` 记录每场景每阶段的 LM 耗时 / prompt·completion·total tokens / 模型 / 重试（`UsageCaptureAdvisor` 采集），场景维度指标 API；**元信息补录**（M2）：`meta/` 平面——运行时配置（modelBackend / 超时 / 波次并发 / temperature / topP）、发布门户注册表、按场景发布配置（file / `mp_*` 表），左侧「元信息补录」页三卡；**团队日志**（M3）：`team_log` 持久化运行时日志（RUN / AUDIT / SYSTEM，不限于业务日志）+ 控制面/元数据/场景面 14 个变更端点全量审计 + Log Explorer 筛选页；**发布管道**（M4）：可移植 JSON 发布包（场景快照 + dry-run 证据 + 门户/版本元数据，SHA-256）追加到 `rl_release` 注册表，发布记录随时导出；**导航-画布联动**（M5）：全局上下文条 + 生命周期闭合链 推演→激活·运行→回放→场景指标，激活场景持久化（`activeScenarioId`），运行/回放携带场景归因 |
 | v2.3 | `6a14f2f` → `f8bcc76` | **业务触发层 + 实例注册表**（M1/M2）：每次业务触发（`POST /api/trips/plan`，可携带调用方 `businessId`）在请求进入时实例化一条 RUNNING 记录（唯一 runId + businessId），终态由 `ObservabilityActor` WAL 写入 `instance/` 注册表（JSONL / `obs_run_instance` 表，跟随 store 开关）；`GET /api/v1/instances` 按 businessId / 场景 / 状态 / 关键字 / 时间窗检索，`GET /api/v1/instances/{runId}` 聚合完整上下文（注册表行 + 可回放时间线 + 每阶段多 Agent/多模型 LM 明细 + 关联团队日志）；**控制台闭环**（M3）：左侧「可观测」新增「实例追踪」页（数据溯源入口），运行表单支持业务 ID，日志页 runId/场景可点击互链，实例 ↔ 回放 ↔ 日志 ↔ 指标双向跳转 |
+| v3.0（开发中） | `b132679` → | **控制器归位**（M1）：controllers 迁入各自领域包 `trip/` `observability/` `instance/`，`api/` 仅留横切（异常映射 + 缓存策略）；**前端解耦**（M2）：`console/` 独立 TypeScript 控制台工程（Vue 3 + Vite + Pinia + Vue Router + Naive UI，strict 构建链），契约 DTO 单一事实源（`types/api.ts`）、11 页面全量迁移（DAG/泳道 SVG 组件化移植）、legacy 全局变量 → route query 跨页上下文、独立 nginx 容器（compose `console` 服务，SPA fallback + SSE 关缓冲反代）；`static/` legacy 保留为零构建回退并标注弃用（v3.1 移除）；分支/hotfix 策略见 `docs/BRANCHING.md` |
 
 当前测试规模：**209 个用例全绿**（`./mvnw test`，DB 相关用例跑 H2 内存库），覆盖编排、控制平面校验、场景注册表与零 token 推演、MCP 注册表与工具插桩、观测控制器与落库指标、运行实例注册表、元数据平面、团队日志、发布管道、存储后端与加密。
 
 ## 2. 体系架构
 
 ```
-浏览器控制台 static/（原生 JS，同源直连 REST + SSE）
+浏览器控制台 console/（Vue 3 + TS SPA，nginx 容器反代 REST + SSE；
+        static/ legacy 原生 JS 同源直连，保留为零构建回退至 v3.1）
         │
         ▼
 ┌────────────────── Spring Boot 4.1.2（Java 25 虚拟线程）──────────────────┐
-│ api/        TripPlanningController · RunObservabilityController          │
-│             ObservabilitySseController（SSE 实时推送）                    │
+│ trip/       TripPlanningController（v3.0 领域包归位）                     │
+│ observability/  RunObservabilityController · ObservabilitySseController  │
+│ instance/   InstanceController                                            │
+│ api/        GlobalExceptionHandler · ApiCacheControlConfig（横切）        │
 │   │ POST /api/trips/plan              │ GET /api/trips/runs[/{id}]       │
 │   ▼                                   ▲                                  │
 │ orchestrator/  TripPlanningOrchestrator ── 依赖波次执行（wave）           │
@@ -129,36 +133,41 @@
 | 服务 | 镜像 / 构建 | 端口 | 职责 |
 | --- | --- | --- | --- |
 | app | 本地多阶段构建（根目录 Dockerfile） | 8080 | 编排器本体；Ollama 默认走 `host.docker.internal:11434` |
+| console | 本地两阶段构建（`console/Dockerfile`：node 构建 → nginx 运行） | 8081 (v3.0) | 解耦控制台 SPA：SPA fallback + `/api`、`/actuator` 反代到 app（SSE 关缓冲） |
 | postgres | `postgres:16-alpine` | 5432 | 控制平面持久化（v2.0 db 模式）：`cp_*` 表 + `pg_isready` 健康检查 |
 | tempo | `grafana/tempo:2.7.2` | 4317 (OTLP gRPC) / 4318 (HTTP) / 3200 (查询) | 接收并存储链路 trace |
 | prometheus | `prom/prometheus:v3.2.1` | 9090 | 抓取 app 的 `/actuator/prometheus` |
 | grafana | `grafana/grafana:11.5.2` | 3000 | 可视化：匿名 Admin 登录，预置 Tempo/Prometheus 数据源与 `agent-observability` 仪表盘 |
 
 - **卷**：compose 项目名 `orchestrator` 前缀到实际卷名——`orchestrator_postgres-data` → 控制平面表存储、`orchestrator_orchestrator-config` → `/app/config`（JSON 状态：迁移源/回退后端）、`orchestrator_tempo-data` → Tempo 存储。跨环境迁移时直接整卷拷贝（同版本 Postgres 数据文件可平移）。
-- **环境变量契约**：所有宿主相关值都经 compose 变量插值（`docker/.env.example` 有完整清单与默认值——复制为 `.env` 即可按环境覆盖，无需改动 compose 文件）：`SPRING_AI_OLLAMA_BASE_URL`（模型后端，部署到其他环境时指向可达的推理服务）、`APP_VERSION`（镜像 tag，与 pom 版本一致）、`APP_PORT`（宿主端口，Prometheus 经 compose 网络内 `app:8080` 抓取，不随端口映射变化）、`OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://tempo:4317`，gRPC 传输——HTTP 传输对 Tempo receiver 会 404）、`ORCHESTRATOR_CONTROL_STORE`（`db`：PostgreSQL / `file`：JSON）、`POSTGRES_DB|USER|PASSWORD`、`ORCHESTRATOR_CRYPTO_KEY`（可选，开启 MCP secret 的 AES-GCM 字段加密）、`ORCHESTRATOR_SPRING_EXCLUDE`（compose 置空以恢复 DataSource 自动配置——本地 file 模式默认排除它，避免无 JDBC url 启动失败）。
-- **可迁移部署**：整套服务以 `name: orchestrator` 固定项目名，镜像 `orchestrator:${APP_VERSION:-2.3.0}` 版本化命名——在任何有 Docker 的机器上 clone 仓库 + `docker compose up -d --build` 即得一致部署，或将镜像推送到 registry 后在其他环境直接 pull 启动；除 Ollama 地址外无宿主耦合。
+- **环境变量契约**：所有宿主相关值都经 compose 变量插值（`docker/.env.example` 有完整清单与默认值——复制为 `.env` 即可按环境覆盖，无需改动 compose 文件）：`SPRING_AI_OLLAMA_BASE_URL`（模型后端，部署到其他环境时指向可达的推理服务）、`APP_VERSION`（两镜像共同 tag，与 pom / package.json 版本一致）、`APP_PORT`（宿主端口，Prometheus 经 compose 网络内 `app:8080` 抓取，不随端口映射变化）、`CONSOLE_PORT`（v3.0 控制台宿主端口，默认 8081）、`OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://tempo:4317`，gRPC 传输——HTTP 传输对 Tempo receiver 会 404）、`ORCHESTRATOR_CONTROL_STORE`（`db`：PostgreSQL / `file`：JSON）、`POSTGRES_DB|USER|PASSWORD`、`ORCHESTRATOR_CRYPTO_KEY`（可选，开启 MCP secret 的 AES-GCM 字段加密）、`ORCHESTRATOR_SPRING_EXCLUDE`（compose 置空以恢复 DataSource 自动配置——本地 file 模式默认排除它，避免无 JDBC url 启动失败）。
+- **可迁移部署**：整套服务以 `name: orchestrator` 固定项目名，镜像 `orchestrator:${APP_VERSION:-3.0.0}` / `orchestrator-console:${APP_VERSION:-3.0.0}` 版本化命名——在任何有 Docker 的机器上 clone 仓库 + `docker compose up -d --build` 即得一致部署，或将镜像推送到 registry 后在其他环境直接 pull 启动；除 Ollama 地址外无宿主耦合。
 - **前置条件**：模型后端就绪（本地为宿主机 Ollama，默认 `qwen3-vl:4b` / 各 agent 覆盖为 `qwen:7b`，可用 `ollama pull` 调整）。
 
 ```bash
 cd docker
 cp .env.example .env    # 按环境调整（可选，默认值即本地开发栈）
-docker build -t orchestrator:2.3.0 ..   # 构建镜像（可选，compose up 会自动构建）
+docker build -t orchestrator:3.0.0 ..   # 构建镜像（可选，compose up 会自动构建）
 
-# 启动完整栈（app + postgres + tempo + prometheus + grafana）
+# 启动完整栈（app + console + postgres + tempo + prometheus + grafana）
 docker compose up -d --build
 
 # 查看可视化
 #   Grafana     http://localhost:3000   （Tempo trace search + 指标仪表盘）
 #   Prometheus  http://localhost:9090
-#   控制台      http://localhost:8080   （侧栏显示运行版本）
+#   控制台      http://localhost:8081   （v3.0 解耦 SPA；8080 为 legacy 回退，v3.1 移除）
 ```
 
 ## 5. 本地运行与测试
 
 ```bash
-./mvnw spring-boot:run        # 需要 localhost:11434 有 Ollama；控制台 http://localhost:8080
-./mvnw test                   # 140 个用例（无需真实模型，ChatClient 打桩；DB 用例跑 H2）
+./mvnw spring-boot:run        # 需要 localhost:11434 有 Ollama；legacy 控制台 http://localhost:8080
+./mvnw test                   # 209 个用例（无需真实模型，ChatClient 打桩；DB 用例跑 H2）
 ./mvnw clean package          # 产出 fat jar
+
+cd console && npm install     # v3.0 解耦控制台（Node ≥ 20）
+npm run dev                   # 开发服务器（/api、/actuator 代理到 localhost:8080）
+npm run build                 # vue-tsc 严格类型检查 + vite 产物构建
 ```
 
 后端切换：`spring.ai.model.chat=openai` + `spring.ai.openai.api-key`；Agent 级模型 / 温度见
@@ -172,17 +181,19 @@ GitHub Actions / GitLab CI：
 
 | 阶段 | 命令 / 机制 | 说明 |
 | --- | --- | --- |
-| 1. 编译 + 测试 | `./mvnw clean test` | 140 用例，ChatClient 打桩 + H2 内存库，无外部依赖，天然适合 CI |
-| 2. 打包 | `./mvnw clean package` | Spring Boot fat jar |
-| 3. 镜像构建 | `docker build .` | 多阶段构建 + 层缓存（pom 先行）+ `/root/.m2` cache mount；无外部 syntax 前端，CI 无需额外拉取 |
-| 4. 部署 | `docker compose -f docker/docker-compose.yml up -d` | app + PostgreSQL + Tempo + Prometheus + Grafana 一键编排，数据卷持久化 |
-| 5. 冒烟验证 | `/actuator/health`、`GET /api/trips/runs`、`GET /api/v1/control/mcp/status`、`POST /api/v1/scenarios/kyoto-classic/dry-run` | 健康、控制平面状态与场景推演即冒烟断言点（db 模式下 `postgres` 容器的 `pg_isready` 先行） |
+| 1. 编译 + 测试 | `./mvnw clean test` | 209 用例，ChatClient 打桩 + H2 内存库，无外部依赖，天然适合 CI |
+| 2. 前端构建（v3.0） | `cd console && npm ci && npm run build` | vue-tsc 严格类型检查 + vite 打包，类型错误即流水线失败 |
+| 3. 打包 | `./mvnw clean package` | Spring Boot fat jar |
+| 4. 镜像构建 | `docker build .` + `docker build console/` | 多阶段构建 + 层缓存（pom/package-lock 先行）+ cache mount；无外部 syntax 前端，CI 无需额外拉取 |
+| 5. 部署 | `docker compose -f docker/docker-compose.yml up -d` | app + console + PostgreSQL + Tempo + Prometheus + Grafana 一键编排，数据卷持久化 |
+| 6. 冒烟验证 | `/actuator/health`、`GET /api/trips/runs`、`GET /api/v1/control/mcp/status`、`POST /api/v1/scenarios/kyoto-classic/dry-run` | 健康、控制平面状态与场景推演即冒烟断言点（db 模式下 `postgres` 容器的 `pg_isready` 先行） |
 
 工程约定：
 
 - **提交规范**：Conventional Commits（`feat:` / `fix:`，scope 标注子系统如 `feat(mcp):`），
   便于由提交历史自动生成 changelog 与语义化版本号。
-- **分支模型**：功能分支（当前 `feat/navigation`）→ 合并主干。
+- **分支模型**：功能分支 → 合并主干；版本发布与 hotfix 策略见 `docs/BRANCHING.md`
+  （大版本发布后经 `hotfix/*` 分支补丁修复并回灌主干/维护分支）。
 - **运行时与代码分离**：`config/control-plane.json` 为 gitignored 的运行时事实源，代码不写死
   任何 Agent / 模板 / MCP 配置——镜像不可变、行为由控制平面数据驱动，这是 CI/CD 中
   「同一镜像多环境部署」的关键前提。

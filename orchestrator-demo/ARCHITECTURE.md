@@ -9,6 +9,10 @@
 **内置并行模板示例**、**控制平面（Control Plane）**——前端可视化配置 Agent 人格/
 模型/校准规则/MCP 服务与工作流拓扑并热生效、**SSE 实时事件流**（详见第 9 节）。
 
+**v3.0** 将控制器按领域包归位（`trip/` `observability/` `instance/`，`api/` 仅留横切），
+并把前端解耦为独立 **TypeScript 控制台工程**（Vue 3 + Vite + Naive UI，独立 nginx
+容器 + 反代，详见第 14 节）。
+
 ## 1. 总体架构
 
 ```
@@ -164,6 +168,22 @@ com.oli.orchestrator_demo
     ├── BudgetResponse           # Step2 产出：分项成本/总额/是否达标
     ├── ItineraryResponse        # Step3 产出：逐日计划（DayPlan）
     └── ReviewResponse           # Step4 产出：校验结论/问题/最终摘要
+```
+
+**前端工作区**（v3.0，与 Java 包树并列，见第 14 节）：
+
+```
+orchestrator-demo/console                 # Vue 3 + TypeScript SPA（独立 npm 工作区）
+├── src/types/api.ts                      # REST/SSE 契约 DTO 单一事实源（镜像后端 record）
+├── src/api/http.ts                       # 类型化 fetch 封装（ApiError 解析后端 {error,message}）
+├── src/api/sse.ts                        # EventSource 单例（run 事件流）
+├── src/stores/                           # Pinia：session（场景上下文/健康）· control（控制平面）
+├── src/router/index.ts                   # 11 路由（history 模式）+ 通配兜底
+├── src/views/                            # 每页一个 SFC：run / dryrun / scenarios / agents /
+│                                         #   workflow / mcp / meta / instances / runs / logs / metrics
+├── src/components/                       # DagDiagram · SwimlaneChart · JsonDetails
+├── nginx.conf                            # SPA fallback + /api、/actuator 反代（SSE 关缓冲）
+└── Dockerfile                            # node:22-alpine 构建 → nginx:1.27-alpine 运行
 ```
 
 ## 4. 核心抽象
@@ -1139,3 +1159,93 @@ facet 检索与重启持久化、Actor 的实例写入与失败隔离、业务�
 InstanceController 列表/筛选/详情聚合/404）+ M3 控制台适配
 （controller 测试适配三参 planTrip）——合计 **209 例全绿**
 （`./mvnw test`，DB 用例跑 H2 内存库）。
+
+## 14. v3.0：前端解耦（TypeScript 控制台工程）
+
+v0–v2.3 的控制台是打进 Spring Boot fat jar 的静态资源（`static/`，原生
+JS 单文件 1838 行）。v3.0 将其解耦为独立 npm 工作区 `console/`：Vue 3 +
+TypeScript + Vite + Pinia + Vue Router + Naive UI，与后端以 REST/SSE 契约
+类型对接，独立构建、独立镜像、独立发布节奏。
+
+### 14.1 动机：legacy 静态资源的四类局限
+
+- **无类型契约**：fetch 返回 `any`，后端 DTO 演进（19 字段事件、实例聚合
+  明细）无编译期对账，字段改名只能靠运行时发现。
+- **单文件难维护**：11 个页面的数据流、SVG 算法、SSE 处理挤在 app.js，
+  全局变量（`ctxScenarioId` 等）承担跨页上下文，刷新即失、不可分享链接。
+- **无组件化**：DAG/泳道 SVG 在多处复制渲染逻辑；`syncMcpRows` 等手写
+  DOM 同步与业务逻辑纠缠。
+- **不可单测/静态检查**：无 lint、无 type-check，回归全靠人工点检。
+
+### 14.2 框架选型论证
+
+| 维度 | **Vue 3 + TS（选定）** | React + TS | Svelte | 保留原生 JS |
+|---|---|---|---|---|
+| 契约类型化 | `strict` 全量 TS，DTO 单一事实源 | 同左 | 同左 | 无 |
+| 中后台组件库 | Naive UI：表格/表单/树/抽屉齐全，内置暗色主题 | 成熟（AntD/MUI）但更重 | 企业级表格生态薄弱 | 手写 |
+| 与 legacy 迁移心智 | SFC 模板 ≈ 手写 DOM 的声明式版本，SVG/样式近乎原样平移 | JSX 化改写面更大 | 改写面大 | — |
+| 产物体积 | gzip ~60 kB（全 11 页懒加载分包） | 类似偏大 | 最小 | 最小但无收益 |
+| 学习/团队成本 | 低（模板语法贴近 HTML） | 中 | 中 | 零 |
+
+选型要点：本控制台是典型"表格 + 表单 + 可视化"中后台，框架间的性能
+差异不构成决策变量；决策变量是**类型契约、组件库成熟度与迁移成本**。
+React 生态更强但对本场景无增益且 JSX 化改写面更大；Svelte 产物最小却
+缺企业级表格组件；保留原生无法获得类型化与组件化收益。最终
+**Vue 3（`<script setup>` + strict TS）+ Naive UI**：组件覆盖度足够、
+暗色主题调色到 legacy 配色（`#58a6ff` 主色 / `#0d1117` 背景）、
+DAG 与泳道 SVG 以 computed 布局原样移植（波次列 + 贝塞尔依赖边、
+时间轴/顺序双模式 + 重试 ⚠/工具 tick）。
+
+### 14.3 运行时拓扑：独立 nginx 容器 vs 内嵌 jar
+
+**选定：独立容器 + nginx 反代**（`docker/docker-compose.yml` 的
+`console` 服务，默认 `CONSOLE_PORT:-8081`）：
+
+- **发布节奏解耦**：`orchestrator-console:${APP_VERSION}` 与后端镜像
+  版本对齐但构建/发布独立——前端改版不必重打 fat jar。
+- **关注点分离**：SPA fallback（history 路由深链）、SSE 反代
+  （`proxy_buffering off` + 1h read timeout）、`/api` `/actuator`
+  转发全部收敛在 `console/nginx.conf`；upstream 经 Docker 内嵌 DNS
+  （`127.0.0.11`）请求时解析，后端宕机时控制台仍可启动（API 返回 502
+  而非整体不可用）。
+- **可扩展性**：SPA 静态资源可独立前置 CDN/负载均衡，后端按需扩容。
+
+**内嵌 jar（legacy 路径）保留为零构建回退**：`static/` 原样保留并在
+`index.html` 头部标注弃用（v3.1 移除计划），本地 `./mvnw spring-boot:run`
+不依赖 Node 工具链仍可用。
+
+**CORS：两种形态下浏览器都只见单一来源**——开发期 Vite dev server 将
+`/api` `/actuator` 代理到 `localhost:8080`，生产期 nginx 反代到 `app:8080`，
+后端无需任何 CORS 配置。
+
+### 14.4 工程结构与契约实践
+
+- **契约单一事实源**：`src/types/api.ts` 手工镜像后端 record（Java 侧
+  无 OpenAPI 生成链，接口面收敛可控；后续可按需引入 openapi-typescript）。
+- **跨页上下文**：legacy 全局变量改为 **route query**——
+  `instances?businessId=&runId=`、`metrics?scenarioId=`、
+  `logs?runId=&scenarioId=&window=`、`runs?runId=`、
+  `run/dryrun?scenarioId=`；链接可分享、刷新可还原，生命周期闭合链
+  （推演 → 激活·运行 → 回放 → 场景指标）在 Pinia session store 中承接。
+- **严格构建链**：`vue-tsc --noEmit && vite build`（strict +
+  noUnusedLocals/Parameters + verbatimModuleSyntax），类型错误即构建失败，
+  前端纳入与后端同级的 CI 门槛。
+- **交互升级**：`alert/confirm` → useMessage/useDialog；手写 DOM 同步 →
+  Vue 响应式；每页懒加载分包。
+
+### 14.5 部署与提醒事项
+
+- **镜像**：`console/Dockerfile` 两阶段——`node:22-alpine` 内
+  `npm ci + vue-tsc + vite build`（`.dockerignore` 排除 node_modules/
+  dist），运行时 `nginx:1.27-alpine` 仅携带静态产物 + nginx.conf。
+- **APP_VERSION**：`orchestrator` 与 `orchestrator-console` 两镜像共用
+  同一版本戳（`docker/.env.example`），后端 pom 版本与前端
+  `package.json` version 需同步推进（发布检查项）。
+- **Node 工具链**：容器内固定 Node 22 LTS；本机开发需 Node ≥ 20
+  （含 npm，注意 PATH），`npm run dev` 的 Vite 代理写死
+  `localhost:8080`。
+- **SSE 代理**：任何前置代理层（nginx/网关/CDN）都必须对
+  `/api/v1/events/stream` 关闭缓冲并拉长读超时，否则事件将成块延迟。
+- **移除计划**：v3.1 删除 `static/` legacy 控制台（保留期间仅修致命
+  缺陷，不新增功能）。
+
