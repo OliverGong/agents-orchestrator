@@ -162,7 +162,7 @@ docker compose up -d --build
 
 ```bash
 ./mvnw spring-boot:run        # 需要 localhost:11434 有 Ollama；legacy 控制台 http://localhost:8080
-./mvnw test                   # 209 个用例（无需真实模型，ChatClient 打桩；DB 用例跑 H2）
+./mvnw test                   # 214 个用例（无需真实模型，ChatClient 打桩；DB 用例跑 H2；含架构守护测试）
 ./mvnw clean package          # 产出 fat jar
 
 cd console && pnpm install    # v3.0 解耦控制台（Node ≥ 20，pnpm 由 corepack 钉版）
@@ -181,7 +181,7 @@ GitHub Actions / GitLab CI：
 
 | 阶段 | 命令 / 机制 | 说明 |
 | --- | --- | --- |
-| 1. 编译 + 测试 | `./mvnw clean test` | 209 用例，ChatClient 打桩 + H2 内存库，无外部依赖，天然适合 CI |
+| 1. 编译 + 测试 | `./mvnw clean test` | 214 用例，ChatClient 打桩 + H2 内存库 + 架构守护测试（依赖规则 fitness functions），无外部依赖，天然适合 CI |
 | 2. 前端构建（v3.0） | `cd console && pnpm install --frozen-lockfile && pnpm build` | vue-tsc 严格类型检查 + vite 打包，类型错误即流水线失败 |
 | 2b. 前端 E2E（v3.0） | `cd console && pnpm test:e2e` | Playwright 功能闭环（16 spec，mock 后端 + SSE 回放），无真实服务依赖 |
 | 3. 打包 | `./mvnw clean package` | Spring Boot fat jar |
