@@ -1,0 +1,160 @@
+/* Orchestrator console — dark observability theme.
+   Naive UI renders the widgets; this sheet keeps the layout shell and the
+   custom visualization / blackboard styling carried over from the legacy
+   console (stage lines, SVG DAG & swimlane, slot chips, json panels). */
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-2: #1c2333;
+  --border: #2d333b;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --ok: #3fb950;
+  --warn: #d29922;
+  --err: #f85149;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.6 -apple-system, "PingFang SC", "Segoe UI", sans-serif;
+}
+
+/* ============ shell layout ============ */
+.console-shell { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 212px; flex-shrink: 0; display: flex; flex-direction: column;
+  background: var(--panel); border-right: 1px solid var(--border);
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.side-brand { padding: 16px 16px 10px; }
+.side-brand h1 { margin: 0; font-size: 15px; }
+.side-brand .subtitle { color: var(--muted); font-size: 11px; }
+.side-nav { flex: 1; padding: 4px 8px; }
+.side-nav .n-menu-item { height: 34px; }
+.side-footer {
+  padding: 12px 16px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.side-footer .links a { font-size: 11px; margin-left: 6px; }
+.side-footer .links a:first-child { margin-left: 0; }
+
+.console-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.console-main { padding: 20px 24px; max-width: 1280px; width: 100%; margin: 0 auto; flex: 1; }
+.console-footer { color: var(--muted); text-align: center; font-size: 12px; padding: 18px 0 26px; }
+
+/* ============ global context bar (lifecycle chain) ============ */
+.ctx-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 14px; margin-bottom: 16px;
+}
+.ctx-label { color: var(--muted); font-size: 12px; letter-spacing: 1px; }
+.ctx-chain { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.ctx-arrow { color: var(--muted); font-size: 12px; }
+
+/* health dot */
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.dot-up { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.dot-down { background: var(--err); box-shadow: 0 0 6px var(--err); }
+.dot-unknown { background: var(--muted); }
+
+/* ============ shared page furniture ============ */
+.hint { color: var(--muted); font-size: 12px; margin: 4px 0 12px; }
+.hint code { font-family: var(--mono); color: var(--accent); font-size: 11px; }
+.mono { font-family: var(--mono); }
+.num { text-align: right; font-family: var(--mono); }
+.error-message { font-family: var(--mono); color: var(--err); font-size: 13px; }
+.wave-head { margin: 14px 0 6px; font-size: 13px; color: var(--muted); }
+.wave-head b { color: var(--text); }
+
+/* request echo */
+.request-echo dl { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; margin: 0; }
+.request-echo dt { color: var(--muted); font-size: 12px; }
+.request-echo dd { margin: 0; font-family: var(--mono); font-size: 13px; }
+
+/* stage lines & tool lines (progress, replay, live blackboard) */
+.stages { display: flex; flex-direction: column; gap: 6px; }
+.stage-line {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 12px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px; font-size: 13px;
+}
+.stage-line .name { font-weight: 600; min-width: 70px; }
+.stage-line .arrow { color: var(--muted); }
+.stage-line .meta { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+.stage-line.done { border-color: var(--ok); }
+.stage-line.fail { border-color: var(--err); }
+.tool-line {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: -2px 0 2px 28px; padding: 4px 10px;
+  background: var(--bg); border: 1px dashed var(--border);
+  border-radius: 6px; font-size: 12px;
+}
+.retry-line { border-left: 2px solid var(--warn); }
+
+/* json / mono panels */
+pre.json, .mono-panel {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; font-family: var(--mono); font-size: 12px;
+  overflow: auto; white-space: pre-wrap; margin: 6px 0;
+}
+#live-context { max-height: 340px; }
+
+/* clickable correlation chips (runId → instance, scenarioId → filtered logs) */
+.link-chip {
+  cursor: pointer; color: var(--accent); border-bottom: 1px dashed
+    color-mix(in srgb, var(--accent) 55%, transparent); padding-bottom: 1px;
+}
+.link-chip:hover { border-bottom-style: solid; }
+
+/* slot contract chips (agent self-declared descriptors) */
+.slot-contract {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin: 2px 0 12px; padding: 8px 10px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+}
+.slot-label { font-size: 11px; color: var(--muted); margin-left: 8px; }
+.slot-label:first-child { margin-left: 0; }
+.slot-chip {
+  font-family: var(--mono); font-size: 11px; padding: 2px 9px;
+  border-radius: 10px; border: 1px solid var(--border); color: var(--text);
+  background: var(--bg);
+}
+.slot-chip.out { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.slot-chip.in { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.slot-chip.pending { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
+.slot-chip.model { color: #d2a8ff; border-color: color-mix(in srgb, #d2a8ff 45%, transparent); }
+
+/* metric cards */
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 10px; }
+.metric-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+.metric-card .label { color: var(--muted); font-size: 11px; }
+.metric-card .value { font-size: 22px; font-weight: 700; font-family: var(--mono); }
+.metric-card .sub { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+
+/* day cards (itinerary result) */
+.day-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.day-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+.day-card h4 { margin: 0 0 6px; color: var(--accent); font-size: 13px; }
+.day-card p { margin: 3px 0; font-size: 12.5px; }
+.day-card .cost { color: var(--warn); font-family: var(--mono); font-size: 12px; }
+
+/* ============ SVG DAG & swimlane (ported verbatim) ============ */
+.viz-card svg { display: block; width: 100%; height: auto; }
+.dag-node-label { fill: var(--text); font-size: 12px; font-family: var(--mono); }
+.dag-node-sub { fill: var(--muted); font-size: 10px; font-family: var(--mono); }
+.dag-edge { stroke: var(--border); stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+.swim-lane-label { fill: var(--text); font-size: 11px; font-family: var(--mono); }
+.swim-axis { stroke: var(--border); stroke-width: 1; }
+.swim-axis-label { fill: var(--muted); font-size: 9px; font-family: var(--mono); }
+.retry-mark { fill: var(--warn); }
+.tool-tick { fill: var(--accent); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }

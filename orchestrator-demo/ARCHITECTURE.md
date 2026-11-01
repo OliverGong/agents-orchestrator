@@ -9,6 +9,16 @@
 **内置并行模板示例**、**控制平面（Control Plane）**——前端可视化配置 Agent 人格/
 模型/校准规则/MCP 服务与工作流拓扑并热生效、**SSE 实时事件流**（详见第 9 节）。
 
+**v3.0** 将控制器按领域包归位（`trip/` `observability/` `instance/`，`api/` 仅留横切），
+并把前端解耦为独立 **TypeScript 控制台工程**（Vue 3 + Vite + Naive UI，独立 nginx
+容器 + 反代，详见第 14 节）；随后完成**前后端目录系统性重组**——后端
+"shared 内核 + contract 契约 + 领域模块三层（web/包根/infra）"、前端 feature-based
+分区（详见第 3 节与第 15 节），console 切换 **pnpm** 工作流并引入 **Playwright
+E2E 功能闭环**（mock 后端，见 §15.5）；随后按 **3~5 抽象法则**把顶层归组为
+**kernel / core / governance / ops** 四 zone（§3），依赖规则由**架构守护测试**固化
+（零依赖 fitness functions，§7.3/§15.6），核心层与 contract 契约面超阈值
+按内聚子域再细分（contract → `spi/` `model/` `config/` `port/` 四子包，§15.3）。
+
 ## 1. 总体架构
 
 ```
@@ -71,100 +81,81 @@
 | Spring AI | 2.0.1 | ChatClient 抽象、结构化输出（entity → record） |
 | Micrometer / OpenTelemetry | 1.17 / 1.62 | Observation→span（OTLP 导出）、Prometheus 指标注册表 |
 | Grafana / Tempo / Prometheus | docker | 可视化栈：追踪瀑布图 + 指标仪表盘（`docker/` 一键启动） |
+| Vue 3 + Vite + Naive UI / pnpm | 3.5 / 6 / 2.41 | v3.0 独立控制台工程（TypeScript strict，corepack 钉版 pnpm） |
+| Playwright | 1.64 | 控制台 E2E 功能闭环：网络级 mock 后端 + SSE 回放，无需真实服务（§15.5） |
 | Ollama | 本地 | LLM 推理（qwen:7b，可替换） |
 | Maven Wrapper | — | 构建 |
 
 ## 3. 包结构
 
+**工程根目录布局**（`orchestrator-demo/`，Maven 单模块 + 独立前端工程；
+每层 3~5 个关键条目，细节 drill down 到注释与对应章节）：
+
+```
+orchestrator-demo/
+├── pom.xml · mvnw · .mvn/            # 构建：Maven wrapper（钉 Java 25 / Spring Boot 4）
+├── src/                              # 后端：main 源码（zone 包树见下）+ resources + test 镜像
+├── console/                          # 前端：TypeScript 控制台工程（pnpm 工作区，§14 / §15.4）
+├── Dockerfile · docker/ · config/    # 交付：镜像构建（§9）+ 可视化栈 + 运行时文件状态（§10）
+└── docs/                             # 文档：BRANCHING.md 等工程文档
+```
+
+**后端 zone 包树**（`com.oli.orchestrator_demo`，v3.1 分组层）——
+顶层只有**装配根 + 4 个 zone**，每个 zone 2~5 个模块（3~5 抽象法则），
+每模块一行点出核心职责，类级细节经模块内三层与 §4/§9-13 各章 drill down：
+
 ```
 com.oli.orchestrator_demo
-├── api                          # REST 层
-│   ├── TripPlanningController   # REST 入口：POST /api/trips/plan
-│   ├── RunObservabilityController # GET /api/trips/runs[/id]：运行时间线与上下文回放
-│   ├── ControlPlaneController   # GET/PUT /api/v1/control/*：控制平面读写（v1，见 9.3）
-│   ├── ObservabilitySseController # GET /api/v1/events/stream：SSE 实时事件流（v1，见 9.5）
-│   └── GlobalExceptionHandler   # 异常 → 400/502/503/500 结构化映射
-├── agent                        # Agent SPI 与实现
-│   ├── Agent<I, O>              # Agent SPI：name() + execute(I)
-│   ├── AbstractContextAgent<R>  # 模板方法基类：respond() + merge() + 解析重试
-│   ├── ResearchAgent            # Step1：需求 → 景点调研
-│   ├── BudgetAgent              # Step2：调研结果 → 成本估算
-│   ├── ItineraryAgent           # Step3：调研+预算 → 逐日行程
-│   ├── ReviewAgent              # Step4：全量审查 → 最终结论
-│   ├── ResponseSanitizerAdvisor # LLM 输出净化（剥围栏/提 JSON/修形状）
-│   ├── CalibrationAdvisor       # 控制平面校准规则套用（v1，见 9.4）
-│   └── UsageCaptureAdvisor      # LM 用量采集：tokens/模型名 → LmUsageCollector（v2.2，见 12.1）
-├── orchestrator                 # 编排者（执行引擎）
-│   ├── TripPlanningOrchestrator # 按协作模板波次执行，串行或并发
-│   └── WorkflowTemplateHolder   # 模板热切换单点：volatile 引用（v1，见 9.3）
-├── workflow                     # 协作模板（与 orchestrator 平级）
-│   ├── ExecutionMode            # SEQUENTIAL | CONCURRENT
-│   ├── StageSpec                # 阶段定义：name + agent + dependsOn
-│   ├── WorkflowTemplate         # 模板：校验 + 依赖波次分解（纯数据+纯计算）
-│   └── WorkflowProperties       # `orchestrator.workflow.*` 配置绑定
-├── observability                # 运行时可观测性（Actor 事件存储 + 过程指标 + Actuator）
-│   ├── AgentObservabilityEvent  # 事件：run/stage 边界 + mode/wave/peers + 上下文 JSON
-│   ├── RunTimeline              # 单次运行的时间线投影（不可变，fold-only）
-│   ├── ObservabilityActor       # 有界邮箱 + 单消费者线程折叠事件（容量/保留上限）
-│   ├── ObservabilitySsePublisher  # 事件广播到 SSE 订阅者（虚拟线程 per-emitter，v1）
-│   ├── OrchestratorMetrics      # run/stage 过程指标（计数器 + 时长 Timer + 保留数 Gauge）
-│   ├── OrchestratorHealthIndicator  # /actuator/health 的 orchestrator 组件
-│   ├── OrchestratorInfoContributor  # /actuator/info 的 workflow 配置
-│   ├── LmUsageCollector / RunMetricsStore # LM 用量 ThreadLocal + 指标落库接缝（v2.2）
-│   └── DbRunMetricsStore        # obs_run_metrics 表（file 模式为 Noop，落库关闭）
-├── aop                          # 横切关注点
-│   └── AgentExecutionAspect     # @Around：Agent 耗时日志 + span + Timer 指标
-├── control                      # 控制平面（v1，见第 9 节；v2.0 存储分层，见第 10 节）
-│   ├── AgentRuntimeConfig       # Agent 运行时配置：prompt/model/温度/校准规则/MCP 引用
-│   ├── CalibrationRule          # 校准规则：正则 pattern → replacement
-│   ├── McpServerConfig          # MCP 服务记录：名称/传输(SSE|STDIO)/端点/启停
-│   ├── WorkflowControlState     # 工作流控制态：mode + 阶段列表（前端编辑形态）
-│   ├── ControlPlaneState        # 全量状态快照（version 单调递增，JSON 持久化）
-│   ├── AgentDefaults            # 内置人格（状态文件种子）+ 已知 Agent 花名册
-│   ├── AgentRuntimeStore        # Agent 读取运行时配置的 SPI
-│   ├── AgentConfigRegistry      # 生产实现：文件持久化 + 校验 + 热应用 + 原子写
-│   ├── ControlPlaneStore        # 持久化接缝（v2.0）：load/save/currentVersion
-│   ├── FileControlPlaneStore / DbControlPlaneStore / CachedControlPlaneStore
-│   │                            # JSON 原子写 │ cp_* 表单事务写 │ Caffeine 读缓存
-│   └── ControlPlaneCrypto       # AES-256-GCM 字段加密 + GET 脱敏/PUT 还原（v2.0）
-├── scenario                     # 场景平面（v2.1，见第 11 节）
-│   ├── Scenario                 # 场景记录：请求模板 + workflow/agent/MCP 覆盖 + 产物类型
-│   ├── ScenarioState / ScenarioStore # 版本化快照与持久化接缝（镜像 ControlPlaneStore 模式，v2.2 含 activeScenarioId）
-│   ├── FileScenarioStore / DbScenarioStore # config/scenarios.json │ cp_scenario* 两表
-│   ├── ScenarioRegistry         # 单写者：CRUD + 引用校验 + activate 热应用 + dry-run
-│   ├── DryRunEngine / DryRunReport # 零 token 推演：模板校验 + 波次展开 + 槽位流
-│   └── ScenarioController       # /api/v1/scenarios CRUD + dry-run + activate
-├── meta                         # 元信息补录平面（v2.2，见 12.2）
-│   ├── MetaState / MetaStore    # 运行时配置+发布门户+按场景发布配置；持久化接缝
-│   ├── FileMetaStore / DbMetaStore # config/meta-plane.json │ mp_* 四表
-│   ├── MetaRegistry             # 单写者：CRUD + 门户可用性判定
-│   └── MetaController           # /api/v1/meta 读写（变更端点全量审计）
-├── teamlog                      # 团队日志（v2.2，见 12.3）
-│   ├── TeamLogEntry             # RUN / AUDIT / SYSTEM 三类条目
-│   ├── FileTeamLogStore / DbTeamLogStore # JSONL team-log.jsonl │ team_log 表
-│   ├── TeamLogRecorder          # 审计单写门面：14 个变更端点 + 系统通知
-│   └── TeamLogController        # GET /api/v1/logs（类别/级别/时间窗/关键字检索）
-├── release                      # 发布管道（v2.2，见 12.4）
-│   ├── ReleasePackage / ReleaseRecord # 可移植 JSON 包（SHA-256）与注册记录
-│   ├── FileReleaseStore / DbReleaseStore # release-registry.json │ rl_release 表
-│   ├── ReleaseService           # 发布编排：场景 → meta 配置 → 打包 → 哈希 → 注册
-│   └── ReleaseController        # /api/v1/releases 列表 / 发布 / 包导出
-├── instance                     # 运行实例注册表（v2.3，见 13.1）
-│   ├── RunInstance              # 唯一 runId + businessId 的实例化记录（RUNNING → 终态）
-│   ├── InstanceStore            # 持久化接缝 + 共享 facet 匹配（查询语义单一定义）
-│   ├── FileInstanceStore / DbInstanceStore # JSONL run-instances.json │ obs_run_instance 表
-│   └── InstanceStoreConfig      # 跟随 orchestrator.control.store 装配
-├── config                       # 配置
-│   ├── AgentConfiguration       # @EnableConfigurationProperties 激活（人格已迁控制平面）
-│   ├── ModelHttpClientConfig    # 模型后端 HTTP 超时（connect 5s / read 5min）
-│   └── AgentModelProperties     # `orchestrator.agents.*` 逐 Agent 模型/温度
-└── model                        # 数据模型（黑板 + DTO，均为 record）
-    ├── OrchestratorContext      # 不可变黑板（request + 四个响应槽位 + mergeFrom）
-    ├── TripRequest              # 用户输入：目的地/天数/预算/偏好
-    ├── ResearchResponse         # Step1 产出：景点/美食/旅行贴士
-    ├── BudgetResponse           # Step2 产出：分项成本/总额/是否达标
-    ├── ItineraryResponse        # Step3 产出：逐日计划（DayPlan）
-    └── ReviewResponse           # Step4 产出：校验结论/问题/最终摘要
+├── OrchestratorDemoApplication      # 装配根：组件扫描四 zone，自身不含业务
+├── kernel/                          # 内核层：零业务语义（R1 守护：禁 import 业务模块）
+│   ├── shared                       # 横切件：web 异常/缓存 · aop 执行切面 · context 运行归因
+│   └── contract                     # 契约面（单模块，子包仅导航）：spi/ Agent SPI · model/ 黑板+运行数据 · config/ 控制面配置 · port/ 跨域端口
+├── core/                            # 编排核心：旅行规划问题域的运行时
+│   ├── trip                         # 应用入口：POST /api/trips/plan → 按模板波次执行
+│   ├── agent                        # 协作方：4 业务 Agent · 模板基类 · advisor/ 链 · config/
+│   ├── workflow                     # 协作模板：stage / dependsOn / mode · 热切换单点
+│   └── mcp                          # 外部集成：MCP 连接注册表 · 插桩工具（EIP 网关）
+├── governance/                      # 治理面：SOP 数字化（配置/场景/元数据/发布/审计）
+│   ├── control                      # 控制面：Agent 人格/模型/校准/MCP 热配置 + 加密
+│   ├── scenario                     # 场景：零 token 推演 → 激活 → 运行
+│   ├── meta                         # 元信息补录
+│   ├── release                      # 发布流水线
+│   └── teamlog                      # 团队审计日志
+└── ops/                             # 观测运维面：运行状态的生产与消费
+    ├── observability                # 事件总线 · SSE 通道 · 指标 · 健康（events/ metrics/ health/）
+    └── instance                     # 运行实例注册与业务关联
+```
+
+**模块内分层约定**（v3.0 起，每个领域模块一致表达 MVC；zone 归属不改变本约定）：
+
+- `web/` — 表现层（MVC-C）：Controller / SSE 端点，只做协议适配与参数校验；
+- 包根 — 核心层（MVC-M）：领域模型、注册表、应用服务/引擎、持久化端口（`*Store` 接口）；
+- `infra/` — 基础设施层：持久化适配器（`Db*` / `File*` / `Noop*`）与其装配配置（`*StoreConfig`）；
+- `V`（视图）= `console/` 前端 SPA（见 §15.4），经 REST/SSE 与 `web/` 层同构对齐；
+- 横切关注点（异常映射、缓存控制、AOP）统一收拢 `kernel/shared/`，不与任何业务域耦合；
+- **drill down 路径**：zone（本树）→ 模块三层（本约定）→ 内聚子域子包
+  （§15.3：advisor/config、events/metrics/health、contract 的 spi/model/config/port）→ 类（§4 与各版本章节）。
+
+**前端工作区**（v3.0，feature-based，与后端模块树并列，见 §14 / §15.4）：
+
+```
+orchestrator-demo/console                 # Vue 3 + TypeScript SPA（pnpm 工作区）
+├── src/app/                              # 应用装配层：main.ts · App.vue（壳）
+│   ├── router/index.ts                   # 11 路由（history 模式）+ 通配兜底
+│   └── stores/session.ts · control.ts    # 跨 feature 全局状态（Pinia）
+├── src/shared/                           # 跨领域复用资产（横切件 ≈ kernel/shared + 契约 ≈ kernel/contract）
+│   ├── api/http.ts · sse.ts              # 类型化 fetch + EventSource 单例
+│   ├── types/api.ts · dag.ts             # REST/SSE 契约 DTO 单一事实源（镜像后端 record）
+│   ├── components/DagDiagram · SwimlaneChart · JsonDetails
+│   ├── styles/base.css                   # 全局样式（横切资产，与后端 kernel/shared 同构归位）
+│   └── utils/format.ts
+├── src/features/                         # 领域特性（顶层 = 侧栏分组 ≈ zone，组内子目录 ≈ 后端模块）
+│   ├── scenario/                         # run/（trip）· dryrun/ · scenarios/（scenario）
+│   ├── metadata/                         # agents/（control）· workflow/（workflow）· mcp/（mcp）· meta/（meta）
+│   └── observability/                    # runs/ · logs/ · metrics/（observability）· instances/（instance）
+├── e2e/                                  # Playwright 功能闭环（mock 后端，见 §15.5）
+├── nginx.conf                            # SPA fallback + /api、/actuator 反代（SSE 关缓冲）
+└── Dockerfile                            # node:22-alpine（corepack/pnpm）→ nginx:1.27-alpine
 ```
 
 ## 4. 核心抽象
@@ -309,7 +300,8 @@ ChatClient 上，在响应返回给转换器前按序执行三步净化：
 ### 4.8 AOP：Agent 执行切面（aop 包）
 
 `AgentExecutionAspect`（`@Aspect` + `@Around`）以切点
-`execution(* com.oli..agent.Agent+.execute(..))` 织入**所有** Agent 调用：
+`execution(* com.oli.orchestrator_demo.kernel.contract.spi.Agent+.execute(..))` 织入**所有** Agent 调用
+（SPI 在 kernel/contract/spi 包，故切点指向契约接口）：
 
 - 成功：`{agent} completed in {n} ms`（INFO）；
 - 失败：`{agent} failed after {n} ms: {message}`（WARN）后原样重抛；
@@ -340,7 +332,7 @@ ChatClient 上，在响应返回给转换器前按序执行三步净化：
 - `inputContextJson` / `outputContextJson`：阶段前后黑板快照（Jackson 3
   序列化，截断至 20KB）——**整个 Agent 上下文可回放**。
 
-`RunObservabilityController`（api 包）暴露只读视图：`GET /api/trips/runs`
+`RunObservabilityController`（observability 包）暴露只读视图：`GET /api/trips/runs`
 （运行列表摘要）与 `GET /api/trips/runs/{runId}`（按依赖波次分组，
 `parallel=true` 标记并发波次，未知 runId 返回 404）。
 
@@ -422,29 +414,24 @@ curl http://localhost:8080/api/trips/runs/{runId}    # 完整时间线：波次 
 `parallelPeers` 与失败信息；`finalContext` 为运行终态。进程内保留最近 100 次
 运行，重启即清零（长期存储走 Tempo/Prometheus，见 4.9）。
 
-### 5.3 前端控制台（`static/`）
+### 5.3 前端控制台（`console/`）
 
-应用自带一个**零依赖、零构建**的单页控制台（原生 HTML/CSS/JS，位于
-`src/main/resources/static/`，启动即由 Boot 作为欢迎页提供，
-**http://localhost:8080/**），把整个工程闭环在一个界面里：
+**v3.0 起前端不再内嵌于后端**：原 `src/main/resources/static/` 下的零依赖单页
+（v2.1 遗留）已删除，控制台解耦为独立的 **Vue 3 + TypeScript 工程**
+（`console/`，独立 nginx 容器，默认 http://localhost:8081/），与后端仅以
+REST/SSE 契约通信。页面清单、技术选型与工程结构见 **§14 与 §15.4**；
+路由到视图的映射见 `console/src/app/router/index.ts`。
 
-| Tab | 内容 | 依赖端点 |
+主要页面与依赖端点：
+
+| 页面 | 内容 | 依赖端点 |
 |---|---|---|
-| 规划工作台 | 用户请求表单（工作流入口）→「本次请求」回显 → **实时执行进度**（轮询运行时间线，逐阶段显示完成/失败徽章与耗时；v1 另有 SSE 实时黑板卡，见 9.5）→ 四张结果卡片（行程结论/逐日行程/预算核算/景点调研），失败时渲染结构化错误卡（400/404/502/503/500） | `POST /api/trips/plan`、`GET /api/trips/runs[/{id}]` |
-| 运行回放 | 运行列表（状态/耗时/阶段数）→ 点开单次运行：**用户最初提出的请求** + 依赖波次与每阶段输入/输出黑板快照（折叠 JSON）+ 终态上下文 | `GET /api/trips/runs[/{id}]` |
-| 系统观测 | 过程指标卡片（运行发起/成功/失败、阶段计数、运行总时长、保留时间线）、Agent 维度表格（`agent.execution.duration` 按标签查询）、健康检查与工作流配置 JSON 面板、Grafana/Tempo/Prometheus 链接 | `/actuator/health`、`/actuator/info`、`/actuator/metrics/{name}?tag=…` |
-| 控制平面（v1） | Agent 卡片编辑（system prompt/模型/温度/校准规则/MCP 引用）+ 工作流编辑器（mode/阶段/agent/依赖，增删行）+ MCP 服务面板 + 版本徽章与刷新 | `/api/v1/control/*` |
-
-v2.1 起控制台重构为**左侧导航布局**（三组八项），替代 v0–v1 的顶部 tab：
-
-| 导航组 | 页面 | 内容 |
-|---|---|---|
-| 场景 | 场景运行 | 顶栏场景选择与**激活**（覆盖热应用到控制平面，激活徽章）+ 原规划工作台全部能力 |
-| 场景 | 场景推演 | dry-run 报告：校验徽章与问题清单、**依赖 DAG（SVG）**、波次展开（有效模型/温度/槽位/pending-safe）、黑板槽位流表 |
-| 场景 | 场景配置 | 场景 CRUD 表格 + 编辑器（请求模板 / workflow 覆盖 JSON / agent 覆盖 JSON / MCP 依赖复选 / 产物类型 / 启停） |
-| 元数据 | Agent 配置 / 工作流编排 / MCP 服务器 | 原「控制平面」tab 的三块内容原样承接（id 不变） |
-| 可观测 | 运行回放 | 详情升级为**三视图切换**：时间线（含 `↻ retry` 第 N 次尝试链与工具明细）/ **DAG 依赖图**（模板精确依赖，回退波次推导，节点带状态填色与 ⚠retry 徽章）/ **泳道图**（agent 泳道 × 时间轴，⚠ 重试时刻定位、▲工具刻度，无完成时间戳时退化为顺序布局） |
-| 可观测 | 系统观测 | 原「系统观测」tab 原样承接 |
+| 场景运行 | 场景选择与**激活**（覆盖热应用到控制平面）+ 规划工作台 + 实时执行进度（轮询）+ SSE 实时黑板卡 + 四张结果卡片，完成后一键跳转回放/实例/指标 | `POST /api/trips/plan`、`GET /api/trips/runs[/{id}]`、`/api/v1/events/stream` |
+| 场景推演 | dry-run 报告：校验徽章与问题清单、依赖 DAG（SVG）、波次展开、黑板槽位流表 | `POST /api/v1/scenarios/{id}/dry-run` |
+| 场景配置 | 场景 CRUD 表格 + 编辑器 | `/api/v1/scenarios` |
+| 元数据三页 | Agent 配置 / 工作流编排 / MCP 服务器 | `/api/v1/control/*` |
+| 运行回放 | 三视图切换：时间线 / DAG 依赖图 / 泳道图 | `GET /api/trips/runs[/{id}]` |
+| 实例追踪 / 团队日志 / 场景指标 | 运行实例溯源、RUN/AUDIT/SYSTEM 日志、按场景 LM 耗时与 token 消耗 | `/api/v1/instances`、`/api/v1/logs`、`/api/v1/metrics/lm` |
 
 实现要点（改错即复发）：
 
@@ -452,13 +439,10 @@ v2.1 起控制台重构为**左侧导航布局**（三组八项），替代 v0�
   运行列表找到 `RUNNING` 的运行并拉取详情——事件时间线由 `ObservabilityActor`
   边执行边折叠，因此无需 WebSocket 即可看到阶段逐个完成。
 - **数据刷新**：`ObservabilityActor` 时间线与 Micrometer 指标都是即时快照，
-  「运行回放」「系统观测」tab 在**每次切换时自动重新拉取**（页面加载时的
+  「运行回放」「系统观测」页面在**每次切换时自动重新拉取**（页面加载时的
   旧数据无意义）。
 - **Actuator 统计名**：`/actuator/metrics` 的 Timer 测量统计名是 `TOTAL_TIME`
   （不是 `TOTAL`），Gauge 是 `VALUE`；读错名字会渲染成 0/「—」。
-- **静态资源缓存**：开发期改动 `static/` 后普通刷新可能命中启发式缓存——
-  已配置 `spring.web.resources.cache.cachecontrol.no-cache=true` 强制再验证，
-  且 HTML 引用带版本参数（`app.js?v=N`），改动后记得同步递增。
 
 ## 6. 配置（application.properties / application.yaml）
 
@@ -554,7 +538,8 @@ management.metrics.distribution.percentiles-histogram.orchestrator.run.duration=
 
 ## 7. 测试体系
 
-共 83 个用例，全部离线运行（不依赖本地 Ollama），`mvn test` 数秒完成。
+共 214 个用例，全部离线运行（不依赖本地 Ollama），`mvn test` 数秒完成。
+下表为 v0 核心用例；v1–v3 的增量见各版本章节的「测试增量」小节。
 
 | 测试类 | 层次 | 验证点 |
 |---|---|---|
@@ -572,8 +557,8 @@ management.metrics.distribution.percentiles-histogram.orchestrator.run.duration=
 | `ItineraryAgentTest`（2 例） | agent | 消费调研+预算；DayPlan 列表解析；prompt 含双上游；**并行模板**：预算未就绪时 prompt 注入 "not on the blackboard yet / stay conservative" 提示 |
 | `ReviewAgentTest` | agent | 消费全部三类上游；最终结论；prompt 含行程 |
 | `AbstractContextAgentTest`（3 例） | agent | 首次解析失败重试成功；重试耗尽后抛 `JacksonException`；首次成功不重试 |
-| `TripPlanningControllerTest` | api | POST JSON → 200；入参绑定；全量上下文序列化 |
-| `RunObservabilityControllerTest`（2 例） | api | GET /api/trips/runs[/id]：时间线按波次分组 + parallel 标记 + 上下文 JSON；未知 runId → 404 |
+| `TripPlanningControllerTest` | trip | POST JSON → 200；入参绑定；全量上下文序列化 |
+| `RunObservabilityControllerTest`（2 例） | observability | GET /api/trips/runs[/id]：时间线按波次分组 + parallel 标记 + 上下文 JSON；未知 runId → 404 |
 | `ResponseSanitizerAdvisorTest`（10 例） | agent | 纯 JSON 透传；剥 Markdown 围栏；prose 中提取 JSON；纯文本不动；null/blank 容错；**回归**：围栏输出 → `entity()` 成功；裸数组按 Schema 单数组字段包装；多属性 Schema 与无 Schema 时不动；真实链路裸数组 → `ItineraryResponse` 解析成功 |
 | `GlobalExceptionHandlerTest`（6 例） | api | 校验失败 → 400；畸形 body → 400；`JacksonException` → 502；`RestClientException`/`ResourceAccessException` → 503；未知路由 → 404 |
 | `AgentConfigRegistryTest`（6 例） | control | 播种默认态并持久化；重启重载并重新热应用模板；updateAgent 校验（未知 agent/空 prompt/悬空 MCP 引用）+ 版本单调 + 持久化跨"重启"保留；updateWorkflow 校验失败不 bump 版本、成功热切换；MCP 记录唯一名/传输/端点校验 |
@@ -599,7 +584,7 @@ management.metrics.distribution.percentiles-histogram.orchestrator.run.duration=
 ### 7.2 运行
 
 ```bash
-./mvnw test                                     # 全量测试（83 例，离线）
+./mvnw test                                     # 全量测试（214 例，离线）
 ./mvnw spring-boot:run                          # 启动（需本地 Ollama + qwen:7b）
 docker compose -f docker/docker-compose.yml up  # 可选：Grafana + Tempo + Prometheus
 ```
@@ -613,6 +598,21 @@ docker compose -f docker/docker-compose.yml up  # 可选：Grafana + Tempo + Pro
 4. Grafana（http://localhost:3000）→ Explore → Tempo 查 `agent.execute` span
    瀑布图（并发波次的兄弟 span 起止重叠）；Dashboards → "Agent Orchestration"
    看耗时/失败率/运行吞吐曲线。
+
+### 7.3 架构守护测试（fitness functions）
+
+`ArchitectureConventionTest`（`src/test/java/.../architecture/`）以**零依赖源码扫描**
+（正则抽取 import 建图，无 ArchUnit、完全离线）固化 §15.3 的依赖规则，规则漂移即测试失败：
+
+| 规则 | 断言 |
+|---|---|
+| R1 | `kernel/shared/` 零业务模块 import（业务 SPI 一律在 `kernel/contract/`） |
+| R2 | `kernel/contract/` 只 import 自身（纯净数据面 + SPI 包；`spi/model/config/port` 子包同属单模块，互引视为包内） |
+| R3 | 模块依赖图（zone 限定名，如 core.agent）无环（**零豁免**，反转记录见 §15.6.2） |
+| R4 | `infra/` 适配器不被跨模块引用（端口与适配器本地性） |
+| R5 | `web/` 表现层不触碰任何 `infra/` 适配器 |
+
+豁免（waiver）必须成对出现在 R3 测试注释与 §15.6.2 反转计划中——禁止无计划的静默豁免。
 
 ## 8. 已知边界与扩展方向
 
@@ -1140,3 +1140,240 @@ facet 检索与重启持久化、Actor 的实例写入与失败隔离、业务�
 InstanceController 列表/筛选/详情聚合/404）+ M3 控制台适配
 （controller 测试适配三参 planTrip）——合计 **209 例全绿**
 （`./mvnw test`，DB 用例跑 H2 内存库）。
+
+## 14. v3.0：前端解耦（TypeScript 控制台工程）
+
+v0–v2.3 的控制台是打进 Spring Boot fat jar 的静态资源（`static/`，原生
+JS 单文件 1838 行）。v3.0 将其解耦为独立 npm 工作区 `console/`：Vue 3 +
+TypeScript + Vite + Pinia + Vue Router + Naive UI，与后端以 REST/SSE 契约
+类型对接，独立构建、独立镜像、独立发布节奏。
+
+### 14.1 动机：legacy 静态资源的四类局限
+
+- **无类型契约**：fetch 返回 `any`，后端 DTO 演进（19 字段事件、实例聚合
+  明细）无编译期对账，字段改名只能靠运行时发现。
+- **单文件难维护**：11 个页面的数据流、SVG 算法、SSE 处理挤在 app.js，
+  全局变量（`ctxScenarioId` 等）承担跨页上下文，刷新即失、不可分享链接。
+- **无组件化**：DAG/泳道 SVG 在多处复制渲染逻辑；`syncMcpRows` 等手写
+  DOM 同步与业务逻辑纠缠。
+- **不可单测/静态检查**：无 lint、无 type-check，回归全靠人工点检。
+
+### 14.2 框架选型论证
+
+| 维度 | **Vue 3 + TS（选定）** | React + TS | Svelte | 保留原生 JS |
+|---|---|---|---|---|
+| 契约类型化 | `strict` 全量 TS，DTO 单一事实源 | 同左 | 同左 | 无 |
+| 中后台组件库 | Naive UI：表格/表单/树/抽屉齐全，内置暗色主题 | 成熟（AntD/MUI）但更重 | 企业级表格生态薄弱 | 手写 |
+| 与 legacy 迁移心智 | SFC 模板 ≈ 手写 DOM 的声明式版本，SVG/样式近乎原样平移 | JSX 化改写面更大 | 改写面大 | — |
+| 产物体积 | gzip ~60 kB（全 11 页懒加载分包） | 类似偏大 | 最小 | 最小但无收益 |
+| 学习/团队成本 | 低（模板语法贴近 HTML） | 中 | 中 | 零 |
+
+选型要点：本控制台是典型"表格 + 表单 + 可视化"中后台，框架间的性能
+差异不构成决策变量；决策变量是**类型契约、组件库成熟度与迁移成本**。
+React 生态更强但对本场景无增益且 JSX 化改写面更大；Svelte 产物最小却
+缺企业级表格组件；保留原生无法获得类型化与组件化收益。最终
+**Vue 3（`<script setup>` + strict TS）+ Naive UI**：组件覆盖度足够、
+暗色主题调色到 legacy 配色（`#58a6ff` 主色 / `#0d1117` 背景）、
+DAG 与泳道 SVG 以 computed 布局原样移植（波次列 + 贝塞尔依赖边、
+时间轴/顺序双模式 + 重试 ⚠/工具 tick）。
+
+### 14.3 运行时拓扑：独立 nginx 容器 vs 内嵌 jar
+
+**选定：独立容器 + nginx 反代**（`docker/docker-compose.yml` 的
+`console` 服务，默认 `CONSOLE_PORT:-8081`）：
+
+- **发布节奏解耦**：`orchestrator-console:${APP_VERSION}` 与后端镜像
+  版本对齐但构建/发布独立——前端改版不必重打 fat jar。
+- **关注点分离**：SPA fallback（history 路由深链）、SSE 反代
+  （`proxy_buffering off` + 1h read timeout）、`/api` `/actuator`
+  转发全部收敛在 `console/nginx.conf`；upstream 经 Docker 内嵌 DNS
+  （`127.0.0.11`）请求时解析，后端宕机时控制台仍可启动（API 返回 502
+  而非整体不可用）。
+- **可扩展性**：SPA 静态资源可独立前置 CDN/负载均衡，后端按需扩容。
+
+**内嵌 jar（legacy 路径）已随 v3.1 移除**：`src/main/resources/static/` 已
+删除，本地 `./mvnw spring-boot:run` 仅提供 REST/SSE API；控制台一律经
+`console/` 工程（`pnpm dev` / nginx 容器）访问。
+
+**CORS：两种形态下浏览器都只见单一来源**——开发期 Vite dev server 将
+`/api` `/actuator` 代理到 `localhost:8080`，生产期 nginx 反代到 `app:8080`，
+后端无需任何 CORS 配置。
+
+### 14.4 工程结构与契约实践
+
+- **契约单一事实源**：`src/types/api.ts` 手工镜像后端 record（Java 侧
+  无 OpenAPI 生成链，接口面收敛可控；后续可按需引入 openapi-typescript）。
+- **跨页上下文**：legacy 全局变量改为 **route query**——
+  `instances?businessId=&runId=`、`metrics?scenarioId=`、
+  `logs?runId=&scenarioId=&window=`、`runs?runId=`、
+  `run/dryrun?scenarioId=`；链接可分享、刷新可还原，生命周期闭合链
+  （推演 → 激活·运行 → 回放 → 场景指标）在 Pinia session store 中承接。
+- **严格构建链**：`vue-tsc --noEmit && vite build`（strict +
+  noUnusedLocals/Parameters + verbatimModuleSyntax），类型错误即构建失败，
+  前端纳入与后端同级的 CI 门槛。
+- **交互升级**：`alert/confirm` → useMessage/useDialog；手写 DOM 同步 →
+  Vue 响应式；每页懒加载分包。
+
+### 14.5 部署与提醒事项
+
+- **镜像**：`console/Dockerfile` 两阶段——`node:22-alpine` 内
+  `pnpm install --frozen-lockfile + vue-tsc + vite build`（pnpm 由
+  corepack 按 `packageManager` 字段钉版；`.dockerignore` 排除 node_modules/
+  dist），运行时 `nginx:1.27-alpine` 仅携带静态产物 + nginx.conf。
+- **APP_VERSION**：`orchestrator` 与 `orchestrator-console` 两镜像共用
+  同一版本戳（`docker/.env.example`），后端 pom 版本与前端
+  `package.json` version 需同步推进（发布检查项）。
+- **Node 工具链**：容器内固定 Node 22 LTS；本机开发需 Node ≥ 20
+  （pnpm ≥ 10，`packageManager` 字段钉版，注意 PATH），`pnpm dev` 的
+  Vite 代理写死 `localhost:8080`。
+- **SSE 代理**：任何前置代理层（nginx/网关/CDN）都必须对
+  `/api/v1/events/stream` 关闭缓冲并拉长读超时，否则事件将成块延迟。
+- **legacy 移除（v3.1 已完成）**：`static/` legacy 控制台已删除，
+  `spring.web.resources.cache.cachecontrol.no-cache` 死配置随之清理；
+  后端不再承载任何 UI 资源。
+
+
+## 15. 目录组织原则（v3.0 重组方法论）
+
+v3.0 前后端各自经历了一次**系统性目录重组**（后端 `d99bd42`、前端 `18a945d`）。
+重组的出发点：按技术层分包（package-by-layer：controller / service / config / model …）
+在单仓库内会随领域数量增长退化为"横向扫描地狱"——一次功能变更要横跨 5+ 个互不相邻的目录。
+v3.0 采用 **package-by-feature**（按业务域分包）+ **模块内三层**：每个业务域自包含，
+跨域关系只剩显式依赖，重组后 209 个测试零修改全绿，证明行为等价。
+
+### 15.1 后端：模块内三层与 MVC 映射
+
+经典 MVC 只解决"表现层与业务分离"一个问题；落到多域后端还需要回答
+"业务域内部怎么组织、持久化怎么替换"。v3.0 的答案是每个领域模块内固定三层，
+并以**端口-适配器**衔接持久化：
+
+| 层 | 位置 | 职责 | MVC / 六边形对应 |
+| --- | --- | --- | --- |
+| 表现层 | `*/web/` | Controller、SSE 端点：协议适配、参数校验、DTO 进出，**无业务逻辑** | MVC-C |
+| 核心层 | 包根 | 领域模型、注册表、应用服务/引擎、`*Store` 端口接口（依赖倒置的"端口"） | MVC-M |
+| 基础设施层 | `*/infra/` | `Db*` / `File*` / `Noop*` 持久化适配器 + `*StoreConfig` 装配（"适配器"） | — |
+| 视图 | `console/`（独立工程） | SPA，与 `web/` 层 REST/SSE 同构对齐 | MVC-V |
+
+- 依赖方向固定：`web → 包根 ← infra`（infra 实现包根声明的端口，永不反向）。
+- 同一抽象的多个适配器并存（DB / 文件 / Noop），由配置切换——存储后端对核心层透明。
+- `V` 不在后端仓库树内，但通过 `types/api.ts` ↔ Java record 的契约镜像保持同构（见 §15.4）。
+
+### 15.2 概念落位映射（AOP / SOP / EIP）
+
+三个高频概念在本仓库的"物理落位"，回答"这个东西到底在哪个包里"：
+
+| 概念 | 落位 | 具体体现 |
+| --- | --- | --- |
+| **AOP**（面向切面） | `kernel/shared/aop/` | `@Around` 织入全部 Agent 执行：耗时日志、span、Timer 指标一次织入，业务组件零观测噪音；横切面收拢 `kernel/shared/`，不与任何业务域耦合 |
+| **SOP**（标准作业流程）的数字化 | `governance/scenario/` + `governance/release/` + `governance/teamlog/` | scenario = 作业指导书：推演（`DryRunEngine` 零 token 验证）→ 激活（热应用覆盖）→ 运行；release = 发布流水线（可移植 JSON 包 + SHA-256 + 注册表追加）；teamlog = 审计轨迹（14 个变更端点全量记录，先落库再推送 WAL 顺序） |
+| **EIP**（企业集成模式） | `ops/observability/` + `core/mcp/` | observability = 事件总线：`ObservabilityEventBus`（pub-sub）+ `ObservabilitySsePublisher`（SSE 出站通道），Actor 邮箱解耦生产/消费速率；mcp = 外部系统适配器/网关：`McpConnectionRegistry` 建连、`InstrumentedMcpTool` 插桩（超时/重试/归因） |
+
+### 15.3 分组层（zone）、配置就近与依赖方向
+
+- **3~5 抽象法则**：目录树的每一层只呈现 3~5 个关键条目，超出即归组或细分——
+  顶层 13 个业务模块归入 4 个 zone（`kernel` 内核 / `core` 编排核心 /
+  `governance` 治理面 / `ops` 观测运维面），每 zone 2~5 个模块，一眼可读；
+  细节沿 drill down 路径下钻（§3）。
+- **zone 是导航分组，不是新的依赖边界**：依赖规则仍在**模块级**由 R1–R5 守护
+  （§7.3）；模块环在模块级检测且当前零豁免（§15.6.2）。
+- **配置就近归属**：`AgentConfiguration` / `AgentModelProperties` /
+  `ModelHttpClientConfig` 位于 `core.agent/config/` 而非集中 `config/`——配置属于拥有它的模块，
+  删除模块时配置随之消失，不会留下幽灵 Bean。
+- **kernel/contract/ 稳定契约包（四子包）**：契约整体仍是**单模块**（R2 守护
+  "只 import 自身"，子包互引视为包内），子包按角色导航——
+  `spi/`：**Agent SPI**（`Agent<I,O>` + 自描述元数据 `AgentDescriptor`）；
+  `model/`：契约数据模型（黑板 `OrchestratorContext`、`TripRequest`、四个响应 record、
+  运行数据 `OrchestratorSnapshot`/`RunInstance`）；
+  `config/`：控制面配置数据 record（`AgentRuntimeConfig`、`AgentDefaults`、
+  `CalibrationRule`、`McpServerConfig`、`McpServerStatus`）；
+  `port/`：跨域端口接口（`AgentRuntimeStore`、`ModelDefaultsReader`、`ControlPlaneReader`、
+  `McpConnectionGateway`、`RunInstanceSink`、`RunStatusReader`）——
+  数据面打破潜在循环，端口反转打破治理/观测域指向运行时实现的逆向依赖；
+  契约类型变更必然是一次显式的跨域决策。
+- **kernel/shared/ 横切内核**：异常映射、缓存控制、AOP、`RunContext` 运行归因上下文——
+  无业务语义、零业务模块 import（R1 守护），进入 shared 需满足"被 ≥2 个域使用"的门槛。
+- **核心层内聚子域再分层**：包根核心层类数超阈值（经验值 ~12）时按内聚子域细分
+  （`agent/` → `advisor/` `config/`；`observability/` → `events/` `metrics/` `health/`；
+  `contract/` → `spi/` `model/` `config/` `port/`，21 个契约类型按角色归组）；
+  细分只是包内导航辅助，不改变依赖边界——contract 子包间互引仍按单模块判定（R2）。
+- **依赖方向总规则**：`web → 包根 ← infra`；跨域只经 `kernel/contract/` 或对方 `web/`
+  端口；`kernel/` 两包不依赖任何业务模块。规则由 §7.3 守护测试固化。
+
+### 15.4 前端：feature-based 分区（console/）
+
+前端采用与后端同构的组织逻辑（§3 树），三层各司其职：
+
+| 分区 | 职责 | 与后端的对应 |
+| --- | --- | --- |
+| `src/app/` | 应用装配：main.ts（naive-ui 全局注册）、App.vue 壳、router、跨 feature 全局 store | 装配 ≈ `*StoreConfig` |
+| `src/shared/` | 复用资产：类型化 `http`/`sse` 客户端、契约 DTO（`types/api.ts` 镜像后端 record，单一事实源）、通用组件（DagDiagram/SwimlaneChart/JsonDetails）、全局样式（`styles/base.css`）、格式化工具 | ≈ `kernel/contract/` + `kernel/shared/` |
+| `src/features/<域>/` | 页面级特性（scenario / metadata / observability 三组），顶层对应侧栏分组 ≈ 后端 zone，组内子目录按后端模块再分层（如 `metadata/agents/` ≈ `governance.control`、`observability/instances/` ≈ `ops.instance`） | ≈ 后端 zone（core / governance / ops）内模块 |
+
+- **`@` 路径别名**（vite `resolve.alias` + tsconfig `paths`）：所有跨目录 import 走
+  `@/features/...`、`@/shared/...`，杜绝 `../../..` 深层相对路径；目录移动时只需改别名映射。
+- **新增页面的落位规则**：新页面进对应 feature 组 + 按后端模块选子目录（无对应模块
+  则先问"这是不是新领域模块"，是则前后端同步开）+ router 注册一行；若与现有
+  侧栏分组都无关，先问"这是不是新领域域"，是则开新 feature 目录（前后端同步开）。
+- **契约变更路径**：后端 record → `types/api.ts` → 视图层，单一方向，无手写散落类型。
+
+### 15.5 Playwright 功能闭环（console/e2e/）
+
+控制台的**功能性测试闭环**：`pnpm test:e2e` 在网络层拦截全部后端流量，
+无需 Spring Boot 进程与真实模型，16 个 spec 约 8s 跑完（见 `console/e2e/`）。
+
+- **确定性后端**：`e2e/mocks.ts` 以单一 `page.route('**/*')` 处理器拦截——非 `/api`、
+  `/actuator` 路径放行（SPA 资源），SSE 路径整段 `text/event-stream` 回放，
+  其余按 URL 匹配回 fixtures（日志接口还按 query 参数过滤）——响应形状镜像
+  `types/api.ts` 契约，后端契约变更会在 mock 处直接暴露。
+- **自动起服**：`playwright.config.ts` 的 `webServer` 自动 `pnpm dev --strictPort`
+  （CI 外复用已运行实例），失败用例保留 trace 可回放。
+- **覆盖面**：11 条路由冒烟 + SSE 黑板折叠（run_started → stage_completed →
+  run_completed）+ 场景推演闭环（选场景 → 推演 → 波次/槽位流断言）+
+  回放/实例详情打开 + 日志级别筛选打到后端 query 参数。
+- **实操经验**（写新用例前先读）：
+  - 断言**稳定标记**而非瞬态——mock 的 SSE 流播完即关闭，EventSource 立即转入
+    重连，连接状态标签在"已连接/重连中"间振荡；应断言 run banner、stage 行等
+    一次性写入后不再变化的文本。
+  - Naive UI 控件交互走类选择器：下拉 `.n-select` + 选项 `.n-base-select-option`；
+    可编辑单元格的**值**用 `toHaveValue()` 断言（`getByText` 匹配不到 input value）。
+  - 表格断言注意列内容（运行列表无 runId 列，只有截断显示的场景/状态）；
+    同名文本多处出现时用 `.first()` 或 `{ exact: true }` 消除 strict mode 歧义。
+
+### 15.6 架构演进指南（守护测试的配套决策记录）
+
+#### 15.6.1 依赖规则与豁免机制
+
+- 规则本体见 §7.3（R1–R5）；R3 的模块环检测当前为**零豁免**状态（历史 4 对已反转，
+  见 §15.6.2）——新环不得通过加豁免消化。
+- 出现新环时按序问：公共依赖能否**下沉 `kernel/contract/`**（SPI/数据面）、
+  **上浮 `kernel/shared/`**（横切语义）、或**经事件解耦**（EIP 发布/订阅）？
+  三者皆不适用时先重构消费面（窄端口），仍无法消解再评估豁免（须同步登记测试注释与本节）。
+
+#### 15.6.2 历史双向耦合反转记录（已清零）
+
+R3 曾登记 4 对豁免；2026-11 已全部按下方记录执行反转，守护测试现为**零豁免**。
+新的环必须按 §15.6.1 决策树反转消化，不得重新引入豁免。
+
+| 已反转对 | 反转手段（下沉数据面 + 窄端口） |
+|---|---|
+| core.agent ⇄ governance.control | 纯数据下沉 `kernel.contract`（AgentRuntimeConfig/CalibrationRule/AgentRuntimeStore/AgentDefaults）；模型默认值经 `ModelDefaultsReader` 端口注入（agent 侧 `ModelDefaultsBridge` 桥接）；Agent SPI 自描述（`descriptor()`），control 不再 import agent 模块 |
+| governance.control ⇄ core.mcp | `McpServerConfig`/`McpServerStatus` 下沉 contract；mcp 读控制面经 `ControlPlaneReader` 端口；control 的 HTTP 面经 `McpConnectionGateway` 端口消费连接状态 |
+| ops.instance ⇄ ops.observability | `RunInstance` 下沉 contract；Actor 写实例经 `RunInstanceSink` 写端口（instance 侧配置类桥接），instance→observability 读侧保持单向 |
+| ops.observability ⇄ core.trip | health/info 探针经 `RunStatusReader` 端口读取 `OrchestratorSnapshot`（contract 快照 record），trip 侧编排者提供实现，探针不 import trip 模块 |
+
+#### 15.6.3 新域模块接入清单
+
+1. **选 zone 归属**：零业务语义且被 ≥2 域用 → `kernel/`（shared 或 contract）；
+   编排运行时 → `core/`；SOP 治理 → `governance/`；观测运维 → `ops/`；
+   某 zone 超 5 个模块时先问是否该开新 zone；
+2. 模块内按三层落位：`web/`（协议适配）+ 包根（核心）+ `infra/`（适配器）；
+3. 与既有域的依赖只经 `kernel/contract/` 端口或对方 `web/`；数据/SPI 需求优先下沉 contract；
+4. 把新模块名加入 `ArchitectureConventionTest.MODULES`，跑 R3 确认无新环；
+5. 若出现新环：按 §15.6.1 决策树处理；确需豁免则同步登记测试注释 + 本节表格；
+6. 更新 §3 zone 包树与 console 侧对应 feature（若有 UI 面）。
+
+#### 15.6.4 结构阈值
+
+- 核心层（包根）类数 > ~12 → 按内聚子域开子包（参照 agent、observability 的拆法）；
+- 子包不承载新的跨域依赖方向——它只是包内导航，跨域规则仍按顶层模块判定；
+- `contract/` 只进"被 ≥2 个域消费"的类型；单域私有类型不得上浮。

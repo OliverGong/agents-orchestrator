@@ -2,6 +2,8 @@
 # every host-specific value goes through a variable (see .env.example), so
 # `docker compose up -d --build` produces the same deployment on any machine.
 #   app          the orchestrator itself (jar built by ../Dockerfile)
+#   console      v3.0 decoupled SPA (Vue 3 + TS, built by ../console/Dockerfile),
+#                nginx-served with /api + /actuator reverse-proxied to app
 #   postgres     control-plane persistence (v2.0: db backend, cp_* tables)
 #   Tempo        receives OTLP traces (HTTP :4318 / gRPC :4317) -> trace search
 #   Prometheus   scrapes the app's /actuator/prometheus endpoint
@@ -17,7 +19,7 @@ services:
       dockerfile: Dockerfile
     # Versioned image name (APP_VERSION, default = the pom version): push it
     # to a registry to deploy the bundle elsewhere without rebuilding.
-    image: orchestrator:${APP_VERSION:-2.2.0}
+    image: orchestrator:${APP_VERSION:-3.0.0}
     environment:
       - SPRING_AI_OLLAMA_BASE_URL=${SPRING_AI_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4317}
@@ -40,6 +42,17 @@ services:
         condition: service_started
       postgres:
         condition: service_healthy
+
+  console:
+    build:
+      context: ../console
+      dockerfile: Dockerfile
+    image: orchestrator-console:${APP_VERSION:-3.0.0}
+    ports:
+      - "${CONSOLE_PORT:-8081}:80"
+    depends_on:
+      app:
+        condition: service_started
 
   postgres:
     image: postgres:16-alpine

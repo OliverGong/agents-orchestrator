@@ -1,0 +1,5 @@
+# Keep the build context minimal: deps are restored by `pnpm install` inside
+# the image, and dist/ is produced by the in-image vite build.
+node_modules/
+dist/
+.gitignore
