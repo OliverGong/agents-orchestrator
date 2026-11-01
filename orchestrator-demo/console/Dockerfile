@@ -9,12 +9,15 @@
 FROM node:22-alpine AS build
 WORKDIR /build
 
+# pnpm is provisioned by corepack, pinned via the packageManager field.
+RUN corepack enable
+
 # Dependency download layer is only invalidated when the lockfile changes.
-COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
 
 COPY . .
-RUN npm run build
+RUN pnpm build
 
 # ---- runtime stage: nginx SPA + API reverse proxy ----
 FROM nginx:1.27-alpine AS runtime

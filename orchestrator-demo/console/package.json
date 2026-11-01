@@ -3,6 +3,7 @@
   "private": true,
   "version": "3.0.0",
   "type": "module",
+  "packageManager": "pnpm@12.16.1",
   "description": "Orchestrator multi-agent console — Vue 3 + TypeScript SPA, decoupled from the Spring Boot static resources (v3.0 M2).",
   "scripts": {
     "dev": "vite",
