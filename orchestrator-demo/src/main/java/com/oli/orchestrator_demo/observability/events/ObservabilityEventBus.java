@@ -11,7 +11,7 @@
  * @Date Oct 31, 2026
  * @Version 2.1
  */
-package com.oli.orchestrator_demo.observability;
+package com.oli.orchestrator_demo.observability.events;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;

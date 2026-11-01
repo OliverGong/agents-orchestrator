@@ -19,7 +19,7 @@ import java.util.List;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.control.AgentDescriptor;
+import com.oli.orchestrator_demo.contract.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;

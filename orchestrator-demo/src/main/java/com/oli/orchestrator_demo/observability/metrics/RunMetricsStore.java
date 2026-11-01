@@ -16,7 +16,7 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.observability;
+package com.oli.orchestrator_demo.observability.metrics;
 
 import java.time.Instant;
 import java.util.List;

@@ -13,8 +13,8 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.observability.web;
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
-import com.oli.orchestrator_demo.observability.ObservabilitySsePublisher;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.events.ObservabilitySsePublisher;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;

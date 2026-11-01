@@ -14,6 +14,7 @@
  * @Version 1.1
  */
 package com.oli.orchestrator_demo.control;
+import com.oli.orchestrator_demo.contract.AgentDescriptor;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;

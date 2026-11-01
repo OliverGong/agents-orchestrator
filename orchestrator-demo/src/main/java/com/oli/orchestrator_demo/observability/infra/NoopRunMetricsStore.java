@@ -11,7 +11,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.observability.infra;
-import com.oli.orchestrator_demo.observability.RunMetricsStore;
+import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore;
 
 import java.time.Instant;
 import java.util.List;

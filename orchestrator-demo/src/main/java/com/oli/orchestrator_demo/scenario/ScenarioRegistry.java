@@ -17,7 +17,7 @@
  * @Version 2.1
  */
 package com.oli.orchestrator_demo.scenario;
-import com.oli.orchestrator_demo.agent.Agent;
+import com.oli.orchestrator_demo.contract.Agent;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.workflow.StageSpec;
 

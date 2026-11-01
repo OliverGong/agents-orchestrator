@@ -14,7 +14,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.observability.web;
-import com.oli.orchestrator_demo.observability.RunMetricsStore;
+import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.oli.orchestrator_demo.observability.RunMetricsStore.StageMetricsSummary;
+import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore.StageMetricsSummary;
 
 @RestController
 public class ScenarioMetricsController {

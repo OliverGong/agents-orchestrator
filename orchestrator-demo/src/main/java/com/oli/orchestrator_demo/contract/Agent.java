@@ -9,7 +9,7 @@
  * @Date Oct 29, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.agent;
+package com.oli.orchestrator_demo.contract;
 import com.oli.orchestrator_demo.contract.OrchestratorContext;
 
 public interface Agent<I, O> {

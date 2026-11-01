@@ -26,6 +26,10 @@
  * @Version 1.1
  */
 package com.oli.orchestrator_demo.agent;
+import com.oli.orchestrator_demo.contract.Agent;
+import com.oli.orchestrator_demo.agent.advisor.UsageCaptureAdvisor;
+import com.oli.orchestrator_demo.agent.advisor.CalibrationAdvisor;
+import com.oli.orchestrator_demo.agent.advisor.ResponseSanitizerAdvisor;
 import com.oli.orchestrator_demo.shared.aop.AgentExecutionAspect;
 
 import java.util.List;
@@ -39,15 +43,15 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 
-import com.oli.orchestrator_demo.control.AgentDescriptor;
+import com.oli.orchestrator_demo.contract.AgentDescriptor;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
 import com.oli.orchestrator_demo.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.contract.OrchestratorContext;
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
-import com.oli.orchestrator_demo.observability.LmUsageCollector;
-import com.oli.orchestrator_demo.observability.ObservabilityEventBus;
-import com.oli.orchestrator_demo.observability.RunContext;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.metrics.LmUsageCollector;
+import com.oli.orchestrator_demo.observability.events.ObservabilityEventBus;
+import com.oli.orchestrator_demo.shared.context.RunContext;
 import tools.jackson.core.JacksonException;
 
 public abstract class AbstractContextAgent<R> implements Agent<OrchestratorContext, OrchestratorContext> {

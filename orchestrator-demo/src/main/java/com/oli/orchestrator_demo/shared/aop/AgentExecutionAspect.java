@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.agent.Agent;
+import com.oli.orchestrator_demo.contract.Agent;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -48,7 +48,7 @@ public class AgentExecutionAspect {
     this.meterRegistry = meterRegistry;
   }
 
-  @Around("execution(* com.oli.orchestrator_demo.agent.Agent+.execute(..))")
+  @Around("execution(* com.oli.orchestrator_demo.contract.Agent+.execute(..))")
   public Object measureExecutionTime(ProceedingJoinPoint joinPoint) throws Throwable {
     Agent<?, ?> agent = (Agent<?, ?>) joinPoint.getTarget();
     String name = agent.name();

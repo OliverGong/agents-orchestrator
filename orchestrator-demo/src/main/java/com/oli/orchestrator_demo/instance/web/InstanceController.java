@@ -31,8 +31,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.oli.orchestrator_demo.observability.ObservabilityActor;
-import com.oli.orchestrator_demo.observability.RunMetricsStore;
+import com.oli.orchestrator_demo.observability.events.ObservabilityActor;
+import com.oli.orchestrator_demo.observability.metrics.RunMetricsStore;
 import com.oli.orchestrator_demo.observability.web.RunObservabilityController;
 import com.oli.orchestrator_demo.teamlog.TeamLogEntry;
 import com.oli.orchestrator_demo.teamlog.TeamLogStore;

@@ -13,7 +13,7 @@
  * @Date Oct 29, 2026
  * @Version 2.3
  */
-package com.oli.orchestrator_demo.observability;
+package com.oli.orchestrator_demo.observability.events;
 
 import java.time.Instant;
 import java.util.ArrayList;

@@ -17,6 +17,7 @@
  * @Version 2.0
  */
 package com.oli.orchestrator_demo.control;
+import com.oli.orchestrator_demo.contract.AgentDescriptor;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -30,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.agent.AgentModelProperties;
+import com.oli.orchestrator_demo.agent.config.AgentModelProperties;
 import com.oli.orchestrator_demo.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.workflow.StageSpec;

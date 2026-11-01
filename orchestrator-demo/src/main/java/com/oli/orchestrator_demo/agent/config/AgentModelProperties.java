@@ -14,7 +14,7 @@
  * @Date Oct 29, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.agent;
+package com.oli.orchestrator_demo.agent.config;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

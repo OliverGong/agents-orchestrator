@@ -12,7 +12,6 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.teamlog;
-import com.oli.orchestrator_demo.observability.ObservabilityActor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

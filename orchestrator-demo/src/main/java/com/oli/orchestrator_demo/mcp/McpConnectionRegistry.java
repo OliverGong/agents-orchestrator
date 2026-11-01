@@ -50,7 +50,7 @@ import com.oli.orchestrator_demo.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.control.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.control.ControlPlaneState;
 import com.oli.orchestrator_demo.control.McpServerConfig;
-import com.oli.orchestrator_demo.observability.ObservabilityActor;
+import com.oli.orchestrator_demo.observability.events.ObservabilityActor;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.modelcontextprotocol.client.McpClient;

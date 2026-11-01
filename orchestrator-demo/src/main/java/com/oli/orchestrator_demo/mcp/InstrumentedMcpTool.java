@@ -28,9 +28,9 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.definition.DefaultToolDefinition;
 
 import com.oli.orchestrator_demo.control.McpServerConfig;
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
-import com.oli.orchestrator_demo.observability.ObservabilityActor;
-import com.oli.orchestrator_demo.observability.RunContext;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.events.ObservabilityActor;
+import com.oli.orchestrator_demo.shared.context.RunContext;
 
 class InstrumentedMcpTool implements ToolCallback {
 

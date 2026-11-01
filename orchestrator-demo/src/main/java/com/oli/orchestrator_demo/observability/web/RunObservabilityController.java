@@ -12,9 +12,9 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.observability.web;
-import com.oli.orchestrator_demo.observability.AgentObservabilityEvent;
-import com.oli.orchestrator_demo.observability.ObservabilityActor;
-import com.oli.orchestrator_demo.observability.RunTimeline;
+import com.oli.orchestrator_demo.observability.events.AgentObservabilityEvent;
+import com.oli.orchestrator_demo.observability.events.ObservabilityActor;
+import com.oli.orchestrator_demo.observability.events.RunTimeline;
 
 import java.time.Duration;
 import java.time.Instant;

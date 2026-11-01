@@ -14,7 +14,7 @@ package com.oli.orchestrator_demo.control;
 import java.util.List;
 import java.util.Map;
 
-import com.oli.orchestrator_demo.agent.AgentModelProperties;
+import com.oli.orchestrator_demo.agent.config.AgentModelProperties;
 
 public final class AgentDefaults {
 

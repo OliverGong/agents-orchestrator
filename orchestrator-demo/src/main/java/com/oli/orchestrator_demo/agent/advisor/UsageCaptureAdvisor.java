@@ -18,7 +18,7 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.agent;
+package com.oli.orchestrator_demo.agent.advisor;
 
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
@@ -28,7 +28,7 @@ import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.core.Ordered;
 
-import com.oli.orchestrator_demo.observability.LmUsageCollector;
+import com.oli.orchestrator_demo.observability.metrics.LmUsageCollector;
 
 public class UsageCaptureAdvisor implements CallAdvisor {
 
