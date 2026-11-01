@@ -23,6 +23,7 @@ document.querySelectorAll('.nav-item').forEach((btn) => btn.addEventListener('cl
   if (btn.dataset.page === 'dryrun') loadScenarioSelects();
   if (btn.dataset.page === 'scenarios') refreshScenarios();
   if (btn.dataset.page === 'agents' || btn.dataset.page === 'workflow' || btn.dataset.page === 'mcp') refreshControl();
+  if (btn.dataset.page === 'meta') refreshMeta();
   if (btn.dataset.page === 'runs') refreshRuns();
   if (btn.dataset.page === 'metrics') refreshObservability();
 }));
@@ -1156,6 +1157,146 @@ async function saveScenarioEditor() {
     msg.textContent = '保存失败: ' + e.message; msg.className = 'hint';
   }
 }
+
+/* ---------------- meta maintenance page (元信息补录) ---------------- */
+/* Runtime-team metadata outside the control plane: global runtime knobs,
+   the release-portal registry and per-scenario release config. The v2.2 M4
+   release pipeline resolves a scenario's publish against portals/releases. */
+let metaState = null;
+
+function showMetaVersion() {
+  $('#meta-version').textContent = `version ${metaState.version}`;
+  $('#meta-updated').textContent = metaState.updatedAt ? `更新于 ${fmtDateTime(metaState.updatedAt)}` : '';
+}
+
+$('#meta-refresh').addEventListener('click', refreshMeta);
+
+async function refreshMeta() {
+  try { metaState = await getJson('/api/v1/meta'); } catch { metaState = null; }
+  if (!metaState) return;
+  showMetaVersion();
+  const rt = metaState.runtime || {};
+  $('#mr-backend').value = rt.modelBackend ?? '';
+  $('#mr-timeout').value = rt.requestTimeoutSeconds ?? '';
+  $('#mr-concurrency').value = rt.maxWaveConcurrency ?? '';
+  $('#mr-temperature').value = rt.temperature ?? '';
+  $('#mr-topp').value = rt.topP ?? '';
+
+  const pbody = $('#portal-table tbody');
+  pbody.innerHTML = (metaState.portals || []).map((p) => `
+    <tr>
+      <td class="mono">${esc(p.id)}</td>
+      <td>${esc(p.name)}</td>
+      <td><span class="badge">${esc(p.kind)}</span></td>
+      <td class="mono">${esc(p.endpoint || '—')}</td>
+      <td><span class="badge ${p.enabled ? 'badge-ok' : 'badge-failed'}">${p.enabled ? '启用' : '停用'}</span></td>
+      <td><button class="mini-btn portal-del" data-id="${esc(p.id)}" type="button">删除</button></td>
+    </tr>`).join('') || '<tr><td colspan="6" class="hint">尚未注册发布门户。</td></tr>';
+  pbody.querySelectorAll('.portal-del').forEach((btn) =>
+    btn.addEventListener('click', async () => {
+      if (!confirm(`删除门户 ${btn.dataset.id}？`)) return;
+      try {
+        metaState = await delJson(`/api/v1/meta/portals/${encodeURIComponent(btn.dataset.id)}`);
+        refreshMeta();
+      } catch (e) { alert('删除失败: ' + e.message); }
+    }));
+
+  const rbody = $('#release-table tbody');
+  rbody.innerHTML = (metaState.releases || []).map((r) => {
+    const portal = (metaState.portals || []).find((p) => p.id === r.portalId);
+    const scn = scenarioCache.find((s) => s.id === r.scenarioId);
+    return `
+    <tr>
+      <td class="mono">${esc(scn ? scn.name : r.scenarioId)}</td>
+      <td>${esc(portal ? `${portal.name}（${portal.id}）` : r.portalId || '—')}</td>
+      <td class="mono">${esc(r.version || '—')}</td>
+      <td><span class="badge">${esc(r.artifactType || '—')}</span></td>
+      <td>${esc(r.changelog || '—')}</td>
+      <td><button class="mini-btn release-del" data-id="${esc(r.scenarioId)}" type="button">删除</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="hint">尚无场景发布配置。</td></tr>';
+  rbody.querySelectorAll('.release-del').forEach((btn) =>
+    btn.addEventListener('click', async () => {
+      if (!confirm(`删除场景 ${btn.dataset.id} 的发布配置？`)) return;
+      try {
+        metaState = await delJson(`/api/v1/meta/releases/${encodeURIComponent(btn.dataset.id)}`);
+        refreshMeta();
+      } catch (e) { alert('删除失败: ' + e.message); }
+    }));
+
+  // Release form selects: scenarios (reusing the shared cache) + enabled portals.
+  if (!scenarioCache.length) {
+    try { scenarioCache = (await getJson('/api/v1/scenarios')).scenarios || []; } catch { scenarioCache = []; }
+  }
+  $('#mrl-scenario').innerHTML = scenarioCache.map((s) =>
+    `<option value="${esc(s.id)}">${esc(s.name)}（${esc(s.id)}）</option>`).join('');
+  $('#mrl-portal').innerHTML = (metaState.portals || []).filter((p) => p.enabled).map((p) =>
+    `<option value="${esc(p.id)}">${esc(p.name)}（${esc(p.id)}）</option>`).join('');
+}
+
+$('#meta-runtime-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const msg = $('#meta-runtime-msg');
+  msg.textContent = '保存中…';
+  // Blank inputs stay null = inherit the agent / backend defaults.
+  const num = (sel) => { const v = $(sel).value.trim(); return v === '' ? null : Number(v); };
+  try {
+    metaState = await putJson('/api/v1/meta/runtime', {
+      modelBackend: $('#mr-backend').value.trim() || null,
+      requestTimeoutSeconds: num('#mr-timeout'),
+      maxWaveConcurrency: num('#mr-concurrency'),
+      temperature: num('#mr-temperature'),
+      topP: num('#mr-topp'),
+    });
+    msg.textContent = '已保存'; msg.className = 'hint ok';
+    showMetaVersion();
+  } catch (e) {
+    msg.textContent = '保存失败: ' + e.message; msg.className = 'hint';
+  }
+});
+
+$('#meta-portal-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const msg = $('#meta-portal-msg');
+  msg.textContent = '保存中…';
+  try {
+    metaState = await postJson('/api/v1/meta/portals', {
+      id: $('#mp-id').value.trim(),
+      name: $('#mp-name').value.trim() || $('#mp-id').value.trim(),
+      kind: $('#mp-kind').value,
+      endpoint: $('#mp-endpoint').value.trim(),
+      enabled: $('#mp-enabled').checked,
+    });
+    msg.textContent = '已保存'; msg.className = 'hint ok';
+    $('#mp-id').value = ''; $('#mp-name').value = ''; $('#mp-endpoint').value = '';
+    refreshMeta();
+  } catch (e) {
+    msg.textContent = '保存失败: ' + e.message; msg.className = 'hint';
+  }
+});
+
+$('#meta-release-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const msg = $('#meta-release-msg');
+  const scenarioId = $('#mrl-scenario').value;
+  if (!scenarioId) {
+    msg.textContent = '尚无场景，请先在「场景配置」创建'; msg.className = 'hint';
+    return;
+  }
+  msg.textContent = '保存中…';
+  try {
+    metaState = await putJson(`/api/v1/meta/releases/${encodeURIComponent(scenarioId)}`, {
+      portalId: $('#mrl-portal').value || null,
+      version: $('#mrl-version').value.trim(),
+      changelog: $('#mrl-changelog').value.trim(),
+      artifactType: $('#mrl-artifact').value,
+    });
+    msg.textContent = '已保存'; msg.className = 'hint ok';
+    refreshMeta();
+  } catch (e) {
+    msg.textContent = '保存失败: ' + e.message; msg.className = 'hint';
+  }
+});
 
 /* ---------------- dry-run page ---------------- */
 $('#dryrun-btn').addEventListener('click', async () => {

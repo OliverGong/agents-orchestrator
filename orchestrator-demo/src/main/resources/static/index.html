@@ -22,6 +22,7 @@
       <button class="nav-item" data-page="agents">Agent 配置</button>
       <button class="nav-item" data-page="workflow">工作流编排</button>
       <button class="nav-item" data-page="mcp">MCP 服务器</button>
+      <button class="nav-item" data-page="meta">元信息补录</button>
       <div class="nav-group">可观测</div>
       <button class="nav-item" data-page="runs">运行回放</button>
       <button class="nav-item" data-page="metrics">系统观测</button>
@@ -161,6 +162,104 @@
       </div>
     </section>
 
+    <!-- ============ 页面: 元信息补录（元数据） ============ -->
+    <section id="page-meta" class="page-panel">
+      <div class="card">
+        <h2>元信息补录
+          <span id="meta-version" class="badge badge-ok">version —</span>
+          <span id="meta-updated" class="hint"></span>
+          <button id="meta-refresh" class="mini-btn" type="button">刷新</button></h2>
+        <p class="hint">控制层面之外的元信息维护：运行时团队维护的全局<b>运行时配置</b>（留空 = 继承各 Agent / 后端默认值）、
+            <b>发布门户</b>注册表与每个场景的<b>发布配置</b>。发布时由发布管道（v2.2 M4）按门户整合场景产物并发布到对应门户。</p>
+      </div>
+
+      <div class="card">
+        <h2>运行时配置（运行时团队维护）</h2>
+        <p class="hint">全局运行时补录：默认模型后端、请求超时、波次并发上限与采样默认值。所有字段均可留空 = 继承既有默认。</p>
+        <form id="meta-runtime-form">
+          <div class="row">
+            <label>默认模型后端<input id="mr-backend" type="text" placeholder="如 qwen3:8b（空 = 后端默认）"></label>
+            <label>请求超时 (秒)<input id="mr-timeout" type="number" min="1" placeholder="空 = 默认"></label>
+          </div>
+          <div class="row">
+            <label>最大波次并发<input id="mr-concurrency" type="number" min="1" placeholder="空 = 默认"></label>
+            <label>采样温度 temperature<input id="mr-temperature" type="number" min="0" max="2" step="0.05" placeholder="空 = 默认"></label>
+            <label>top-P<input id="mr-topp" type="number" min="0" max="1" step="0.05" placeholder="空 = 默认"></label>
+          </div>
+          <button class="accent-btn" type="submit">保存运行时配置</button>
+          <span id="meta-runtime-msg" class="hint"></span>
+        </form>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h2>发布门户</h2>
+          <p class="hint">发布目标注册表：同 ID 保存即覆盖；停用的门户不可作为发布目标。</p>
+          <table class="data-table" id="portal-table">
+            <thead><tr>
+              <th>ID</th><th>名称</th><th>类型</th><th>端点</th><th>启用</th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+          <h3>新增 / 更新门户</h3>
+          <form id="meta-portal-form">
+            <div class="row">
+              <label>ID（slug）<input id="mp-id" required placeholder="如 team-portal"></label>
+              <label>名称<input id="mp-name" placeholder="团队门户"></label>
+            </div>
+            <div class="row">
+              <label>类型
+                <select id="mp-kind">
+                  <option>WEB_PORTAL</option>
+                  <option>STATIC_SITE</option>
+                  <option>DOWNLOAD</option>
+                  <option>CUSTOM</option>
+                </select></label>
+              <label>端点 URL<input id="mp-endpoint" placeholder="https://portal.example.com/api/publish"></label>
+            </div>
+            <label class="inline-check"><input id="mp-enabled" type="checkbox" checked> 启用该门户</label>
+            <div>
+              <button class="accent-btn" type="submit">保存门户</button>
+              <span id="meta-portal-msg" class="hint"></span>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>场景发布配置</h2>
+          <p class="hint">发布阶段的按场景补录：目标门户、版本号、变更说明与产物类型；每场景一条，同场景保存即覆盖。</p>
+          <table class="data-table" id="release-table">
+            <thead><tr>
+              <th>场景</th><th>目标门户</th><th>版本</th><th>产物</th><th>变更说明</th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+          <h3>新增 / 更新场景发布配置</h3>
+          <form id="meta-release-form">
+            <div class="row">
+              <label>场景<select id="mrl-scenario"></select></label>
+              <label>目标门户<select id="mrl-portal"></select></label>
+            </div>
+            <div class="row">
+              <label>版本<input id="mrl-version" placeholder="如 v1.2.0"></label>
+              <label>产物类型
+                <select id="mrl-artifact">
+                  <option>HTML</option>
+                  <option>SPRING_BOOT_PROJECT</option>
+                  <option>JAR</option>
+                  <option>AUDIO</option>
+                </select></label>
+            </div>
+            <label>变更说明（changelog）<textarea id="mrl-changelog" rows="2"></textarea></label>
+            <div>
+              <button class="accent-btn" type="submit">保存发布配置</button>
+              <span id="meta-release-msg" class="hint"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
     <!-- ============ 页面: 运行回放（可观测） ============ -->
     <section id="page-runs" class="page-panel">
       <div class="card">
@@ -216,6 +315,6 @@
   </div>
 </div>
 
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>
