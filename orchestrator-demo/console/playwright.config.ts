@@ -3,8 +3,8 @@ import { defineConfig } from '@playwright/test'
 /**
  * Console E2E suite. The Vite dev server is started automatically; every
  * backend call (/api/**, /actuator/**, SSE) is intercepted at the network
- * level by e2e/mocks.ts, so the functional closed loop runs deterministically
- * without a Spring Boot process or a real model behind it.
+ * level by e2e/support/mocks.ts, so the functional closed loop runs
+ * deterministically without a Spring Boot process or a real model behind it.
  */
 export default defineConfig({
   testDir: './e2e',

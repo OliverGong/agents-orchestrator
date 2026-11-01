@@ -3,7 +3,7 @@
  * folds them into the stage list and the final context JSON.
  */
 import { expect, test } from '@playwright/test'
-import { installBackendMocks } from './mocks'
+import { installBackendMocks } from '../support/mocks'
 
 test.beforeEach(async ({ page }) => {
   await installBackendMocks(page)

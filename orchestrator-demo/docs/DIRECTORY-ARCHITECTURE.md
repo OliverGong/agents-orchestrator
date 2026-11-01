@@ -111,6 +111,27 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 | `src/shared/` | http/sse 客户端、契约 DTO、通用组件、全局样式（`styles/base.css`）、工具 | ≈ `kernel/contract/` + `kernel/shared/` |
 | `src/features/<域>/<模块>/` | 页面特性：顶层三组（scenario / metadata / observability）≈ zone，组内子目录 ≈ 后端模块（`scenario/{run→trip, dryrun·scenarios→scenario}`、`metadata/{agents→control, workflow→workflow, mcp→mcp, meta→meta}`、`observability/{runs·logs·metrics→observability, instances→instance}`） | ≈ 后端 zone（core/governance/ops）内模块 |
 
+**条目数法则（前端与后端同一把尺）**：每个目录的可见条目（文件 + 子目录）
+保持 **2~5 个**，超限先问"是否该按逻辑角色分组"再动手：
+
+- `src/`（3 分区 + env.d.ts）、`shared/`（5 子包）、`features/`（3 组）——全部达标；
+- 单文件模块目录（如 `metadata/agents/AgentsView.vue`）保留——目录名即模块名，
+  与后端"包根"同构，新增组合文件时再分层，不为拆而拆；
+- `e2e/` 布局同构：根只留跨组 spec（`console-navigation`、`observability`）与
+  两个子目录——`support/mocks.ts`（测试基建 ≈ 后端 test fixture）、
+  `scenario/`（场景组 3 个 spec，镜像 `features/scenario/`）；某组 spec ≥2 且
+  根目录条目超限时按 features 组继续分包。
+
+**工程根（console/）按 5 类阅读**（构建工具要求入口文件留在根，类别即分组）：
+
+| 类别 | 条目 |
+|---|---|
+| 装配入口 | `index.html`（Vite 挂载点） |
+| 构建与工具配置 | `vite.config.ts`、`tsconfig.json`、`playwright.config.ts`、`package.json`、`pnpm-lock.yaml` |
+| 部署 | `Dockerfile`、`nginx.conf`、`.dockerignore` |
+| 源码 | `src/`、`e2e/` |
+| 本地生成（gitignore） | `dist/`、`node_modules/`、`test-results/` |
+
 > 样式等横切资产归 `shared/`（与后端 `kernel/shared` 同构），`app/` 只留装配——
 > 判断依据与后端一致：这段资产的本质职责服务于谁？所有页面 → `shared/`；仅装配用 → `app/`。
 
@@ -166,5 +187,5 @@ observability → events/metrics/health，contract → spi/model/config/port 四
 - 全量 **214 个测试离线全绿**（含 5 条架构守护规则），重组与子包化前后行为等价；
 - 顶层 4 zone × 2~5 模块，§1 的"13 个包扫不完"问题消除；contract 21 个契约类型
   按角色归组 4 个导航子包（spi 2 / model 8 / config 5 / port 6），单文件目录不再铺开；
-- 前端 16 个 Playwright E2E spec 不受影响（契约经 `types/api.ts` 镜像，未触碰）；
+- 前端 17 个 Playwright E2E spec 不受影响（契约经 `types/api.ts` 镜像，未触碰）；
   `pnpm build`（vue-tsc strict + vite）与 E2E 全绿。

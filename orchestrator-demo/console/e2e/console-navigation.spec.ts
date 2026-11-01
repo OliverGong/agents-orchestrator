@@ -3,7 +3,7 @@
  * domain data — the functional closed loop without a live backend.
  */
 import { expect, test } from '@playwright/test'
-import { installBackendMocks } from './mocks'
+import { installBackendMocks } from './support/mocks'
 
 test.beforeEach(async ({ page }) => {
   await installBackendMocks(page)

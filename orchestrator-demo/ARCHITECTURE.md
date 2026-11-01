@@ -1319,9 +1319,9 @@ v3.0 采用 **package-by-feature**（按业务域分包）+ **模块内三层**�
 ### 15.5 Playwright 功能闭环（console/e2e/）
 
 控制台的**功能性测试闭环**：`pnpm test:e2e` 在网络层拦截全部后端流量，
-无需 Spring Boot 进程与真实模型，16 个 spec 约 8s 跑完（见 `console/e2e/`）。
+无需 Spring Boot 进程与真实模型，17 个 spec 约 10s 跑完（见 `console/e2e/`）。
 
-- **确定性后端**：`e2e/mocks.ts` 以单一 `page.route('**/*')` 处理器拦截——非 `/api`、
+- **确定性后端**：`e2e/support/mocks.ts` 以单一 `page.route('**/*')` 处理器拦截——非 `/api`、
   `/actuator` 路径放行（SPA 资源），SSE 路径整段 `text/event-stream` 回放，
   其余按 URL 匹配回 fixtures（日志接口还按 query 参数过滤）——响应形状镜像
   `types/api.ts` 契约，后端契约变更会在 mock 处直接暴露。
@@ -1329,7 +1329,12 @@ v3.0 采用 **package-by-feature**（按业务域分包）+ **模块内三层**�
   （CI 外复用已运行实例），失败用例保留 trace 可回放。
 - **覆盖面**：11 条路由冒烟 + SSE 黑板折叠（run_started → stage_completed →
   run_completed）+ 场景推演闭环（选场景 → 推演 → 波次/槽位流断言）+
+  **生命周期闭环**（激活场景 → 规划运行 → 回放跳转，网络级断言 activate 请求）+
   回放/实例详情打开 + 日志级别筛选打到后端 query 参数。
+- **目录布局**（同 3~5 条目法则）：`e2e/` 根只留跨组 spec（路由冒烟、observability）
+  与两个子目录——`support/`（测试基建：mocks.ts 确定性后端）、
+  `scenario/`（场景组 3 个 spec，与 `features/scenario/` 同构）；某组 spec 累积 ≥2
+  且根目录条目超限时，按 features 组继续分包。
 - **实操经验**（写新用例前先读）：
   - 断言**稳定标记**而非瞬态——mock 的 SSE 流播完即关闭，EventSource 立即转入
     重连，连接状态标签在"已连接/重连中"间振荡；应断言 run banner、stage 行等

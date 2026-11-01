@@ -3,7 +3,7 @@
  * final context), instance registry, and the team log with level filtering.
  */
 import { expect, test } from '@playwright/test'
-import { installBackendMocks } from './mocks'
+import { installBackendMocks } from './support/mocks'
 
 test.beforeEach(async ({ page }) => {
   await installBackendMocks(page)

@@ -3,7 +3,7 @@
  * (validation verdict, dependency DAG, wave expansion, slot flows).
  */
 import { expect, test } from '@playwright/test'
-import { installBackendMocks } from './mocks'
+import { installBackendMocks } from '../support/mocks'
 
 test.beforeEach(async ({ page }) => {
   await installBackendMocks(page)
