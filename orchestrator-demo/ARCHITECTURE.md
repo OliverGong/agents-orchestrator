@@ -149,10 +149,10 @@ orchestrator-demo/console                 # Vue 3 + TypeScript SPA（pnpm 工作
 │   ├── components/DagDiagram · SwimlaneChart · JsonDetails
 │   ├── styles/base.css                   # 全局样式（横切资产，与后端 kernel/shared 同构归位）
 │   └── utils/format.ts
-├── src/features/                         # 领域特性（1:1 对应侧栏分组与后端模块）
-│   ├── scenario/                         # RunView · DryRunView · ScenariosView
-│   ├── metadata/                         # AgentsView · WorkflowView · McpView · MetaView
-│   └── observability/                    # InstancesView · RunsView · LogsView · MetricsView
+├── src/features/                         # 领域特性（顶层 = 侧栏分组 ≈ zone，组内子目录 ≈ 后端模块）
+│   ├── scenario/                         # run/（trip）· dryrun/ · scenarios/（scenario）
+│   ├── metadata/                         # agents/（control）· workflow/（workflow）· mcp/（mcp）· meta/（meta）
+│   └── observability/                    # runs/ · logs/ · metrics/（observability）· instances/（instance）
 ├── e2e/                                  # Playwright 功能闭环（mock 后端，见 §15.5）
 ├── nginx.conf                            # SPA fallback + /api、/actuator 反代（SSE 关缓冲）
 └── Dockerfile                            # node:22-alpine（corepack/pnpm）→ nginx:1.27-alpine
@@ -1314,11 +1314,12 @@ v3.0 采用 **package-by-feature**（按业务域分包）+ **模块内三层**�
 | --- | --- | --- |
 | `src/app/` | 应用装配：main.ts（naive-ui 全局注册）、App.vue 壳、router、跨 feature 全局 store | 装配 ≈ `*StoreConfig` |
 | `src/shared/` | 复用资产：类型化 `http`/`sse` 客户端、契约 DTO（`types/api.ts` 镜像后端 record，单一事实源）、通用组件（DagDiagram/SwimlaneChart/JsonDetails）、全局样式（`styles/base.css`）、格式化工具 | ≈ `kernel/contract/` + `kernel/shared/` |
-| `src/features/<域>/` | 页面级特性（scenario / metadata / observability），1:1 对应侧栏分组与后端 zone 模块 | ≈ 后端 zone（core / governance / ops）内模块 |
+| `src/features/<域>/` | 页面级特性（scenario / metadata / observability 三组），顶层对应侧栏分组 ≈ 后端 zone，组内子目录按后端模块再分层（如 `metadata/agents/` ≈ `governance.control`、`observability/instances/` ≈ `ops.instance`） | ≈ 后端 zone（core / governance / ops）内模块 |
 
 - **`@` 路径别名**（vite `resolve.alias` + tsconfig `paths`）：所有跨目录 import 走
   `@/features/...`、`@/shared/...`，杜绝 `../../..` 深层相对路径；目录移动时只需改别名映射。
-- **新增页面的落位规则**：新页面进对应 feature 目录 + router 注册一行；若与现有
+- **新增页面的落位规则**：新页面进对应 feature 组 + 按后端模块选子目录（无对应模块
+  则先问"这是不是新领域模块"，是则前后端同步开）+ router 注册一行；若与现有
   侧栏分组都无关，先问"这是不是新领域域"，是则开新 feature 目录（前后端同步开）。
 - **契约变更路径**：后端 record → `types/api.ts` → 视图层，单一方向，无手写散落类型。
 

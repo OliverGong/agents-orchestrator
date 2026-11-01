@@ -109,7 +109,7 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 |---|---|---|
 | `src/app/` | 装配：main.ts、App.vue 壳、router、全局 store | 装配 ≈ `*StoreConfig` |
 | `src/shared/` | http/sse 客户端、契约 DTO、通用组件、全局样式（`styles/base.css`）、工具 | ≈ `kernel/contract/` + `kernel/shared/` |
-| `src/features/<域>/` | 页面特性（scenario / metadata / observability 三组） | ≈ 后端 zone（core/governance/ops）内模块 |
+| `src/features/<域>/<模块>/` | 页面特性：顶层三组（scenario / metadata / observability）≈ zone，组内子目录 ≈ 后端模块（`scenario/{run→trip, dryrun·scenarios→scenario}`、`metadata/{agents→control, workflow→workflow, mcp→mcp, meta→meta}`、`observability/{runs·logs·metrics→observability, instances→instance}`） | ≈ 后端 zone（core/governance/ops）内模块 |
 
 > 样式等横切资产归 `shared/`（与后端 `kernel/shared` 同构），`app/` 只留装配——
 > 判断依据与后端一致：这段资产的本质职责服务于谁？所有页面 → `shared/`；仅装配用 → `app/`。
