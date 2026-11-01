@@ -22,9 +22,9 @@
 | v2.1 | `90f76a8` + console | **场景元模型（Scenario Plane）**：场景 = 请求模板 + 工作流覆盖 + Agent 覆盖 + MCP 映射 + 产物类型，`ScenarioRegistry` 单写者 + `ScenarioStore` 接缝（file / `cp_scenario*` 表，跟随同一 store 开关）；`activate` 将覆盖热应用到控制平面（动态实例化）；`dry-run` 零 token 推演（模板校验 + 波次展开 + 黑板槽位流）；**解析重试事件链**：`STAGE_RETRIED` 经 RunContext 归因进时间线 / SSE / 回放；**控制台 v2.1**：左侧三组导航（场景运行·推演·配置 / agents·workflow·MCP / 回放·观测）+ 运行回放时间线 / DAG / 泳道三视图（原生 SVG）+ retry 链可视化 |
 | v2.2 | `b4b7121` → `050e587` | **观测落库 + LM 指标**（M1）：`ObservabilityActor` WAL 顺序先落库再推送，`obs_run_metrics` 记录每场景每阶段的 LM 耗时 / prompt·completion·total tokens / 模型 / 重试（`UsageCaptureAdvisor` 采集），场景维度指标 API；**元信息补录**（M2）：`meta/` 平面——运行时配置（modelBackend / 超时 / 波次并发 / temperature / topP）、发布门户注册表、按场景发布配置（file / `mp_*` 表），左侧「元信息补录」页三卡；**团队日志**（M3）：`team_log` 持久化运行时日志（RUN / AUDIT / SYSTEM，不限于业务日志）+ 控制面/元数据/场景面 14 个变更端点全量审计 + Log Explorer 筛选页；**发布管道**（M4）：可移植 JSON 发布包（场景快照 + dry-run 证据 + 门户/版本元数据，SHA-256）追加到 `rl_release` 注册表，发布记录随时导出；**导航-画布联动**（M5）：全局上下文条 + 生命周期闭合链 推演→激活·运行→回放→场景指标，激活场景持久化（`activeScenarioId`），运行/回放携带场景归因 |
 | v2.3 | `6a14f2f` → `f8bcc76` | **业务触发层 + 实例注册表**（M1/M2）：每次业务触发（`POST /api/trips/plan`，可携带调用方 `businessId`）在请求进入时实例化一条 RUNNING 记录（唯一 runId + businessId），终态由 `ObservabilityActor` WAL 写入 `instance/` 注册表（JSONL / `obs_run_instance` 表，跟随 store 开关）；`GET /api/v1/instances` 按 businessId / 场景 / 状态 / 关键字 / 时间窗检索，`GET /api/v1/instances/{runId}` 聚合完整上下文（注册表行 + 可回放时间线 + 每阶段多 Agent/多模型 LM 明细 + 关联团队日志）；**控制台闭环**（M3）：左侧「可观测」新增「实例追踪」页（数据溯源入口），运行表单支持业务 ID，日志页 runId/场景可点击互链，实例 ↔ 回放 ↔ 日志 ↔ 指标双向跳转 |
-| v3.0（开发中） | `b132679` → | **控制器归位**（M1）：controllers 迁入各自领域包 `trip/` `observability/` `instance/`，`api/` 仅留横切（异常映射 + 缓存策略）；**前端解耦**（M2）：`console/` 独立 TypeScript 控制台工程（Vue 3 + Vite + Pinia + Vue Router + Naive UI，strict 构建链），契约 DTO 单一事实源（`types/api.ts`）、11 页面全量迁移（DAG/泳道 SVG 组件化移植）、legacy 全局变量 → route query 跨页上下文、独立 nginx 容器（compose `console` 服务，SPA fallback + SSE 关缓冲反代）；`static/` legacy 保留为零构建回退并标注弃用（v3.1 移除）；分支/hotfix 策略见 `docs/BRANCHING.md` |
+| v3.0（开发中） | `b132679` → | **控制器归位**（M1）：controllers 迁入各自领域包 `trip/` `observability/` `instance/`，`api/` 仅留横切（异常映射 + 缓存策略）；**前端解耦**（M2）：`console/` 独立 TypeScript 控制台工程（Vue 3 + Vite + Pinia + Vue Router + Naive UI，strict 构建链），契约 DTO 单一事实源（`types/api.ts`）、11 页面全量迁移（DAG/泳道 SVG 组件化移植）、legacy 全局变量 → route query 跨页上下文、独立 nginx 容器（compose `console` 服务，SPA fallback + SSE 关缓冲反代）；`static/` legacy 保留为零构建回退并标注弃用（v3.1 移除）；**目录重组**（M3）：后端重组为「shared 横切内核 + contract 契约 + 领域模块三层（web/ 包根 / infra，端口-适配器）」、前端 feature-based 分区 + `@` 路径别名（MVC 映射与 AOP/SOP/EIP 落位见 ARCHITECTURE §15）；**工具链**（M4）：console 切换 pnpm（corepack 按 `packageManager` 钉版 + Dockerfile store cache mount）+ Playwright E2E 功能闭环（16 spec，网络级 mock 后端 + SSE 回放）；分支/hotfix 策略见 `docs/BRANCHING.md` |
 
-当前测试规模：**209 个用例全绿**（`./mvnw test`，DB 相关用例跑 H2 内存库），覆盖编排、控制平面校验、场景注册表与零 token 推演、MCP 注册表与工具插桩、观测控制器与落库指标、运行实例注册表、元数据平面、团队日志、发布管道、存储后端与加密。
+当前测试规模：**209 个用例全绿**（`./mvnw test`，DB 相关用例跑 H2 内存库），覆盖编排、控制平面校验、场景注册表与零 token 推演、MCP 注册表与工具插桩、观测控制器与落库指标、运行实例注册表、元数据平面、团队日志、发布管道、存储后端与加密；前端另有 **16 个 Playwright E2E**（`cd console && pnpm test:e2e`，网络级 mock 后端 + SSE 回放，无需真实服务），覆盖 11 条路由冒烟与推演 / 运行 / 回放 / 日志筛选功能闭环。
 
 ## 2. 体系架构
 
@@ -165,9 +165,9 @@ docker compose up -d --build
 ./mvnw test                   # 209 个用例（无需真实模型，ChatClient 打桩；DB 用例跑 H2）
 ./mvnw clean package          # 产出 fat jar
 
-cd console && npm install     # v3.0 解耦控制台（Node ≥ 20）
-npm run dev                   # 开发服务器（/api、/actuator 代理到 localhost:8080）
-npm run build                 # vue-tsc 严格类型检查 + vite 产物构建
+cd console && pnpm install    # v3.0 解耦控制台（Node ≥ 20，pnpm 由 corepack 钉版）
+pnpm dev                      # 开发服务器（/api、/actuator 代理到 localhost:8080）
+pnpm build                    # vue-tsc 严格类型检查 + vite 产物构建
 ```
 
 后端切换：`spring.ai.model.chat=openai` + `spring.ai.openai.api-key`；Agent 级模型 / 温度见
@@ -182,9 +182,10 @@ GitHub Actions / GitLab CI：
 | 阶段 | 命令 / 机制 | 说明 |
 | --- | --- | --- |
 | 1. 编译 + 测试 | `./mvnw clean test` | 209 用例，ChatClient 打桩 + H2 内存库，无外部依赖，天然适合 CI |
-| 2. 前端构建（v3.0） | `cd console && npm ci && npm run build` | vue-tsc 严格类型检查 + vite 打包，类型错误即流水线失败 |
+| 2. 前端构建（v3.0） | `cd console && pnpm install --frozen-lockfile && pnpm build` | vue-tsc 严格类型检查 + vite 打包，类型错误即流水线失败 |
+| 2b. 前端 E2E（v3.0） | `cd console && pnpm test:e2e` | Playwright 功能闭环（16 spec，mock 后端 + SSE 回放），无真实服务依赖 |
 | 3. 打包 | `./mvnw clean package` | Spring Boot fat jar |
-| 4. 镜像构建 | `docker build .` + `docker build console/` | 多阶段构建 + 层缓存（pom/package-lock 先行）+ cache mount；无外部 syntax 前端，CI 无需额外拉取 |
+| 4. 镜像构建 | `docker build .` + `docker build console/` | 多阶段构建 + 层缓存（pom/pnpm-lock 先行）+ cache mount；无外部 syntax 前端，CI 无需额外拉取 |
 | 5. 部署 | `docker compose -f docker/docker-compose.yml up -d` | app + console + PostgreSQL + Tempo + Prometheus + Grafana 一键编排，数据卷持久化 |
 | 6. 冒烟验证 | `/actuator/health`、`GET /api/trips/runs`、`GET /api/v1/control/mcp/status`、`POST /api/v1/scenarios/kyoto-classic/dry-run` | 健康、控制平面状态与场景推演即冒烟断言点（db 模式下 `postgres` 容器的 `pg_isready` 先行） |
 
