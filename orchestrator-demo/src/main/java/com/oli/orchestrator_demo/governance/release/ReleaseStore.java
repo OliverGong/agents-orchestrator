@@ -11,6 +11,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.release;
+import com.oli.orchestrator_demo.governance.release.model.ReleaseRecord;
 import com.oli.orchestrator_demo.governance.release.infra.DbReleaseStore;
 import com.oli.orchestrator_demo.governance.release.infra.FileReleaseStore;
 

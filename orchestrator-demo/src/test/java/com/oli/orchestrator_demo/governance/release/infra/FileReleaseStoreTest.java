@@ -9,7 +9,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.release.infra;
-import com.oli.orchestrator_demo.governance.release.ReleaseRecord;
+import com.oli.orchestrator_demo.governance.release.model.ReleaseRecord;
 import com.oli.orchestrator_demo.governance.release.ReleaseStore;
 
 import static org.assertj.core.api.Assertions.assertThat;

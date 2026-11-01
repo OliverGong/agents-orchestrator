@@ -11,8 +11,8 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.control.web;
-import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
-import com.oli.orchestrator_demo.governance.control.AgentDescriptorRegistry;
+import com.oli.orchestrator_demo.governance.control.registry.AgentConfigRegistry;
+import com.oli.orchestrator_demo.governance.control.registry.AgentDescriptorRegistry;
 import com.oli.orchestrator_demo.governance.control.infra.FileControlPlaneStore;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,10 +38,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.client.RestClient;
 
 import com.oli.orchestrator_demo.kernel.shared.web.GlobalExceptionHandler;
-import com.oli.orchestrator_demo.core.agent.BudgetAgent;
-import com.oli.orchestrator_demo.core.agent.ItineraryAgent;
-import com.oli.orchestrator_demo.core.agent.ResearchAgent;
-import com.oli.orchestrator_demo.core.agent.ReviewAgent;
+import com.oli.orchestrator_demo.core.agent.agents.BudgetAgent;
+import com.oli.orchestrator_demo.core.agent.agents.ItineraryAgent;
+import com.oli.orchestrator_demo.core.agent.agents.ResearchAgent;
+import com.oli.orchestrator_demo.core.agent.agents.ReviewAgent;
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
 import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
 import com.oli.orchestrator_demo.core.mcp.McpConnectionRegistry;

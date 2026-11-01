@@ -19,7 +19,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.core.agent.advisor;
-import com.oli.orchestrator_demo.kernel.contract.model.ItineraryResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.llm.ItineraryResponse;
 
 import java.util.ArrayList;
 import java.util.List;

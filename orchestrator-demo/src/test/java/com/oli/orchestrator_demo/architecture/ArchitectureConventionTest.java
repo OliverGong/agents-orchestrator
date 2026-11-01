@@ -1,4 +1,9 @@
 package com.oli.orchestrator_demo.architecture;
+import com.oli.orchestrator_demo.kernel.contract.port.runtime.McpConnectionGateway;
+import com.oli.orchestrator_demo.kernel.contract.port.runtime.RunStatusReader;
+import com.oli.orchestrator_demo.kernel.contract.port.runtime.RunInstanceSink;
+import com.oli.orchestrator_demo.kernel.contract.port.controlplane.ModelDefaultsReader;
+import com.oli.orchestrator_demo.kernel.contract.port.controlplane.ControlPlaneReader;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 

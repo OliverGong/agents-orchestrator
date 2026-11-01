@@ -15,8 +15,8 @@
  * @Version 2.0
  */
 package com.oli.orchestrator_demo.governance.control.infra;
-import com.oli.orchestrator_demo.governance.control.ControlPlaneCrypto;
-import com.oli.orchestrator_demo.governance.control.ControlPlaneStore;
+import com.oli.orchestrator_demo.governance.control.store.ControlPlaneCrypto;
+import com.oli.orchestrator_demo.governance.control.store.ControlPlaneStore;
 
 import java.nio.file.Path;
 import java.time.Duration;

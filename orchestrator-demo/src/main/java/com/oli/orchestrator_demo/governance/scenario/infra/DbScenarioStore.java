@@ -17,9 +17,9 @@
  * @Version 2.1
  */
 package com.oli.orchestrator_demo.governance.scenario.infra;
-import com.oli.orchestrator_demo.governance.scenario.Scenario;
-import com.oli.orchestrator_demo.governance.scenario.ScenarioState;
-import com.oli.orchestrator_demo.governance.scenario.ScenarioStore;
+import com.oli.orchestrator_demo.governance.scenario.model.Scenario;
+import com.oli.orchestrator_demo.governance.scenario.model.ScenarioState;
+import com.oli.orchestrator_demo.governance.scenario.store.ScenarioStore;
 
 import java.sql.Timestamp;
 import java.util.List;
@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
+import com.oli.orchestrator_demo.governance.control.state.WorkflowControlState;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;

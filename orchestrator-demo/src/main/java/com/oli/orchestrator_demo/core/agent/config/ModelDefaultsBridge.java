@@ -12,7 +12,7 @@ package com.oli.orchestrator_demo.core.agent.config;
 
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.kernel.contract.port.ModelDefaultsReader;
+import com.oli.orchestrator_demo.kernel.contract.port.controlplane.ModelDefaultsReader;
 
 @Component
 public class ModelDefaultsBridge implements ModelDefaultsReader {

@@ -10,6 +10,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.core.mcp;
+import com.oli.orchestrator_demo.support.Await;
 
 import com.oli.orchestrator_demo.kernel.contract.config.McpServerStatus;
 
@@ -31,10 +32,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
-import com.oli.orchestrator_demo.Await;
+import com.oli.orchestrator_demo.support.Await;
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
 import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
-import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
+import com.oli.orchestrator_demo.governance.control.registry.AgentConfigRegistry;
 import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.governance.control.infra.FileControlPlaneStore;
 import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;

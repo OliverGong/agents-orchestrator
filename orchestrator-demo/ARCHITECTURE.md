@@ -17,7 +17,8 @@
 E2E 功能闭环**（mock 后端，见 §15.5）；随后按 **3~5 抽象法则**把顶层归组为
 **kernel / core / governance / ops** 四 zone（§3），依赖规则由**架构守护测试**固化
 （零依赖 fitness functions，§7.3/§15.6），核心层与 contract 契约面超阈值
-按内聚子域再细分（contract → `spi/` `model/` `config/` `port/` 四子包，§15.3）。
+按内聚子域再细分（contract → `spi/` `model/` `config/` `port/` 四子包，model/port
+内再按角色分组，§15.3）。
 
 ## 1. 总体架构
 
@@ -109,17 +110,17 @@ com.oli.orchestrator_demo
 ├── OrchestratorDemoApplication      # 装配根：组件扫描四 zone，自身不含业务
 ├── kernel/                          # 内核层：零业务语义（R1 守护：禁 import 业务模块）
 │   ├── shared                       # 横切件：web 异常/缓存 · aop 执行切面 · context 运行归因
-│   └── contract                     # 契约面（单模块，子包仅导航）：spi/ Agent SPI · model/ 黑板+运行数据 · config/ 控制面配置 · port/ 跨域端口
+│   └── contract                     # 契约面（单模块，子包仅导航）：spi/ Agent SPI · model/ 黑板+运行数据（context/run/llm） · config/ 控制面配置 · port/ 跨域端口（controlplane/runtime）
 ├── core/                            # 编排核心：旅行规划问题域的运行时
 │   ├── trip                         # 应用入口：POST /api/trips/plan → 按模板波次执行
-│   ├── agent                        # 协作方：4 业务 Agent · 模板基类 · advisor/ 链 · config/
+│   ├── agent                        # 协作方：agents/ 4 业务 Agent · 模板基类 · advisor/ 链 · config/
 │   ├── workflow                     # 协作模板：stage / dependsOn / mode · 热切换单点
 │   └── mcp                          # 外部集成：MCP 连接注册表 · 插桩工具（EIP 网关）
 ├── governance/                      # 治理面：SOP 数字化（配置/场景/元数据/发布/审计）
-│   ├── control                      # 控制面：Agent 人格/模型/校准/MCP 热配置 + 加密
-│   ├── scenario                     # 场景：零 token 推演 → 激活 → 运行
+│   ├── control                      # 控制面：registry/ 配置注册 · state/ 状态 · store/ 持久化+加密 · infra/ web/
+│   ├── scenario                     # 场景：model/ 元模型 · store/ 注册+存储 · dryrun/ 零token推演 · infra/ web/
 │   ├── meta                         # 元信息补录
-│   ├── release                      # 发布流水线
+│   ├── release                      # 发布流水线：model/ 包与记录 + 服务/存储 · infra/ web/
 │   └── teamlog                      # 团队审计日志
 └── ops/                             # 观测运维面：运行状态的生产与消费
     ├── observability                # 事件总线 · SSE 通道 · 指标 · 健康（events/ metrics/ health/）
@@ -1279,15 +1280,16 @@ v3.0 采用 **package-by-feature**（按业务域分包）+ **模块内三层**�
 - **配置就近归属**：`AgentConfiguration` / `AgentModelProperties` /
   `ModelHttpClientConfig` 位于 `core.agent/config/` 而非集中 `config/`——配置属于拥有它的模块，
   删除模块时配置随之消失，不会留下幽灵 Bean。
-- **kernel/contract/ 稳定契约包（四子包）**：契约整体仍是**单模块**（R2 守护
-  "只 import 自身"，子包互引视为包内），子包按角色导航——
+- **kernel/contract/ 稳定契约包（四角色子包 + 角色内分组）**：契约整体仍是**单模块**
+  （R2 守护"只 import 自身"，子包互引视为包内），21 个契约类型按角色归组——
   `spi/`：**Agent SPI**（`Agent<I,O>` + 自描述元数据 `AgentDescriptor`）；
-  `model/`：契约数据模型（黑板 `OrchestratorContext`、`TripRequest`、四个响应 record、
-  运行数据 `OrchestratorSnapshot`/`RunInstance`）；
+  `model/`：契约数据模型，内按角色三分——`context/`（黑板 `OrchestratorContext`、
+  `OrchestratorSnapshot`）、`run/`（`TripRequest`、`RunInstance`）、`llm/`（四个响应 record）；
   `config/`：控制面配置数据 record（`AgentRuntimeConfig`、`AgentDefaults`、
   `CalibrationRule`、`McpServerConfig`、`McpServerStatus`）；
-  `port/`：跨域端口接口（`AgentRuntimeStore`、`ModelDefaultsReader`、`ControlPlaneReader`、
-  `McpConnectionGateway`、`RunInstanceSink`、`RunStatusReader`）——
+  `port/`：跨域端口接口，内按服务面二分——`controlplane/`（`ControlPlaneReader`、
+  `ModelDefaultsReader`）、`runtime/`（`AgentRuntimeStore`、`McpConnectionGateway`、
+  `RunInstanceSink`、`RunStatusReader`）——
   数据面打破潜在循环，端口反转打破治理/观测域指向运行时实现的逆向依赖；
   契约类型变更必然是一次显式的跨域决策。
 - **kernel/shared/ 横切内核**：异常映射、缓存控制、AOP、`RunContext` 运行归因上下文——

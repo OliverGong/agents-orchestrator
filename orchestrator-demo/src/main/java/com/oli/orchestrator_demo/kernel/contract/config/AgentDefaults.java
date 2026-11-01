@@ -11,7 +11,7 @@
  */
 package com.oli.orchestrator_demo.kernel.contract.config;
 
-import com.oli.orchestrator_demo.kernel.contract.port.ModelDefaultsReader;
+import com.oli.orchestrator_demo.kernel.contract.port.controlplane.ModelDefaultsReader;
 
 import java.util.List;
 import java.util.Map;

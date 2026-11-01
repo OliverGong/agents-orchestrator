@@ -9,6 +9,7 @@
  * @Version 2.0
  */
 package com.oli.orchestrator_demo.governance.control;
+import com.oli.orchestrator_demo.governance.control.store.ControlPlaneCrypto;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

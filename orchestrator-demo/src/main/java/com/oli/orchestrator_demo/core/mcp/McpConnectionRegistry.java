@@ -50,8 +50,8 @@ import org.springframework.ai.mcp.SyncMcpToolCallback;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.kernel.contract.port.ControlPlaneReader;
-import com.oli.orchestrator_demo.kernel.contract.port.McpConnectionGateway;
+import com.oli.orchestrator_demo.kernel.contract.port.controlplane.ControlPlaneReader;
+import com.oli.orchestrator_demo.kernel.contract.port.runtime.McpConnectionGateway;
 import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;
 

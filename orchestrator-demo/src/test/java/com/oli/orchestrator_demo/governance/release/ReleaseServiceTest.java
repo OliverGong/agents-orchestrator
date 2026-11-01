@@ -14,8 +14,10 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.release;
+import com.oli.orchestrator_demo.governance.release.model.ReleaseRecord;
+import com.oli.orchestrator_demo.governance.release.model.ReleasePackage;
 import com.oli.orchestrator_demo.governance.release.infra.FileReleaseStore;
-import com.oli.orchestrator_demo.governance.scenario.DryRunEngine;
+import com.oli.orchestrator_demo.governance.scenario.dryrun.DryRunEngine;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,15 +35,15 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
 import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
-import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
+import com.oli.orchestrator_demo.governance.control.registry.AgentConfigRegistry;
 import com.oli.orchestrator_demo.governance.control.infra.FileControlPlaneStore;
 import com.oli.orchestrator_demo.governance.meta.infra.FileMetaStore;
 import com.oli.orchestrator_demo.governance.meta.MetaRegistry;
 import com.oli.orchestrator_demo.governance.meta.MetaState;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
-import com.oli.orchestrator_demo.governance.scenario.DryRunReport;
+import com.oli.orchestrator_demo.governance.scenario.dryrun.DryRunReport;
 import com.oli.orchestrator_demo.governance.scenario.infra.FileScenarioStore;
-import com.oli.orchestrator_demo.governance.scenario.ScenarioRegistry;
+import com.oli.orchestrator_demo.governance.scenario.store.ScenarioRegistry;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogEntry;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogRecorder;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogStore;
@@ -68,7 +70,7 @@ class ReleaseServiceTest {
     controlPlane.initialize();
     scenarios = new ScenarioRegistry(
         new FileScenarioStore(tempDir.resolve("scenarios.json"), JsonMapper.builder().build()),
-        controlPlane, new com.oli.orchestrator_demo.governance.scenario.DryRunEngine(controlPlane));
+        controlPlane, new com.oli.orchestrator_demo.governance.scenario.dryrun.DryRunEngine(controlPlane));
     scenarios.initialize();
     meta = new MetaRegistry(new FileMetaStore(tempDir.resolve("meta-plane.json"),
         JsonMapper.builder().build()));

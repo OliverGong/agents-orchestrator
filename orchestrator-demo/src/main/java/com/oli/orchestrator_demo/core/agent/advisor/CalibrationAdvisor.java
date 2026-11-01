@@ -30,7 +30,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.core.Ordered;
 
-import com.oli.orchestrator_demo.kernel.contract.port.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.port.runtime.AgentRuntimeStore;
 import com.oli.orchestrator_demo.kernel.contract.config.CalibrationRule;
 
 public class CalibrationAdvisor implements CallAdvisor {

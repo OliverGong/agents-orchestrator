@@ -11,8 +11,8 @@
  * @Version 2.1
  */
 package com.oli.orchestrator_demo.governance.scenario.infra;
-import com.oli.orchestrator_demo.governance.scenario.Scenario;
-import com.oli.orchestrator_demo.governance.scenario.ScenarioState;
+import com.oli.orchestrator_demo.governance.scenario.model.Scenario;
+import com.oli.orchestrator_demo.governance.scenario.model.ScenarioState;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,7 +29,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import com.oli.orchestrator_demo.kernel.contract.config.CalibrationRule;
-import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
+import com.oli.orchestrator_demo.governance.control.state.WorkflowControlState;
 
 import tools.jackson.databind.json.JsonMapper;
 

@@ -13,6 +13,8 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.release;
+import com.oli.orchestrator_demo.governance.release.model.ReleaseRecord;
+import com.oli.orchestrator_demo.governance.release.model.ReleasePackage;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -27,9 +29,9 @@ import org.springframework.stereotype.Component;
 
 import com.oli.orchestrator_demo.governance.meta.MetaRegistry;
 import com.oli.orchestrator_demo.governance.meta.MetaState;
-import com.oli.orchestrator_demo.governance.scenario.DryRunReport;
-import com.oli.orchestrator_demo.governance.scenario.Scenario;
-import com.oli.orchestrator_demo.governance.scenario.ScenarioRegistry;
+import com.oli.orchestrator_demo.governance.scenario.dryrun.DryRunReport;
+import com.oli.orchestrator_demo.governance.scenario.model.Scenario;
+import com.oli.orchestrator_demo.governance.scenario.store.ScenarioRegistry;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogRecorder;
 
 import tools.jackson.databind.ObjectMapper;

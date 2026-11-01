@@ -16,11 +16,11 @@
 package com.oli.orchestrator_demo.governance.control.web;
 
 import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
-import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
+import com.oli.orchestrator_demo.governance.control.registry.AgentConfigRegistry;
 import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
 import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.governance.control.ControlPlaneState;
-import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
+import com.oli.orchestrator_demo.governance.control.state.ControlPlaneState;
+import com.oli.orchestrator_demo.governance.control.state.WorkflowControlState;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +40,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 
-import com.oli.orchestrator_demo.kernel.contract.port.McpConnectionGateway;
+import com.oli.orchestrator_demo.kernel.contract.port.runtime.McpConnectionGateway;
 import com.oli.orchestrator_demo.kernel.contract.config.McpServerStatus;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogRecorder;
 

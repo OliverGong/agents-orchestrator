@@ -21,8 +21,8 @@ import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorSnapshot;
-import com.oli.orchestrator_demo.kernel.contract.port.RunStatusReader;
+import com.oli.orchestrator_demo.kernel.contract.model.context.OrchestratorSnapshot;
+import com.oli.orchestrator_demo.kernel.contract.port.runtime.RunStatusReader;
 
 @Component("orchestrator")
 public class OrchestratorHealthIndicator implements HealthIndicator {

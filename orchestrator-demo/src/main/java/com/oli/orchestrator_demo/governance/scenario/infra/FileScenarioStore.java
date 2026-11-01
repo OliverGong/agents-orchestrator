@@ -12,8 +12,8 @@
  * @Version 2.1
  */
 package com.oli.orchestrator_demo.governance.scenario.infra;
-import com.oli.orchestrator_demo.governance.scenario.ScenarioState;
-import com.oli.orchestrator_demo.governance.scenario.ScenarioStore;
+import com.oli.orchestrator_demo.governance.scenario.model.ScenarioState;
+import com.oli.orchestrator_demo.governance.scenario.store.ScenarioStore;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

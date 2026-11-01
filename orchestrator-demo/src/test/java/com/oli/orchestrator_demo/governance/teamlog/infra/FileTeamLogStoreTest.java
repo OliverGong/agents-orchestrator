@@ -90,7 +90,7 @@ class FileTeamLogStoreTest {
     assertThat(store.search(new TeamLogStore.TeamLogQuery(null, null, null, null, null,
         "runtime", 10))).hasSize(1);
     assertThat(store.search(new TeamLogStore.TeamLogQuery(
-        Instant.parse("2026-11-01T09:00:00Z"), null, null, null, null, null, 10))).isEmpty();
+        Instant.now().plusSeconds(3600), null, null, null, null, null, 10))).isEmpty();
     assertThat(store.search(new TeamLogStore.TeamLogQuery(null, null, null, null, null, null, 1)))
         .hasSize(1);
   }

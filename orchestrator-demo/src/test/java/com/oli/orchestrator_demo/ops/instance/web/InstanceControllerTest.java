@@ -10,11 +10,13 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.ops.instance.web;
-import com.oli.orchestrator_demo.Await;
+import com.oli.orchestrator_demo.support.ChatClientStubs;
+import com.oli.orchestrator_demo.support.Await;
+import com.oli.orchestrator_demo.support.Await;
 import com.oli.orchestrator_demo.ops.instance.web.InstanceController;
 import com.oli.orchestrator_demo.ops.observability.events.RunTimeline;
 
-import static com.oli.orchestrator_demo.Await.until;
+import static com.oli.orchestrator_demo.support.Await.until;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,8 +29,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.ChatClientStubs.CollectingInstanceStore;
+import com.oli.orchestrator_demo.support.ChatClientStubs;
+import com.oli.orchestrator_demo.support.ChatClientStubs.CollectingInstanceStore;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.ops.observability.infra.NoopRunMetricsStore;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;

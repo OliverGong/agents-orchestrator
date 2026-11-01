@@ -6,7 +6,7 @@
  *              backend {@link org.springframework.ai.chat.model.ChatModel}
  *              selected through `spring.ai.model.chat` and read the system
  *              prompt / model / temperature / calibration rules from the
- *              control-plane registry ({@link com.oli.orchestrator_demo.governance.control.AgentConfigRegistry})
+ *              control-plane registry ({@link com.oli.orchestrator_demo.governance.control.registry.AgentConfigRegistry})
  *              on every call. The built-in personas that seed that registry
  *              live in {@link com.oli.orchestrator_demo.kernel.contract.config.AgentDefaults}.
  * @Author OliverGong
@@ -14,7 +14,7 @@
  * @Version 1.1
  */
 package com.oli.orchestrator_demo.core.agent.config;
-import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
+import com.oli.orchestrator_demo.governance.control.registry.AgentConfigRegistry;
 import com.oli.orchestrator_demo.kernel.contract.config.AgentDefaults;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

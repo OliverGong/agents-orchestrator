@@ -45,9 +45,9 @@ import org.springframework.ai.tool.ToolCallback;
 
 import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
 import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.kernel.contract.port.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.port.runtime.AgentRuntimeStore;
 import com.oli.orchestrator_demo.core.mcp.McpConnectionRegistry;
-import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.context.OrchestratorContext;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.ops.observability.metrics.LmUsageCollector;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityEventBus;
@@ -106,7 +106,7 @@ public abstract class AbstractContextAgent<R> implements Agent<OrchestratorConte
 
   /**
    * The agent's self-declared slot contract (title, human description, and
-   * which {@link com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext} slots it
+   * which {@link com.oli.orchestrator_demo.kernel.contract.model.context.OrchestratorContext} slots it
    * produces, consumes and tolerates to be missing). Collected at startup by
    * the control plane and used for the logical-closure validation of
    * collaboration templates. Deliberately not final: like {@link #name()},

@@ -10,7 +10,8 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.core.agent.advisor;
-import com.oli.orchestrator_demo.core.agent.ResearchAgent;
+import com.oli.orchestrator_demo.support.ChatClientStubs;
+import com.oli.orchestrator_demo.core.agent.agents.ResearchAgent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,13 +20,13 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import com.oli.orchestrator_demo.ChatClientStubs;
+import com.oli.orchestrator_demo.support.ChatClientStubs;
 import com.oli.orchestrator_demo.kernel.contract.config.AgentDefaults;
 import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.kernel.contract.port.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.port.runtime.AgentRuntimeStore;
 import com.oli.orchestrator_demo.kernel.contract.config.CalibrationRule;
-import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
-import com.oli.orchestrator_demo.kernel.contract.model.TripRequest;
+import com.oli.orchestrator_demo.kernel.contract.model.context.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.run.TripRequest;
 
 class CalibrationAdvisorTest {
 

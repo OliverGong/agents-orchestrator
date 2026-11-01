@@ -31,11 +31,11 @@ import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
 import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
 import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.kernel.contract.config.CalibrationRule;
-import com.oli.orchestrator_demo.governance.control.ControlPlaneCrypto;
-import com.oli.orchestrator_demo.governance.control.ControlPlaneState;
-import com.oli.orchestrator_demo.governance.control.ControlPlaneStore;
+import com.oli.orchestrator_demo.governance.control.store.ControlPlaneCrypto;
+import com.oli.orchestrator_demo.governance.control.state.ControlPlaneState;
+import com.oli.orchestrator_demo.governance.control.store.ControlPlaneStore;
 import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
-import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
+import com.oli.orchestrator_demo.governance.control.state.WorkflowControlState;
 
 import java.sql.Timestamp;
 import java.util.LinkedHashMap;

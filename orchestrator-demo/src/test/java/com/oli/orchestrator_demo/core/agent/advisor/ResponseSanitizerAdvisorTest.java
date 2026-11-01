@@ -9,6 +9,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.core.agent.advisor;
+import com.oli.orchestrator_demo.support.ChatClientStubs;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,9 +18,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 
-import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.kernel.contract.model.ItineraryResponse;
-import com.oli.orchestrator_demo.kernel.contract.model.ResearchResponse;
+import com.oli.orchestrator_demo.support.ChatClientStubs;
+import com.oli.orchestrator_demo.kernel.contract.model.llm.ItineraryResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.llm.ResearchResponse;
 
 class ResponseSanitizerAdvisorTest {
 

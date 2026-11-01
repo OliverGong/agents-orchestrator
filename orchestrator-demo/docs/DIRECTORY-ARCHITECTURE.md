@@ -181,7 +181,7 @@ prometheus 与 tempo 各 1 配置文件。新增资产时按上表落位，条�
 | 规则 | 断言 | 守护的文档章节 |
 |---|---|---|
 | R1 | `kernel/shared/` 零业务模块 import | §4 kernel 约束 |
-| R2 | `kernel/contract/` 只 import 自身（`spi/model/config/port` 子包同属单模块，互引视为包内） | §5 SPI 下沉判据 |
+| R2 | `kernel/contract/` 只 import 自身（`spi/model/config/port` 及其角色内子包同属单模块，互引视为包内） | §5 SPI 下沉判据 |
 | R3 | 模块依赖图（zone 限定名）无环，**零豁免** | §8 反转记录 |
 | R4 | `infra/` 适配器不被跨模块引用 | §5 三层依赖方向 |
 | R5 | `web/` 不触碰任何 `infra/` 适配器 | §5 三层依赖方向 |
@@ -201,10 +201,29 @@ prometheus 与 tempo 各 1 配置文件。新增资产时按上表落位，条�
 observability → events/metrics/health，contract → spi/model/config/port 四角色子包）；
 子包不承载新的跨域依赖方向——contract 子包间互引仍按单模块判定（R2）。
 
+**第二轮收敛（2026-11，叶子目录 2~5 化）**：首轮归组后仍有 9 个目录条目 6~8 个，
+按逻辑角色二次开包，全部收敛至 2~5（测试树与主树同构镜像）：
+
+| 目录（前→后条目数） | 角色分组 |
+|---|---|
+| contract/model（8→3） | `context/` 黑板（OrchestratorContext/Snapshot）· `run/` 请求与实例（TripRequest/RunInstance）· `llm/` 四响应 record |
+| contract/port（6→2） | `controlplane/` 控制面读端口 · `runtime/` 数据面写/读端口 |
+| governance/control（8→5） | `registry/` 配置注册 · `state/` 状态 · `store/` 持久化+加密 |
+| governance/scenario（8→5） | `model/` 元模型 · `store/` 注册+存储 · `dryrun/` 零token推演 |
+| governance/release（6→5） | `model/` 包与记录 |
+| core/agent（7→4） | `agents/` 4 业务 Agent（基类/横切/配置留包根） |
+| 测试根（8→6）、test core/agent（7→4）、test ops/observability（6→5） | `support/` 测试基建 · `agents/`、`web/` 镜像主树 |
+
+要点：纯移动重构（git rename 保留历史），包声明与 import 同步重写；
+守护测试 R2/R3 先后抓出并修复"注释类名误插 import"造成的假性依赖——
+与零豁免原则一致；测试根 6 条目为 4 zone 镜像 + 2 横切（fitness/support），
+因镜像主树不再细分。
+
 ## 9. 效果验证
 
-- 全量 **214 个测试离线全绿**（含 5 条架构守护规则），重组与子包化前后行为等价；
+- 全量 **214 个测试离线全绿**（含 5 条架构守护规则），两轮重组前后行为等价；
 - 顶层 4 zone × 2~5 模块，§1 的"13 个包扫不完"问题消除；contract 21 个契约类型
-  按角色归组 4 个导航子包（spi 2 / model 8 / config 5 / port 6），单文件目录不再铺开；
+  按角色归组 4 个导航子包（spi 2 / model 8 / config 5 / port 6，model/port 内再按
+  角色分组），单文件目录不再铺开；全树叶子目录（含测试树）条目数 2~5 化（§8 二轮收敛）；
 - 前端 17 个 Playwright E2E spec 不受影响（契约经 `types/api.ts` 镜像，未触碰）；
   `pnpm build`（vue-tsc strict + vite）与 E2E 全绿。

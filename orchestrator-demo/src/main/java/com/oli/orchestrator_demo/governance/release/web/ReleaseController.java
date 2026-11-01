@@ -11,8 +11,8 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.release.web;
-import com.oli.orchestrator_demo.governance.release.ReleasePackage;
-import com.oli.orchestrator_demo.governance.release.ReleaseRecord;
+import com.oli.orchestrator_demo.governance.release.model.ReleasePackage;
+import com.oli.orchestrator_demo.governance.release.model.ReleaseRecord;
 import com.oli.orchestrator_demo.governance.release.ReleaseService;
 
 import java.util.List;

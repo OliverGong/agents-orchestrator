@@ -14,6 +14,9 @@
  * @Version 2.1
  */
 package com.oli.orchestrator_demo.governance.scenario;
+import com.oli.orchestrator_demo.governance.scenario.dryrun.DryRunReport;
+import com.oli.orchestrator_demo.governance.scenario.dryrun.DryRunEngine;
+import com.oli.orchestrator_demo.governance.scenario.model.Scenario;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,10 +31,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
 import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
-import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
+import com.oli.orchestrator_demo.governance.control.registry.AgentConfigRegistry;
 import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
 import com.oli.orchestrator_demo.governance.control.infra.FileControlPlaneStore;
-import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
+import com.oli.orchestrator_demo.governance.control.state.WorkflowControlState;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.core.workflow.WorkflowProperties;
 

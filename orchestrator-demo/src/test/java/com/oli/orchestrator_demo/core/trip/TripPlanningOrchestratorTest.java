@@ -16,10 +16,12 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.core.trip;
-import com.oli.orchestrator_demo.Await;
+import com.oli.orchestrator_demo.support.ChatClientStubs;
+import com.oli.orchestrator_demo.support.Await;
+import com.oli.orchestrator_demo.support.Await;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
 
-import static com.oli.orchestrator_demo.Await.until;
+import static com.oli.orchestrator_demo.support.Await.until;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -35,13 +37,13 @@ import org.junit.jupiter.api.Test;
 
 import com.oli.orchestrator_demo.kernel.contract.spi.Agent;
 import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
-import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.kernel.contract.model.BudgetResponse;
-import com.oli.orchestrator_demo.kernel.contract.model.ItineraryResponse;
-import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
-import com.oli.orchestrator_demo.kernel.contract.model.ResearchResponse;
-import com.oli.orchestrator_demo.kernel.contract.model.ReviewResponse;
-import com.oli.orchestrator_demo.kernel.contract.model.TripRequest;
+import com.oli.orchestrator_demo.support.ChatClientStubs;
+import com.oli.orchestrator_demo.kernel.contract.model.llm.BudgetResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.llm.ItineraryResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.context.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.llm.ResearchResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.llm.ReviewResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.run.TripRequest;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent.Type;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;

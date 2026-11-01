@@ -13,10 +13,10 @@
  * @Version 2.1
  */
 package com.oli.orchestrator_demo.governance.scenario.web;
-import com.oli.orchestrator_demo.governance.scenario.DryRunReport;
-import com.oli.orchestrator_demo.governance.scenario.Scenario;
-import com.oli.orchestrator_demo.governance.scenario.ScenarioRegistry;
-import com.oli.orchestrator_demo.governance.scenario.ScenarioState;
+import com.oli.orchestrator_demo.governance.scenario.dryrun.DryRunReport;
+import com.oli.orchestrator_demo.governance.scenario.model.Scenario;
+import com.oli.orchestrator_demo.governance.scenario.store.ScenarioRegistry;
+import com.oli.orchestrator_demo.governance.scenario.model.ScenarioState;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,8 +28,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
-import com.oli.orchestrator_demo.governance.control.ControlPlaneState;
+import com.oli.orchestrator_demo.governance.control.registry.AgentConfigRegistry;
+import com.oli.orchestrator_demo.governance.control.state.ControlPlaneState;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogRecorder;
 
 @RestController

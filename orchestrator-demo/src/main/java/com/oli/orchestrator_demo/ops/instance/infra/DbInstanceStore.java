@@ -17,7 +17,7 @@
  */
 package com.oli.orchestrator_demo.ops.instance.infra;
 import com.oli.orchestrator_demo.ops.instance.InstanceStore;
-import com.oli.orchestrator_demo.kernel.contract.model.RunInstance;
+import com.oli.orchestrator_demo.kernel.contract.model.run.RunInstance;
 
 import java.sql.Timestamp;
 import java.time.Instant;

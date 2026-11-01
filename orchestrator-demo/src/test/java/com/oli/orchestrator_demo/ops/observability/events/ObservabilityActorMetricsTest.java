@@ -10,10 +10,12 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.ops.observability.events;
+import com.oli.orchestrator_demo.support.ChatClientStubs;
+import com.oli.orchestrator_demo.support.Await;
 import com.oli.orchestrator_demo.ops.observability.metrics.RunMetricsStore;
-import com.oli.orchestrator_demo.Await;
+import com.oli.orchestrator_demo.support.Await;
 
-import static com.oli.orchestrator_demo.Await.until;
+import static com.oli.orchestrator_demo.support.Await.until;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
@@ -22,7 +24,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.junit.jupiter.api.Test;
 
-import com.oli.orchestrator_demo.ChatClientStubs;
+import com.oli.orchestrator_demo.support.ChatClientStubs;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent.LmUsage;
 import com.oli.orchestrator_demo.ops.observability.events.RunTimeline.RunStatus;
 

@@ -25,11 +25,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import com.oli.orchestrator_demo.kernel.contract.model.ItineraryResponse;
-import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
-import com.oli.orchestrator_demo.kernel.contract.model.ResearchResponse;
-import com.oli.orchestrator_demo.kernel.contract.model.ReviewResponse;
-import com.oli.orchestrator_demo.kernel.contract.model.TripRequest;
+import com.oli.orchestrator_demo.kernel.contract.model.llm.ItineraryResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.context.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.llm.ResearchResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.llm.ReviewResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.run.TripRequest;
 import com.oli.orchestrator_demo.core.trip.TripPlanningOrchestrator;
 
 class TripPlanningControllerTest {

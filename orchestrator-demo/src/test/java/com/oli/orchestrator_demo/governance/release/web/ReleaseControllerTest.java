@@ -30,8 +30,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.oli.orchestrator_demo.governance.release.web.ReleaseController;
-import com.oli.orchestrator_demo.governance.release.ReleasePackage;
-import com.oli.orchestrator_demo.governance.release.ReleaseRecord;
+import com.oli.orchestrator_demo.governance.release.model.ReleasePackage;
+import com.oli.orchestrator_demo.governance.release.model.ReleaseRecord;
 import com.oli.orchestrator_demo.governance.release.ReleaseService;
 
 class ReleaseControllerTest {

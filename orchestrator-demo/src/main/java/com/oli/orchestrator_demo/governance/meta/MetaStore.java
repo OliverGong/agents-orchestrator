@@ -1,7 +1,7 @@
 /**
  * @ClassName MetaStore
  * @Description Persistence seam of the metadata maintenance plane, mirroring
- *              {@link com.oli.orchestrator_demo.governance.control.ControlPlaneStore} and
+ *              {@link com.oli.orchestrator_demo.governance.control.store.ControlPlaneStore} and
  *              the scenario store: the {@link MetaRegistry} stays the single
  *              writer while the implementations decide where the versioned
  *              {@link MetaState} lives — the JSON {@link FileMetaStore}
@@ -12,7 +12,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.meta;
-import com.oli.orchestrator_demo.governance.control.ControlPlaneStore;
+import com.oli.orchestrator_demo.governance.control.store.ControlPlaneStore;
 import com.oli.orchestrator_demo.governance.meta.infra.DbMetaStore;
 import com.oli.orchestrator_demo.governance.meta.infra.FileMetaStore;
 

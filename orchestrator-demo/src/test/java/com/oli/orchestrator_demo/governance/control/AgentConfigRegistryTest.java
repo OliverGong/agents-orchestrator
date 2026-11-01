@@ -13,10 +13,15 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.control;
+import com.oli.orchestrator_demo.governance.control.store.ControlPlaneCrypto;
+import com.oli.orchestrator_demo.governance.control.state.WorkflowControlState;
+import com.oli.orchestrator_demo.governance.control.state.ControlPlaneState;
+import com.oli.orchestrator_demo.governance.control.registry.AgentDescriptorRegistry;
+import com.oli.orchestrator_demo.governance.control.registry.AgentConfigRegistry;
 
 import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
 
-import com.oli.orchestrator_demo.kernel.contract.port.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.port.runtime.AgentRuntimeStore;
 
 import com.oli.orchestrator_demo.kernel.contract.config.CalibrationRule;
 
@@ -40,10 +45,10 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 import org.springframework.ai.chat.model.ChatModel;
 
-import com.oli.orchestrator_demo.core.agent.BudgetAgent;
-import com.oli.orchestrator_demo.core.agent.ItineraryAgent;
-import com.oli.orchestrator_demo.core.agent.ResearchAgent;
-import com.oli.orchestrator_demo.core.agent.ReviewAgent;
+import com.oli.orchestrator_demo.core.agent.agents.BudgetAgent;
+import com.oli.orchestrator_demo.core.agent.agents.ItineraryAgent;
+import com.oli.orchestrator_demo.core.agent.agents.ResearchAgent;
+import com.oli.orchestrator_demo.core.agent.agents.ReviewAgent;
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
 import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
