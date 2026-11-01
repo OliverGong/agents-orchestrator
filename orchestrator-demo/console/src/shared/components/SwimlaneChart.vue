@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
-import type { RunWave } from '../types/api'
+import type { RunWave } from '@/shared/types/api'
 
 /** Agent swimlane (ported from the legacy console): one lane per agent,
     bars per stage on a time axis when per-stage completion timestamps exist,

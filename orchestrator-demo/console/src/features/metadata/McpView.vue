@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useMessage } from 'naive-ui'
-import { http } from '../api/http'
-import { useControlStore } from '../stores/control'
-import type { ControlPlaneState, McpServerConfig, McpServerStatus, McpTransport } from '../types/api'
+import { http } from '@/shared/api/http'
+import { useControlStore } from '@/app/stores/control'
+import type { ControlPlaneState, McpServerConfig, McpServerStatus, McpTransport } from '@/shared/types/api'
 
 const message = useMessage()
 const control = useControlStore()

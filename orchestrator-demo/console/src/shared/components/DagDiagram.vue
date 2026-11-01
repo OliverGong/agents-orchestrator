@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { DagEdge, DagNode } from '../types/dag'
+import type { DagEdge, DagNode } from '@/shared/types/dag'
 
 /** Layered DAG (ported from the legacy console): waves as columns,
     bezier dependency edges, optional per-stage status coloring. */

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { http } from '../api/http'
-import { connectOrchestratorEvents, type SseConnection } from '../api/sse'
-import { useSessionStore } from '../stores/session'
-import { fmtTime } from '../utils/format'
-import JsonDetails from '../components/JsonDetails.vue'
+import { http } from '@/shared/api/http'
+import { connectOrchestratorEvents, type SseConnection } from '@/shared/api/sse'
+import { useSessionStore } from '@/app/stores/session'
+import { fmtTime } from '@/shared/utils/format'
+import JsonDetails from '@/shared/components/JsonDetails.vue'
 import type {
   ControlPlaneState,
   OrchestratorContext,
@@ -16,7 +16,7 @@ import type {
   RunSummary,
   StageEvent,
   TripRequest,
-} from '../types/api'
+} from '@/shared/types/api'
 
 const route = useRoute()
 const router = useRouter()

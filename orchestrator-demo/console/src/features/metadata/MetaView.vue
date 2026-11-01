@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useDialog, useMessage } from 'naive-ui'
-import { http } from '../api/http'
-import { useSessionStore } from '../stores/session'
-import { fmtDateTime } from '../utils/format'
-import type { ArtifactType, MetaState, PortalConfig, ReleaseRecord } from '../types/api'
+import { http } from '@/shared/api/http'
+import { useSessionStore } from '@/app/stores/session'
+import { fmtDateTime } from '@/shared/utils/format'
+import type { ArtifactType, MetaState, PortalConfig, ReleaseRecord } from '@/shared/types/api'
 
 const message = useMessage()
 const dialog = useDialog()

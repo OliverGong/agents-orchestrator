@@ -2,10 +2,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
-import { http } from '../api/http'
-import { useSessionStore } from '../stores/session'
-import DagDiagram from '../components/DagDiagram.vue'
-import type { ControlPlaneState, DryRunReport } from '../types/api'
+import { http } from '@/shared/api/http'
+import { useSessionStore } from '@/app/stores/session'
+import DagDiagram from '@/shared/components/DagDiagram.vue'
+import type { ControlPlaneState, DryRunReport } from '@/shared/types/api'
 
 const route = useRoute()
 const router = useRouter()

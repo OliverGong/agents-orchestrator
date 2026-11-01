@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { http, qs } from '../api/http'
-import { fmtDateTime } from '../utils/format'
-import JsonDetails from '../components/JsonDetails.vue'
-import type { InstanceDetail, InstanceStageMetric, RunStage, RunStatus } from '../types/api'
+import { http, qs } from '@/shared/api/http'
+import { fmtDateTime } from '@/shared/utils/format'
+import JsonDetails from '@/shared/components/JsonDetails.vue'
+import type { InstanceDetail, InstanceStageMetric, RunStage, RunStatus } from '@/shared/types/api'
 
 const route = useRoute()
 const router = useRouter()

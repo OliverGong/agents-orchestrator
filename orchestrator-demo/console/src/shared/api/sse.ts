@@ -5,7 +5,7 @@
  * The Run view subscribes for its live blackboard; the connection itself is
  * a module singleton shared by the whole SPA (EventSource auto-reconnects).
  */
-import type { RunStartedEvent, StageEvent } from '../types/api'
+import type { RunStartedEvent, StageEvent } from '@/shared/types/api'
 
 export interface OrchestratorSseHandlers {
   connected?: () => void

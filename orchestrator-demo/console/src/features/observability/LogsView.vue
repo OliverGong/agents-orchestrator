@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { http, qs } from '../api/http'
-import { fmtDateTime, tryParseJson } from '../utils/format'
-import type { TeamLogEntry } from '../types/api'
+import { http, qs } from '@/shared/api/http'
+import { fmtDateTime, tryParseJson } from '@/shared/utils/format'
+import type { TeamLogEntry } from '@/shared/types/api'
 
 const route = useRoute()
 const router = useRouter()

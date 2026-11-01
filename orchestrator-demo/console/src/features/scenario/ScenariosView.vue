@@ -2,10 +2,10 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDialog, useMessage } from 'naive-ui'
-import { http } from '../api/http'
-import { useSessionStore } from '../stores/session'
-import { useControlStore } from '../stores/control'
-import type { ArtifactType, ScenarioSummary } from '../types/api'
+import { http } from '@/shared/api/http'
+import { useSessionStore } from '@/app/stores/session'
+import { useControlStore } from '@/app/stores/control'
+import type { ArtifactType, ScenarioSummary } from '@/shared/types/api'
 
 const router = useRouter()
 const dialog = useDialog()

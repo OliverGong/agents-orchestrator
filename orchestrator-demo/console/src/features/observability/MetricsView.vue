@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { http, qs } from '../api/http'
-import { useSessionStore } from '../stores/session'
-import { fmtDateTime, fmtNum } from '../utils/format'
-import type { ActuatorInfo, HealthResponse, MetricResponse } from '../types/api'
+import { http, qs } from '@/shared/api/http'
+import { useSessionStore } from '@/app/stores/session'
+import { fmtDateTime, fmtNum } from '@/shared/utils/format'
+import type { ActuatorInfo, HealthResponse, MetricResponse } from '@/shared/types/api'
 
 const route = useRoute()
 const session = useSessionStore()

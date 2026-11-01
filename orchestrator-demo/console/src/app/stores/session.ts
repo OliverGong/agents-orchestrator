@@ -6,8 +6,8 @@
  */
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { http } from '../api/http'
-import type { ActuatorInfo, HealthResponse, ScenarioSummary, ScenariosState } from '../types/api'
+import { http } from '@/shared/api/http'
+import type { ActuatorInfo, HealthResponse, ScenarioSummary, ScenariosState } from '@/shared/types/api'
 
 export type HealthState = 'UP' | 'DOWN' | 'UNKNOWN'
 

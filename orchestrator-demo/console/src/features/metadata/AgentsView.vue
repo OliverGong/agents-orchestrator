@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
-import { http } from '../api/http'
-import { useControlStore } from '../stores/control'
-import type { AgentConfig, AgentDescriptor, ControlPlaneState } from '../types/api'
+import { http } from '@/shared/api/http'
+import { useControlStore } from '@/app/stores/control'
+import type { AgentConfig, AgentDescriptor, ControlPlaneState } from '@/shared/types/api'
 
 const message = useMessage()
 const control = useControlStore()

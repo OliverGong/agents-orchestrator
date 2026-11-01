@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { http } from '../api/http'
-import { useControlStore } from '../stores/control'
-import { fmtTime, prettyJson } from '../utils/format'
-import JsonDetails from '../components/JsonDetails.vue'
-import DagDiagram from '../components/DagDiagram.vue'
-import SwimlaneChart from '../components/SwimlaneChart.vue'
-import type { DagNode } from '../types/dag'
-import type { RunDetails, RunStatus, RunSummary } from '../types/api'
+import { http } from '@/shared/api/http'
+import { useControlStore } from '@/app/stores/control'
+import { fmtTime, prettyJson } from '@/shared/utils/format'
+import JsonDetails from '@/shared/components/JsonDetails.vue'
+import DagDiagram from '@/shared/components/DagDiagram.vue'
+import SwimlaneChart from '@/shared/components/SwimlaneChart.vue'
+import type { DagNode } from '@/shared/types/dag'
+import type { RunDetails, RunStatus, RunSummary } from '@/shared/types/api'
 
 const route = useRoute()
 const router = useRouter()

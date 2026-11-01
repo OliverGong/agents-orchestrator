@@ -6,8 +6,8 @@
  */
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { http } from '../api/http'
-import type { ControlPlaneState } from '../types/api'
+import { http } from '@/shared/api/http'
+import type { ControlPlaneState } from '@/shared/types/api'
 
 export const useControlStore = defineStore('control', () => {
   const state = ref<ControlPlaneState | null>(null)

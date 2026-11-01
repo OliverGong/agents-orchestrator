@@ -2,7 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { darkTheme, type GlobalThemeOverrides } from 'naive-ui'
-import { useSessionStore } from './stores/session'
+import { useSessionStore } from '@/app/stores/session'
 
 const route = useRoute()
 const router = useRouter()

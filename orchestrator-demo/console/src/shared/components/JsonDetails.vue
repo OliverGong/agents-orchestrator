@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { prettyJson } from '../utils/format'
+import { prettyJson } from '@/shared/utils/format'
 
 /** Collapsible pretty-JSON block (blackboard snapshots, tool results…). */
 const props = defineProps<{ title: string; json: string | null | undefined }>()
