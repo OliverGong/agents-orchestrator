@@ -135,6 +135,24 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 > 样式等横切资产归 `shared/`（与后端 `kernel/shared` 同构），`app/` 只留装配——
 > 判断依据与后端一致：这段资产的本质职责服务于谁？所有页面 → `shared/`；仅装配用 → `app/`。
 
+### 6.1 资产落位（assets）
+
+**资产与代码同一把尺**：图标、字体、图片、仪表盘 JSON、provisioning 配置等
+非代码资产同样遵循 2~5 条目法则，按**资产的服务对象**选落位（与 §6 判断依据
+同构），并预定义落位避免"随手一放"：
+
+| 资产类型 | 落位 | 分组方式 |
+|---|---|---|
+| 前端静态资源（favicon、图标、字体、图片） | `console/public/` | 按子类型分目录（`icons/`、`fonts/`、`images/`），每目录 ≤5 |
+| 可观测栈资产（仪表盘、provisioning、采集配置） | `docker/grafana/`、`docker/prometheus/`、`docker/tempo/` | 仪表盘进 `dashboards/`，provisioning 按 Grafana 约定二分（datasources/dashboards） |
+| 文档配图与示意资源 | `docs/assets/` | 按所属文档主题分组 |
+| 后端 resources | `src/main/resources/` | 仅配置文件；当前无静态资源（v3.1 已移除 legacy static，不再回归） |
+
+**当前盘点（2026-11）**：源码级零散资产为零——console 无 public/（index.html
+无外链图标），后端 resources 仅 application.properties；已落位资产全部达标：
+docker/ 根 5 条目、grafana 2 子目录（dashboards 1 / provisioning 2）、
+prometheus 与 tempo 各 1 配置文件。新增资产时按上表落位，条目超限先分组。
+
 ## 7. 演进指南：新模块接入清单
 
 1. **选 zone 归属**（§4 判定问题）：零业务语义且被 ≥2 域用 → `kernel/`；
@@ -145,7 +163,8 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 4. 把新模块加入守护测试的 `MODULES` 集合，跑 R3 确认无新环。
 5. 出现新环 → 按决策树处理：下沉 contract / 上浮 shared / 事件解耦；确需豁免则
    同步登记测试注释 + 反转计划表（禁止无计划的静默豁免）。
-6. 更新 ARCHITECTURE §3 zone 包树与 console 侧对应 feature（若有 UI 面）。
+6. 资产按 §6.1 落位表归位（前端 public/、docker 可观测栈、docs/assets/），目录条目超限先分组。
+7. 更新 ARCHITECTURE §3 zone 包树与 console 侧对应 feature（若有 UI 面）。
 
 **反模式清单**（重组过程中明确拒绝的方案）：
 
