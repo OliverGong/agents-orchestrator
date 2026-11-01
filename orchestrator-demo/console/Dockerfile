@@ -13,7 +13,10 @@ WORKDIR /build
 RUN corepack enable
 
 # Dependency download layer is only invalidated when the lockfile changes.
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml carries the allowBuilds approval (pnpm 12 reads build
+# approvals from here, not the package.json "pnpm" field) — needed for
+# strictDepBuilds to let esbuild's postinstall run.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
 
 COPY . .
