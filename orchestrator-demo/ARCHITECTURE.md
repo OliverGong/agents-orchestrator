@@ -108,7 +108,7 @@ com.oli.orchestrator_demo
 ├── OrchestratorDemoApplication      # 装配根：组件扫描四 zone，自身不含业务
 ├── kernel/                          # 内核层：零业务语义（R1 守护：禁 import 业务模块）
 │   ├── shared                       # 横切件：web 异常/缓存 · aop 执行切面 · context 运行归因
-│   └── contract                     # 契约面：黑板 + DTO 数据 · Agent SPI · AgentDescriptor
+│   └── contract                     # 契约面：黑板 + DTO 数据 · Agent SPI · 跨域端口（Reader/Sink/Gateway）
 ├── core/                            # 编排核心：旅行规划问题域的运行时
 │   ├── trip                         # 应用入口：POST /api/trips/plan → 按模板波次执行
 │   ├── agent                        # 协作方：4 业务 Agent · 模板基类 · advisor/ 链 · config/
@@ -615,7 +615,7 @@ docker compose -f docker/docker-compose.yml up  # 可选：Grafana + Tempo + Pro
 |---|---|
 | R1 | `kernel/shared/` 零业务模块 import（业务 SPI 一律在 `kernel/contract/`） |
 | R2 | `kernel/contract/` 只 import 自身（纯净数据面 + SPI 包） |
-| R3 | 模块依赖图（zone 限定名，如 core.agent）无环（豁免对见 §15.6.2） |
+| R3 | 模块依赖图（zone 限定名，如 core.agent）无环（**零豁免**，反转记录见 §15.6.2） |
 | R4 | `infra/` 适配器不被跨模块引用（端口与适配器本地性） |
 | R5 | `web/` 表现层不触碰任何 `infra/` 适配器 |
 
@@ -1281,14 +1281,16 @@ v3.0 采用 **package-by-feature**（按业务域分包）+ **模块内三层**�
   `governance` 治理面 / `ops` 观测运维面），每 zone 2~5 个模块，一眼可读；
   细节沿 drill down 路径下钻（§3）。
 - **zone 是导航分组，不是新的依赖边界**：依赖规则仍在**模块级**由 R1–R5 守护
-  （§7.3），豁免对也登记在模块级（§15.6.2）。
+  （§7.3）；模块环在模块级检测且当前零豁免（§15.6.2）。
 - **配置就近归属**：`AgentConfiguration` / `AgentModelProperties` /
   `ModelHttpClientConfig` 位于 `core.agent/config/` 而非集中 `config/`——配置属于拥有它的模块，
   删除模块时配置随之消失，不会留下幽灵 Bean。
-- **kernel/contract/ 稳定契约包**：`OrchestratorContext`、`TripRequest`、四个响应 record 与
-  **Agent SPI**（`Agent<I,O>`、`AgentDescriptor`）单独成包——数据面打破 `trip/` ↔
-  `agent/` 的潜在循环，SPI 下沉打破 `shared/`/`control/`/`mcp/` 指向 agent 实现的
-  逆向依赖；契约类型变更必然是一次显式的跨域决策。
+- **kernel/contract/ 稳定契约包**：`OrchestratorContext`、`TripRequest`、四个响应 record、
+  跨域数据 record（`AgentRuntimeConfig`、`McpServerConfig`、`RunInstance` 等）与两族 SPI——
+  **Agent SPI**（`Agent<I,O>`、`AgentDescriptor`）与**跨域端口**（`ModelDefaultsReader`、
+  `ControlPlaneReader`、`McpConnectionGateway`、`RunInstanceSink`、`RunStatusReader`）——
+  数据面打破潜在循环，端口反转打破治理/观测域指向运行时实现的逆向依赖；
+  契约类型变更必然是一次显式的跨域决策。
 - **kernel/shared/ 横切内核**：异常映射、缓存控制、AOP、`RunContext` 运行归因上下文——
   无业务语义、零业务模块 import（R1 守护），进入 shared 需满足"被 ≥2 个域使用"的门槛。
 - **核心层内聚子域再分层**：包根核心层类数超阈值（经验值 ~12）时按内聚子域细分
@@ -1340,19 +1342,23 @@ v3.0 采用 **package-by-feature**（按业务域分包）+ **模块内三层**�
 
 #### 15.6.1 依赖规则与豁免机制
 
-- 规则本体见 §7.3（R1–R5）；R3 的模块环检测在**豁免对**上放行，每个豁免必须
-  同时登记在测试注释与本节反转计划中——豁免是**带还债计划的临时状态**，不是永久许可。
-- 新增豁免前先问：公共依赖能否**下沉 `kernel/contract/`**（SPI/数据面）、**上浮 `kernel/shared/`**
-  （横切语义）、或**经事件解耦**（EIP 发布/订阅）？三者皆不适用再豁免。
+- 规则本体见 §7.3（R1–R5）；R3 的模块环检测当前为**零豁免**状态（历史 4 对已反转，
+  见 §15.6.2）——新环不得通过加豁免消化。
+- 出现新环时按序问：公共依赖能否**下沉 `kernel/contract/`**（SPI/数据面）、
+  **上浮 `kernel/shared/`**（横切语义）、或**经事件解耦**（EIP 发布/订阅）？
+  三者皆不适用时先重构消费面（窄端口），仍无法消解再评估豁免（须同步登记测试注释与本节）。
 
-#### 15.6.2 已知双向耦合（4 对豁免）与反转计划
+#### 15.6.2 历史双向耦合反转记录（已清零）
 
-| 豁免对 | 双向成因 | 反转计划（任一侧重构时顺带执行） |
-|---|---|---|
-| core.agent ⇄ governance.control | control 读 agent 描述符做内省 vs agent 运行时回读控制面配置 | 描述符已下沉 `kernel.contract.AgentDescriptor`；剩余边（运行时配置回读）抽为只读端口注入 |
-| governance.control ⇄ core.mcp | 连接注册表读控制面状态 vs 控制面状态端点组合注册表 | 注册表发布连接状态事件，控制面订阅（EIP 观察者反转直读） |
-| ops.instance ⇄ ops.observability | 回放读侧组合实例数据 vs Actor 写运行实例 | 实例写入改经事件端口；回放侧组合两个 Store 端口 |
-| ops.observability ⇄ core.trip | health 探针读编排者活状态 vs 编排者向观测域发事件/指标 | 抽只读 `RunStatusReader` 端口（contract SPI），探针经端口读取 |
+R3 曾登记 4 对豁免；2026-11 已全部按下方记录执行反转，守护测试现为**零豁免**。
+新的环必须按 §15.6.1 决策树反转消化，不得重新引入豁免。
+
+| 已反转对 | 反转手段（下沉数据面 + 窄端口） |
+|---|---|
+| core.agent ⇄ governance.control | 纯数据下沉 `kernel.contract`（AgentRuntimeConfig/CalibrationRule/AgentRuntimeStore/AgentDefaults）；模型默认值经 `ModelDefaultsReader` 端口注入（agent 侧 `ModelDefaultsBridge` 桥接）；Agent SPI 自描述（`descriptor()`），control 不再 import agent 模块 |
+| governance.control ⇄ core.mcp | `McpServerConfig`/`McpServerStatus` 下沉 contract；mcp 读控制面经 `ControlPlaneReader` 端口；control 的 HTTP 面经 `McpConnectionGateway` 端口消费连接状态 |
+| ops.instance ⇄ ops.observability | `RunInstance` 下沉 contract；Actor 写实例经 `RunInstanceSink` 写端口（instance 侧配置类桥接），instance→observability 读侧保持单向 |
+| ops.observability ⇄ core.trip | health/info 探针经 `RunStatusReader` 端口读取 `OrchestratorSnapshot`（contract 快照 record），trip 侧编排者提供实现，探针不 import trip 模块 |
 
 #### 15.6.3 新域模块接入清单
 

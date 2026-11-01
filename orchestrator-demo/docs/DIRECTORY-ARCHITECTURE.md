@@ -136,18 +136,20 @@ Level 5  class       类级细节归 §4 与各版本章节                 （�
 |---|---|---|
 | R1 | `kernel/shared/` 零业务模块 import | §4 kernel 约束 |
 | R2 | `kernel/contract/` 只 import 自身 | §5 SPI 下沉判据 |
-| R3 | 模块依赖图（zone 限定名）无环，豁免对显式登记 | §8 豁免机制 |
+| R3 | 模块依赖图（zone 限定名）无环，**零豁免** | §8 反转记录 |
 | R4 | `infra/` 适配器不被跨模块引用 | §5 三层依赖方向 |
 | R5 | `web/` 不触碰任何 `infra/` 适配器 | §5 三层依赖方向 |
 
-**当前豁免（4 对）与反转计划**——豁免是带还债计划的临时状态，任一侧重构时顺带执行：
+**历史豁免反转记录（已全部执行，2026-11）**——反转手法统一为"纯数据下沉 contract + 窄端口注入"：
 
-| 豁免对 | 双向成因 | 反转计划 |
-|---|---|---|
-| `core.agent ⇄ governance.control` | 描述符内省 vs 运行时配置回读 | 描述符已下沉 contract；剩余边抽只读端口 |
-| `governance.control ⇄ core.mcp` | 注册表读控制面状态 vs 状态端点组合 | 注册表发事件，控制面订阅（EIP 反转直读） |
-| `ops.instance ⇄ ops.observability` | 回放读侧组合 vs Actor 写实例 | 实例写入改经事件端口 |
-| `ops.observability ⇄ core.trip` | health 探针读活状态 vs 事件/指标发布 | 抽只读 `RunStatusReader` 端口（contract SPI） |
+| 已反转对 | 反转手段 |
+|---|---|
+| `core.agent ⇄ governance.control` | 数据下沉（AgentRuntimeConfig/CalibrationRule/AgentRuntimeStore/AgentDefaults）+ `ModelDefaultsReader` 端口 + Agent SPI `descriptor()` 自描述 |
+| `governance.control ⇄ core.mcp` | 数据下沉（McpServerConfig/McpServerStatus）+ mcp 侧 `ControlPlaneReader` / control 侧 `McpConnectionGateway` 端口 |
+| `ops.instance ⇄ ops.observability` | 数据下沉（RunInstance）+ Actor 写侧 `RunInstanceSink` 端口（instance 配置类桥接），读侧保持单向 |
+| `ops.observability ⇄ core.trip` | 探针侧 `RunStatusReader` 端口 + `OrchestratorSnapshot` 快照 record（trip 编排者实现） |
+
+新环必须按 §7 决策树反转消化，不得重新引入豁免。
 
 **阈值备忘**：包根核心层类数 >~12 → 按内聚子域开子包（先例：agent → advisor/config，
 observability → events/metrics/health）；子包不承载新的跨域依赖方向。
