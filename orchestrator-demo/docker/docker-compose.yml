@@ -17,7 +17,7 @@ services:
       dockerfile: Dockerfile
     # Versioned image name (APP_VERSION, default = the pom version): push it
     # to a registry to deploy the bundle elsewhere without rebuilding.
-    image: orchestrator:${APP_VERSION:-2.1.0}
+    image: orchestrator:${APP_VERSION:-2.2.0}
     environment:
       - SPRING_AI_OLLAMA_BASE_URL=${SPRING_AI_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4317}

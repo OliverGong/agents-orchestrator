@@ -92,7 +92,8 @@ com.oli.orchestrator_demo
 │   ├── ItineraryAgent           # Step3：调研+预算 → 逐日行程
 │   ├── ReviewAgent              # Step4：全量审查 → 最终结论
 │   ├── ResponseSanitizerAdvisor # LLM 输出净化（剥围栏/提 JSON/修形状）
-│   └── CalibrationAdvisor       # 控制平面校准规则套用（v1，见 9.4）
+│   ├── CalibrationAdvisor       # 控制平面校准规则套用（v1，见 9.4）
+│   └── UsageCaptureAdvisor      # LM 用量采集：tokens/模型名 → LmUsageCollector（v2.2，见 12.1）
 ├── orchestrator                 # 编排者（执行引擎）
 │   ├── TripPlanningOrchestrator # 按协作模板波次执行，串行或并发
 │   └── WorkflowTemplateHolder   # 模板热切换单点：volatile 引用（v1，见 9.3）
@@ -108,7 +109,9 @@ com.oli.orchestrator_demo
 │   ├── ObservabilitySsePublisher  # 事件广播到 SSE 订阅者（虚拟线程 per-emitter，v1）
 │   ├── OrchestratorMetrics      # run/stage 过程指标（计数器 + 时长 Timer + 保留数 Gauge）
 │   ├── OrchestratorHealthIndicator  # /actuator/health 的 orchestrator 组件
-│   └── OrchestratorInfoContributor  # /actuator/info 的 workflow 配置
+│   ├── OrchestratorInfoContributor  # /actuator/info 的 workflow 配置
+│   ├── LmUsageCollector / RunMetricsStore # LM 用量 ThreadLocal + 指标落库接缝（v2.2）
+│   └── DbRunMetricsStore        # obs_run_metrics 表（file 模式为 Noop，落库关闭）
 ├── aop                          # 横切关注点
 │   └── AgentExecutionAspect     # @Around：Agent 耗时日志 + span + Timer 指标
 ├── control                      # 控制平面（v1，见第 9 节；v2.0 存储分层，见第 10 节）
@@ -126,11 +129,26 @@ com.oli.orchestrator_demo
 │   └── ControlPlaneCrypto       # AES-256-GCM 字段加密 + GET 脱敏/PUT 还原（v2.0）
 ├── scenario                     # 场景平面（v2.1，见第 11 节）
 │   ├── Scenario                 # 场景记录：请求模板 + workflow/agent/MCP 覆盖 + 产物类型
-│   ├── ScenarioState / ScenarioStore # 版本化快照与持久化接缝（镜像 ControlPlaneStore 模式）
+│   ├── ScenarioState / ScenarioStore # 版本化快照与持久化接缝（镜像 ControlPlaneStore 模式，v2.2 含 activeScenarioId）
 │   ├── FileScenarioStore / DbScenarioStore # config/scenarios.json │ cp_scenario* 两表
 │   ├── ScenarioRegistry         # 单写者：CRUD + 引用校验 + activate 热应用 + dry-run
 │   ├── DryRunEngine / DryRunReport # 零 token 推演：模板校验 + 波次展开 + 槽位流
 │   └── ScenarioController       # /api/v1/scenarios CRUD + dry-run + activate
+├── meta                         # 元信息补录平面（v2.2，见 12.2）
+│   ├── MetaState / MetaStore    # 运行时配置+发布门户+按场景发布配置；持久化接缝
+│   ├── FileMetaStore / DbMetaStore # config/meta-plane.json │ mp_* 四表
+│   ├── MetaRegistry             # 单写者：CRUD + 门户可用性判定
+│   └── MetaController           # /api/v1/meta 读写（变更端点全量审计）
+├── teamlog                      # 团队日志（v2.2，见 12.3）
+│   ├── TeamLogEntry             # RUN / AUDIT / SYSTEM 三类条目
+│   ├── FileTeamLogStore / DbTeamLogStore # JSONL team-log.jsonl │ team_log 表
+│   ├── TeamLogRecorder          # 审计单写门面：14 个变更端点 + 系统通知
+│   └── TeamLogController        # GET /api/v1/logs（类别/级别/时间窗/关键字检索）
+├── release                      # 发布管道（v2.2，见 12.4）
+│   ├── ReleasePackage / ReleaseRecord # 可移植 JSON 包（SHA-256）与注册记录
+│   ├── FileReleaseStore / DbReleaseStore # release-registry.json │ rl_release 表
+│   ├── ReleaseService           # 发布编排：场景 → meta 配置 → 打包 → 哈希 → 注册
+│   └── ReleaseController        # /api/v1/releases 列表 / 发布 / 包导出
 ├── config                       # 配置
 │   ├── AgentConfiguration       # @EnableConfigurationProperties 激活（人格已迁控制平面）
 │   ├── ModelHttpClientConfig    # 模型后端 HTTP 超时（connect 5s / read 5min）
@@ -608,8 +626,8 @@ docker compose -f docker/docker-compose.yml up  # 可选：Grafana + Tempo + Pro
   时间线（REST 回放上下文）、过程指标目录与 Actuator health/info 端点
   （OrchestratorMetrics / OrchestratorHealthIndicator / OrchestratorInfoContributor）、
   Grafana/Tempo/Prometheus 可视化栈（`docker/`）。
-  可扩展：`RunTimeline` 持久化、`orchestrator.planTrip` 内增加波次级子 span、
-  或为模板元数据挂 LLM token 用量。
+  可扩展：完整 `RunTimeline` 的长期持久化（v2.2 已落库阶段级 LM 指标与运行
+  日志，见 12.1/12.3）、`orchestrator.planTrip` 内增加波次级子 span。
 
 ## 9. v1：Docker 化、并行示例与控制平面（Control Plane）
 
@@ -931,3 +949,121 @@ JDBC starter（store=db 所需）常驻 classpath，而本地 file 模式没有
 `DryRunEngineTest`（默认模板 4 波 6 边 + 槽位流/CONCURRENT 覆盖并行/校验
 问题报告/槽位缺口/覆盖生效/未配置 MCP 判 invalid）、`AbstractContextAgentTest`
 追加重试事件归因与工作流外丢弃两例——合计 **140 例全绿**。
+
+## 12. v2.2：观测落库、元信息补录、团队日志、发布管道与导航-画布联动
+
+v2.1 回答"编排逻辑如何作为资产切换"，v2.2 补齐运营闭环的另一半：**观测数据
+落库**（每场景每阶段 LM 耗时/token 可查）、**控制层面元信息补录**（运行时配置/
+发布门户/按场景发布配置）、**运行时团队日志**（不限于业务日志的全量审计与
+检索）、**发布管道**（可移植包 + 注册表）与**左侧导航-画布联动**（生命周期
+闭合链）。五块共享同一模式：新存储平面一律镜像既有
+"单写者 registry + Store 接缝 + 跟随 `orchestrator.control.store` 装配"，
+不另设开关。
+
+### 12.1 观测落库与 LM 指标（obs_run_metrics）
+
+- **用量采集**：`UsageCaptureAdvisor`（agent 包，`CallAdvisor`）从原始
+  `ChatResponse` metadata 读取 prompt/completion/total tokens 与服务模型名，
+  写入 `LmUsageCollector` ThreadLocal，编排者在阶段边界汇成
+  `AgentObservabilityEvent.LmUsage` 随事件进 Actor。注册序取
+  `LOWEST_PRECEDENCE - 1`（紧贴终端 `ChatModelCallAdvisor` 之前）——净化/校准
+  advisor 会重建响应并丢弃 metadata，**采集必须离模型最近**；全链路 null-safe，
+  后端不报用量或工作流之外的调用不贡献数据。
+- **WAL 顺序落库**：`ObservabilityActor.apply()` 对每个事件先 `recordLog`
+  （`team_log` 追加）再 `recordMetrics`（`obs_run_metrics` 追加），二者先于
+  内存折叠与 SSE 推送；任一 store 失败降级 WARN，不破坏时间线。
+- **表**：`obs_run_metrics`（run_id/scenario_id/stage/agent/model/wave_index/
+  attempt/outcome/duration_ms/prompt·completion·total_tokens/created_at，
+  created_at 与 scenario_id 双索引）。装配 `RunMetricsConfig` 同样跟随
+  `orchestrator.control.store`：db 模式为 `DbRunMetricsStore`（PostgreSQL/H2
+  同一可移植 schema），file 模式为 `NoopRunMetricsStore`（进程内时间线照常，
+  落库关闭）。
+- **查询 API**：`GET /api/v1/scenarios/{id}/metrics`（单场景聚合）与
+  `GET /api/v1/metrics/lm`（全场景，`since`/`scenarioId` 过滤）——按
+  scenario/stage/agent/model 汇总调用数、总耗时与 token 消耗，即
+  "每个业务场景对应模型 LM 的耗时与 token 消耗"历史。
+- 回放侧 `RunTimeline`/`RunSummary`/`RunDetails` 均携带 `scenarioId`
+  （RUN_STARTED 归因，见 12.5），运行与场景可互查。
+
+### 12.2 元信息补录（meta 平面）
+
+控制平面回答"当前生效的编排配置"，meta 平面补录其**周边元信息**，三组数据
+一个快照（`MetaState`，version 单调递增）：
+
+| 组成 | 内容 | mp_* 表 |
+|---|---|---|
+| `runtime` | 运行时配置补录：modelBackend / requestTimeoutSeconds / maxWaveConcurrency / temperature / topP | `mp_runtime` |
+| `portals` | 发布门户注册表：id/name/kind/endpoint/enabled | `mp_portal` |
+| `releases` | 按场景发布配置：scenarioId/portalId/version/changelog/artifactType | `mp_release` |
+
+- `MetaRegistry` 单写者 + `MetaStore` 接缝：`FileMetaStore`
+  （`config/meta-plane.json`）│ `DbMetaStore`（mp_* 四表，另有 `mp_version`
+  单行版本戳），跟随 `orchestrator.control.store` 装配，db 首启一次性导入
+  既有 JSON；`orchestrator.meta.file` 可改路径。
+- REST（`/api/v1/meta`）：GET 状态/门户/发布配置 + `PUT /runtime`、
+  `POST /portals`、`DELETE /portals/{id}`、`PUT|DELETE /releases/{scenarioId}`，
+  5 个变更端点全部写审计（见 12.3）。左侧「元信息补录」页三卡对应三组数据。
+
+### 12.3 团队日志（teamlog 平面）
+
+运行时团队的日志平面，**不限于业务日志**——三类条目同一 `team_log` 表
+（ts/category/level/source/run_id/scenario_id/action/message/detail，
+ts 与 (category, level) 双索引）：
+
+| 类别 | 产出方 | 内容 |
+|---|---|---|
+| `RUN` | `ObservabilityActor` 直接经 Store 接缝（先于指标落库，见 12.1） | 运行/阶段边界事件流（含场景归因） |
+| `AUDIT` | `TeamLogRecorder.audit(source, action, target, detail)` | 控制面 5 + meta 面 5 + 场景面 4 共 **14 个变更端点**的全量审计（动作/目标/JSON 明细；v2.2 发布管道再加 1，见 12.4） |
+| `SYSTEM` | `TeamLogRecorder.system(...)` | 启动、接线等系统通知 |
+
+- 存储接缝：`FileTeamLogStore`（JSONL `config/team-log.jsonl`，追加写）│
+  `DbTeamLogStore`（`team_log` 表），跟随 `orchestrator.control.store`；
+  `orchestrator.teamlog.file` 可改路径。
+- **日志永不砸业务**：任何 append 失败降级 WARN，被记录的操作照常完成
+  （TeamLogRecorder 的唯一不变量）。
+- 检索：`GET /api/v1/logs?category=&level=&since=&until=&runId=&scenarioId=&q=`
+  （时间倒序）；控制台「日志检索」页按类别/级别/关键字筛选，覆盖整体场景
+  观测与可观测性回顾。
+
+### 12.4 发布管道（release 平面）
+
+发布 = 把场景资产打包为**可移植 JSON 包**并登记，门户信息从 meta 平面整合：
+
+- `ReleaseService.publish(scenarioId)`：场景 → meta 平面读该场景的发布配置
+  （无配置 400）→ 校验门户已注册且启用 → 组装 `ReleasePackage`
+  （FORMAT `orchestrator-release-package` / 版本 `1.0` / 工具 `orchestrator`：
+  **场景快照 + dry-run 证据** + 门户/版本/changelog/产物类型元数据）→
+  序列化计算 **SHA-256** → 追加 `ReleaseRecord` 进注册表 → 审计
+  `SCENARIO_PUBLISHED`。artifactType 未单独配置时回落场景自身的类型。
+- 存储接缝：`FileReleaseStore`（`config/release-registry.json`，id = 内部
+  version+1，重启续号）│ `DbReleaseStore`（`rl_release` 表），跟随
+  `orchestrator.control.store`；`orchestrator.release.file` 可改路径。
+- REST（`/api/v1/releases`）：`GET ?scenarioId=`（最新在前）、
+  `POST /{scenarioId}/publish`、`GET /{id}/package`（attachment 重新导出，
+  包体逐字节一致，哈希可对外校验）。控制台「发布注册表」卡支持行内一键发布。
+
+### 12.5 导航-画布联动与生命周期闭合（控制台 v2.2）
+
+- **全局上下文条**：画布顶部 `ctx-bar` 显示当前激活场景徽章 + 生命周期闭合链
+  四步（推演 → 激活·运行 → 回放 → 场景指标）；步进按钮携带场景上下文跨页
+  跳转，当前页对应步骤高亮。
+- **激活状态持久化**：`ScenarioState` 新增第 4 分量 `activeScenarioId`——
+  activate 是场景面一等状态变更（bump version + 落库，跨重启/跨客户端可见，
+  空白归一为 null）；激活场景被删除时自动重置（闭合）。旧 JSON 状态文件缺该
+  字段加载为 null，向后兼容。
+- **场景归因贯通**：`RUN_STARTED` 携带 scenarioId → `RunTimeline`/
+  `RunSummary`/`RunDetails`/`obs_run_metrics`/`team_log` 全链路带场景字段；
+  回放列表加「场景」列，LM 指标页加场景筛选下拉（保留跨页携带的筛选值）。
+- **跨页动作闭合**：运行完成卡 →「查看回放」「场景指标」；场景配置行内 →
+  「推演」「激活」；dry-run 报告尾部 →「激活并运行」。全部经
+  `gotoPage(page, {scenarioId})` 程序化导航，目标页按携带上下文预选。
+- 静态资源缓存戳 `app.js?v=15`。
+
+### 12.6 测试增量
+
+M1 指标落库（RunMetricsStore file/db/UsageCapture/LmUsageCollector/指标 API）、
+M2 元数据平面（MetaRegistry/MetaStore file+db/MetaController）、M3 团队日志
+（TeamLogStore file+db/TeamLogRecorder/TeamLogController）、M4 发布管道
+（ReleaseStore file+db/ReleaseService/ReleaseController）、M5 联动
+（activeScenarioId 往返/activate 记录与删除重置/回放视图 scenarioId）——
+合计 **195 例全绿**（`./mvnw test`，DB 用例跑 H2 内存库）。

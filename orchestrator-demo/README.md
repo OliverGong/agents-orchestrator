@@ -4,8 +4,8 @@
 运行时控制平面、场景平面、MCP 动态工具接入与端到端可观测性（Traces / Metrics / 运行时间线回放）。
 
 - 技术基线：Java 25 · Spring Boot 4.1.2 · Spring AI 2.0.1（BOM）· MCP Java SDK
-- Maven 坐标：`com.oli:orchestrator:2.1.0`（版本经 `/actuator/info` 暴露，控制台侧栏可见）
-- 功能版本：**v2.1**，分支 `feat/navigation`
+- Maven 坐标：`com.oli:orchestrator:2.2.0`（版本经 `/actuator/info` 暴露，控制台侧栏可见）
+- 功能版本：**v2.2**，主干 `main`
 - 深入设计细节见 [ARCHITECTURE.md](./ARCHITECTURE.md)（本文为其索引入口）
 
 ---
@@ -20,8 +20,9 @@
 | v1.1 · Phase 2 | `d1e261a` | **MCP 解耦**：连接注册表从控制平面动态建连（Streamable HTTP 默认 / SSE 兼容 / STDIO 子进程）、版本 diff 热重建、失败冷却重试与手动重连；**工具注入**：映射服务器的工具以 ToolCallback 进入每次模型调用；**工具调用可观测**：耗时 / 结果 / 归因进时间线与 SSE；前端 MCP 面板与运行回放工具明细 |
 | v2.0 | `14fe222` / `1aaa4c6` | **控制平面持久化基座**：`ControlPlaneStore` 抽象——文件（默认/seed/回退）或 PostgreSQL（规范化 `cp_*` 表 + 单事务写 + WAL 崩溃安全）；Caffeine 缓存（version 戳失效 + 写透 + TTL）；`cp_mcp_server.env` 字段级 AES-256-GCM 加密（`ORCHESTRATOR_CRYPTO_KEY`），GET 脱敏 `******` / PUT 回写还原；首次启动 JSON → DB 一次性导入；compose 栈切 db 模式（postgres:16 + 健康检查） |
 | v2.1 | `90f76a8` + console | **场景元模型（Scenario Plane）**：场景 = 请求模板 + 工作流覆盖 + Agent 覆盖 + MCP 映射 + 产物类型，`ScenarioRegistry` 单写者 + `ScenarioStore` 接缝（file / `cp_scenario*` 表，跟随同一 store 开关）；`activate` 将覆盖热应用到控制平面（动态实例化）；`dry-run` 零 token 推演（模板校验 + 波次展开 + 黑板槽位流）；**解析重试事件链**：`STAGE_RETRIED` 经 RunContext 归因进时间线 / SSE / 回放；**控制台 v2.1**：左侧三组导航（场景运行·推演·配置 / agents·workflow·MCP / 回放·观测）+ 运行回放时间线 / DAG / 泳道三视图（原生 SVG）+ retry 链可视化 |
+| v2.2 | `b4b7121` → `050e587` | **观测落库 + LM 指标**（M1）：`ObservabilityActor` WAL 顺序先落库再推送，`obs_run_metrics` 记录每场景每阶段的 LM 耗时 / prompt·completion·total tokens / 模型 / 重试（`UsageCaptureAdvisor` 采集），场景维度指标 API；**元信息补录**（M2）：`meta/` 平面——运行时配置（modelBackend / 超时 / 波次并发 / temperature / topP）、发布门户注册表、按场景发布配置（file / `mp_*` 表），左侧「元信息补录」页三卡；**团队日志**（M3）：`team_log` 持久化运行时日志（RUN / AUDIT / SYSTEM，不限于业务日志）+ 控制面/元数据/场景面 14 个变更端点全量审计 + Log Explorer 筛选页；**发布管道**（M4）：可移植 JSON 发布包（场景快照 + dry-run 证据 + 门户/版本元数据，SHA-256）追加到 `rl_release` 注册表，发布记录随时导出；**导航-画布联动**（M5）：全局上下文条 + 生命周期闭合链 推演→激活·运行→回放→场景指标，激活场景持久化（`activeScenarioId`），运行/回放携带场景归因 |
 
-当前测试规模：**140 个用例全绿**（`./mvnw test`，DB 相关用例跑 H2 内存库），覆盖编排、控制平面校验、场景注册表与零 token 推演、MCP 注册表与工具插桩、观测控制器、存储后端与加密。
+当前测试规模：**195 个用例全绿**（`./mvnw test`，DB 相关用例跑 H2 内存库），覆盖编排、控制平面校验、场景注册表与零 token 推演、MCP 注册表与工具插桩、观测控制器与落库指标、元数据平面、团队日志、发布管道、存储后端与加密。
 
 ## 2. 体系架构
 
@@ -55,7 +56,14 @@
 │   ScenarioRegistry（单写者）· DryRunEngine（零 token 推演）                 │
 │   └─ ScenarioStore：file（scenarios.json）│ db（cp_scenario* 两表）         │
 │      Scenario = 请求模板 + workflow/agent/MCP 覆盖 + 产物类型；             │
-│      activate → 覆盖热应用到控制平面（动态实例化）                           │
+│      activate → 覆盖热应用到控制平面（动态实例化，v2.2 记录 activeScenarioId）│
+│                                                                          │
+│ meta/ 元信息补录平面（v2.2）：运行时配置 · 发布门户 · 按场景发布配置           │
+│   └─ MetaStore：file（meta-plane.json）│ db（mp_* 四表）                    │
+│ release/ 发布管道（v2.2）：可移植 JSON 包（SHA-256）→ 发布注册表              │
+│   └─ ReleaseStore：file（release-registry.json）│ db（rl_release 表）       │
+│ teamlog/ 团队日志（v2.2）：RUN / AUDIT / SYSTEM 先落库再推送（WAL 顺序）      │
+│   └─ TeamLogStore：file（team-log.jsonl）│ db（team_log 表）                │
 │                                                                          │
 │ mcp/ MCP 动态连接层（解耦核心）                                            │
 │   McpConnectionRegistry：版本 diff reconcile · 异步建连 · 30s 冷却重试     │
@@ -97,7 +105,14 @@
 | GET/POST | `/api/v1/scenarios` | 场景列表 / 创建（创建即校验引用与模板合法性） |
 | GET/PUT/DELETE | `/api/v1/scenarios/{id}` | 场景读 / 更新 / 删除（version 单调递增） |
 | POST | `/api/v1/scenarios/{id}/dry-run` | 零 token 推演：校验 + 波次展开 + DAG 边 + 槽位流 |
-| POST | `/api/v1/scenarios/{id}/activate` | 激活：覆盖热应用到控制平面（返回脱敏后状态） |
+| POST | `/api/v1/scenarios/{id}/activate` | 激活：覆盖热应用到控制平面（返回脱敏后状态，v2.2 起记录激活场景） |
+| GET | `/api/v1/scenarios/{id}/metrics` | 场景维度 LM 指标（耗时 / tokens 聚合，v2.2） |
+| GET | `/api/v1/metrics/lm` | 全场景 LM 指标聚合（obs_run_metrics，v2.2） |
+| GET/PUT/POST/DELETE | `/api/v1/meta[...]` | 元信息补录：状态 / 运行时配置 / 发布门户 / 按场景发布配置（v2.2） |
+| GET | `/api/v1/logs` | 团队日志检索（类别 / 级别 / 时间窗 / run / 场景 / 关键字，v2.2） |
+| GET | `/api/v1/releases` | 发布注册表（可按场景过滤，v2.2） |
+| POST | `/api/v1/releases/{scenarioId}/publish` | 发布：打包（快照 + dry-run 证据 + 门户元数据）→ 哈希 → 注册表（v2.2） |
+| GET | `/api/v1/releases/{id}/package` | 重新导出发布包（attachment 下载，v2.2） |
 | — | `/actuator/health` · `/info` · `/metrics` · `/prometheus` | 健康检查（含 orchestrator 组件）、活工作流配置、指标 |
 
 ## 4. Docker 服务
@@ -116,13 +131,13 @@
 
 - **卷**：compose 项目名 `orchestrator` 前缀到实际卷名——`orchestrator_postgres-data` → 控制平面表存储、`orchestrator_orchestrator-config` → `/app/config`（JSON 状态：迁移源/回退后端）、`orchestrator_tempo-data` → Tempo 存储。跨环境迁移时直接整卷拷贝（同版本 Postgres 数据文件可平移）。
 - **环境变量契约**：所有宿主相关值都经 compose 变量插值（`docker/.env.example` 有完整清单与默认值——复制为 `.env` 即可按环境覆盖，无需改动 compose 文件）：`SPRING_AI_OLLAMA_BASE_URL`（模型后端，部署到其他环境时指向可达的推理服务）、`APP_VERSION`（镜像 tag，与 pom 版本一致）、`APP_PORT`（宿主端口，Prometheus 经 compose 网络内 `app:8080` 抓取，不随端口映射变化）、`OTEL_EXPORTER_OTLP_ENDPOINT`（默认 `http://tempo:4317`，gRPC 传输——HTTP 传输对 Tempo receiver 会 404）、`ORCHESTRATOR_CONTROL_STORE`（`db`：PostgreSQL / `file`：JSON）、`POSTGRES_DB|USER|PASSWORD`、`ORCHESTRATOR_CRYPTO_KEY`（可选，开启 MCP secret 的 AES-GCM 字段加密）、`ORCHESTRATOR_SPRING_EXCLUDE`（compose 置空以恢复 DataSource 自动配置——本地 file 模式默认排除它，避免无 JDBC url 启动失败）。
-- **可迁移部署**：整套服务以 `name: orchestrator` 固定项目名，镜像 `orchestrator:${APP_VERSION:-2.1.0}` 版本化命名——在任何有 Docker 的机器上 clone 仓库 + `docker compose up -d --build` 即得一致部署，或将镜像推送到 registry 后在其他环境直接 pull 启动；除 Ollama 地址外无宿主耦合。
+- **可迁移部署**：整套服务以 `name: orchestrator` 固定项目名，镜像 `orchestrator:${APP_VERSION:-2.2.0}` 版本化命名——在任何有 Docker 的机器上 clone 仓库 + `docker compose up -d --build` 即得一致部署，或将镜像推送到 registry 后在其他环境直接 pull 启动；除 Ollama 地址外无宿主耦合。
 - **前置条件**：模型后端就绪（本地为宿主机 Ollama，默认 `qwen3-vl:4b` / 各 agent 覆盖为 `qwen:7b`，可用 `ollama pull` 调整）。
 
 ```bash
 cd docker
 cp .env.example .env    # 按环境调整（可选，默认值即本地开发栈）
-docker build -t orchestrator:2.1.0 ..   # 构建镜像（可选，compose up 会自动构建）
+docker build -t orchestrator:2.2.0 ..   # 构建镜像（可选，compose up 会自动构建）
 
 # 启动完整栈（app + postgres + tempo + prometheus + grafana）
 docker compose up -d --build
