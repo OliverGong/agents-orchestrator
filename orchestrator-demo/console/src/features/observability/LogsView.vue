@@ -127,6 +127,7 @@ onBeforeUnmount(() => {
         <n-form-item label="类别">
           <n-select
             v-model:value="filters.category"
+            @update:value="refresh"
             :options="[
               { label: '全部', value: '' },
               { label: 'RUN', value: 'RUN' },
@@ -139,6 +140,7 @@ onBeforeUnmount(() => {
         <n-form-item label="级别">
           <n-select
             v-model:value="filters.level"
+            @update:value="refresh"
             :options="[
               { label: '全部', value: '' },
               { label: 'INFO', value: 'INFO' },
@@ -151,6 +153,7 @@ onBeforeUnmount(() => {
         <n-form-item label="时间窗口">
           <n-select
             v-model:value="filters.window"
+            @update:value="refresh"
             :options="[
               { label: '近 1 小时', value: '1h' },
               { label: '近 24 小时', value: '24h' },
