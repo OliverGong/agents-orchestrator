@@ -15,7 +15,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.ops.instance.infra;
-import com.oli.orchestrator_demo.kernel.contract.RunInstanceSink;
+import com.oli.orchestrator_demo.kernel.contract.port.RunInstanceSink;
 import com.oli.orchestrator_demo.ops.instance.InstanceStore;
 
 import java.nio.file.Path;
@@ -48,7 +48,7 @@ public class InstanceStoreConfig {
   public RunInstanceSink runInstanceSink(InstanceStore store) {
     return new RunInstanceSink() {
       @Override
-      public void start(com.oli.orchestrator_demo.kernel.contract.RunInstance instance) {
+      public void start(com.oli.orchestrator_demo.kernel.contract.model.RunInstance instance) {
         store.start(instance);
       }
 

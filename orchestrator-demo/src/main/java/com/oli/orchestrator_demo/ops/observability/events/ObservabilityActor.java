@@ -53,8 +53,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.kernel.contract.RunInstanceSink;
-import com.oli.orchestrator_demo.kernel.contract.RunInstance;
+import com.oli.orchestrator_demo.kernel.contract.port.RunInstanceSink;
+import com.oli.orchestrator_demo.kernel.contract.model.RunInstance;
 import com.oli.orchestrator_demo.governance.teamlog.infra.NoopTeamLogStore;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogEntry;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogStore;

@@ -36,4 +36,6 @@ build/
 .DS_Store
 
 ### Runtime state (control plane persists here) ###
-config/
+# anchored to the module root only — an unanchored "config/" would also
+# ignore source directories like kernel/contract/config/
+/config/

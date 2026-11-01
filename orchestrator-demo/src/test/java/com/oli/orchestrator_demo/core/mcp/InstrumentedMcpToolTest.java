@@ -10,7 +10,7 @@
  */
 package com.oli.orchestrator_demo.core.mcp;
 
-import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,7 +21,7 @@ import org.mockito.Mockito;
 import org.springframework.ai.mcp.SyncMcpToolCallback;
 import org.springframework.ai.tool.definition.DefaultToolDefinition;
 
-import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;
 import com.oli.orchestrator_demo.kernel.shared.context.RunContext;

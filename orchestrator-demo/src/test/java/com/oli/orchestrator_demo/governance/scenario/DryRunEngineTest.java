@@ -29,7 +29,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
 import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
 import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
 import com.oli.orchestrator_demo.governance.control.infra.FileControlPlaneStore;
 import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;

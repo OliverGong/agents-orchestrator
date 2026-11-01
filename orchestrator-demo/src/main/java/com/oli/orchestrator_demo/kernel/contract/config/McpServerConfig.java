@@ -20,7 +20,7 @@
  * @Date Oct 30, 2026
  * @Version 1.1
  */
-package com.oli.orchestrator_demo.kernel.contract;
+package com.oli.orchestrator_demo.kernel.contract.config;
 
 
 import java.util.List;

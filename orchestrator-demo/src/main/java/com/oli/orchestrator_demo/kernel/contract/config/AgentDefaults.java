@@ -9,7 +9,9 @@
  * @Date Oct 30, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.kernel.contract;
+package com.oli.orchestrator_demo.kernel.contract.config;
+
+import com.oli.orchestrator_demo.kernel.contract.port.ModelDefaultsReader;
 
 import java.util.List;
 import java.util.Map;

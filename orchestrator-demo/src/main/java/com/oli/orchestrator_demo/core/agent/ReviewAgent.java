@@ -19,13 +19,13 @@ import java.util.List;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.port.AgentRuntimeStore;
 import com.oli.orchestrator_demo.core.mcp.McpConnectionRegistry;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
-import com.oli.orchestrator_demo.kernel.contract.ReviewResponse;
-import com.oli.orchestrator_demo.kernel.contract.TripRequest;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.ReviewResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.TripRequest;
 
 @Component
 public class ReviewAgent extends AbstractContextAgent<ReviewResponse> {

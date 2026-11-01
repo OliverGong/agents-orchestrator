@@ -22,8 +22,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.kernel.contract.CalibrationRule;
+import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.config.CalibrationRule;
 import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
 
 public record Scenario(

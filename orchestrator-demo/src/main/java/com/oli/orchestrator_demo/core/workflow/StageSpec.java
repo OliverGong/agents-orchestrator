@@ -9,7 +9,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.core.workflow;
-import com.oli.orchestrator_demo.kernel.contract.Agent;
+import com.oli.orchestrator_demo.kernel.contract.spi.Agent;
 
 import java.util.List;
 

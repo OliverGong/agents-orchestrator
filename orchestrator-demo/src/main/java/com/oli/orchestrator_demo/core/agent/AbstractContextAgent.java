@@ -26,7 +26,7 @@
  * @Version 1.1
  */
 package com.oli.orchestrator_demo.core.agent;
-import com.oli.orchestrator_demo.kernel.contract.Agent;
+import com.oli.orchestrator_demo.kernel.contract.spi.Agent;
 import com.oli.orchestrator_demo.core.agent.advisor.UsageCaptureAdvisor;
 import com.oli.orchestrator_demo.core.agent.advisor.CalibrationAdvisor;
 import com.oli.orchestrator_demo.core.agent.advisor.ResponseSanitizerAdvisor;
@@ -43,11 +43,11 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.port.AgentRuntimeStore;
 import com.oli.orchestrator_demo.core.mcp.McpConnectionRegistry;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.ops.observability.metrics.LmUsageCollector;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityEventBus;
@@ -106,7 +106,7 @@ public abstract class AbstractContextAgent<R> implements Agent<OrchestratorConte
 
   /**
    * The agent's self-declared slot contract (title, human description, and
-   * which {@link com.oli.orchestrator_demo.kernel.contract.OrchestratorContext} slots it
+   * which {@link com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext} slots it
    * produces, consumes and tolerates to be missing). Collected at startup by
    * the control plane and used for the logical-closure validation of
    * collaboration templates. Deliberately not final: like {@link #name()},

@@ -17,9 +17,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
-import com.oli.orchestrator_demo.kernel.contract.ResearchResponse;
-import com.oli.orchestrator_demo.kernel.contract.TripRequest;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.ResearchResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.TripRequest;
 
 class BudgetAgentTest {
 

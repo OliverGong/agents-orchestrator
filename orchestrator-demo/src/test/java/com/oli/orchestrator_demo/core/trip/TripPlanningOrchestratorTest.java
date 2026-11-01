@@ -33,15 +33,15 @@ import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
-import com.oli.orchestrator_demo.kernel.contract.Agent;
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.spi.Agent;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.kernel.contract.BudgetResponse;
-import com.oli.orchestrator_demo.kernel.contract.ItineraryResponse;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
-import com.oli.orchestrator_demo.kernel.contract.ResearchResponse;
-import com.oli.orchestrator_demo.kernel.contract.ReviewResponse;
-import com.oli.orchestrator_demo.kernel.contract.TripRequest;
+import com.oli.orchestrator_demo.kernel.contract.model.BudgetResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.ItineraryResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.ResearchResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.ReviewResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.TripRequest;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent.Type;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;

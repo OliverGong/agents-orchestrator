@@ -11,9 +11,9 @@
  */
 package com.oli.orchestrator_demo.core.mcp;
 
-import com.oli.orchestrator_demo.kernel.contract.McpServerStatus;
+import com.oli.orchestrator_demo.kernel.contract.config.McpServerStatus;
 
-import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,9 +35,9 @@ import com.oli.orchestrator_demo.Await;
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
 import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
 import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.governance.control.infra.FileControlPlaneStore;
-import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.core.workflow.WorkflowProperties;

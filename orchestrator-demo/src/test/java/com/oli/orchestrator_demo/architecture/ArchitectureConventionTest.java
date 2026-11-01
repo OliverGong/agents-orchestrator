@@ -1,6 +1,4 @@
 package com.oli.orchestrator_demo.architecture;
-import com.oli.orchestrator_demo.kernel.contract.Agent;
-
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -101,7 +99,10 @@ class ArchitectureConventionTest {
         assertTrue(violations.isEmpty(), "shared/ must stay decoupled from business domains: " + violations);
     }
 
-    /** R2 — contract/ is a pristine data plane: imports only within itself. */
+    /** R2 — contract/ is a pristine data plane: imports only within itself.
+     *  The spi/model/config/port subpackages are navigation-only grouping;
+     *  moduleOf() still resolves them to the single kernel.contract module,
+     *  so intra-contract references count as package-internal. */
     @Test
     void contractPackageImportsNothingOutsideItself() throws IOException {
         List<String> violations = sources().stream()

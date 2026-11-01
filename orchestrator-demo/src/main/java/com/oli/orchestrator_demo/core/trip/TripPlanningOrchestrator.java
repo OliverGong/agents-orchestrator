@@ -44,11 +44,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import com.oli.orchestrator_demo.kernel.contract.Agent;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorSnapshot;
-import com.oli.orchestrator_demo.kernel.contract.RunStatusReader;
-import com.oli.orchestrator_demo.kernel.contract.TripRequest;
+import com.oli.orchestrator_demo.kernel.contract.spi.Agent;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorSnapshot;
+import com.oli.orchestrator_demo.kernel.contract.port.RunStatusReader;
+import com.oli.orchestrator_demo.kernel.contract.model.TripRequest;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.ops.observability.metrics.LmUsageCollector;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;

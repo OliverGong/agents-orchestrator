@@ -18,8 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.kernel.contract.ItineraryResponse;
-import com.oli.orchestrator_demo.kernel.contract.ResearchResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.ItineraryResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.ResearchResponse;
 
 class ResponseSanitizerAdvisorTest {
 

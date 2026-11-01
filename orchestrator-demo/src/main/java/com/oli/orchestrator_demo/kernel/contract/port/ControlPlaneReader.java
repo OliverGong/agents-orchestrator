@@ -10,7 +10,10 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.kernel.contract;
+package com.oli.orchestrator_demo.kernel.contract.port;
+
+import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
 
 import java.util.List;
 

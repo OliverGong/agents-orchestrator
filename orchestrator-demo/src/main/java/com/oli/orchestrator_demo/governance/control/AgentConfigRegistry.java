@@ -18,12 +18,12 @@
  */
 package com.oli.orchestrator_demo.governance.control;
 
-import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
 
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.port.AgentRuntimeStore;
 
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -37,9 +37,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.kernel.contract.ControlPlaneReader;
-import com.oli.orchestrator_demo.kernel.contract.ModelDefaultsReader;
-import com.oli.orchestrator_demo.kernel.contract.AgentDefaults;
+import com.oli.orchestrator_demo.kernel.contract.port.ControlPlaneReader;
+import com.oli.orchestrator_demo.kernel.contract.port.ModelDefaultsReader;
+import com.oli.orchestrator_demo.kernel.contract.config.AgentDefaults;
 
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.core.workflow.ExecutionMode;

@@ -26,9 +26,9 @@
  */
 package com.oli.orchestrator_demo.core.mcp;
 
-import com.oli.orchestrator_demo.kernel.contract.McpServerStatus;
+import com.oli.orchestrator_demo.kernel.contract.config.McpServerStatus;
 
-import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+import com.oli.orchestrator_demo.kernel.contract.config.McpServerConfig;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -50,9 +50,9 @@ import org.springframework.ai.mcp.SyncMcpToolCallback;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.kernel.contract.ControlPlaneReader;
-import com.oli.orchestrator_demo.kernel.contract.McpConnectionGateway;
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.port.ControlPlaneReader;
+import com.oli.orchestrator_demo.kernel.contract.port.McpConnectionGateway;
+import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;
 
 import io.micrometer.core.instrument.MeterRegistry;

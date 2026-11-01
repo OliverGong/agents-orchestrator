@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
 
 public record WorkflowTemplate(String name, ExecutionMode mode, List<StageSpec> stages) {
 

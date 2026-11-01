@@ -19,7 +19,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.control;
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplate;
 
 import java.util.Collections;
@@ -30,8 +30,8 @@ import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.kernel.contract.Agent;
-import com.oli.orchestrator_demo.kernel.contract.ModelDefaultsReader;
+import com.oli.orchestrator_demo.kernel.contract.spi.Agent;
+import com.oli.orchestrator_demo.kernel.contract.port.ModelDefaultsReader;
 
 import jakarta.annotation.PostConstruct;
 

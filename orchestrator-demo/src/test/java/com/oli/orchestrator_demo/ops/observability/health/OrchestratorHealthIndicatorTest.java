@@ -22,9 +22,9 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.kernel.contract.Agent;
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.spi.Agent;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
 import com.oli.orchestrator_demo.core.trip.TripPlanningOrchestrator;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.core.workflow.WorkflowProperties;

@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
-import com.oli.orchestrator_demo.kernel.contract.TripRequest;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.TripRequest;
 import com.oli.orchestrator_demo.core.trip.TripPlanningOrchestrator;
 
 @RestController

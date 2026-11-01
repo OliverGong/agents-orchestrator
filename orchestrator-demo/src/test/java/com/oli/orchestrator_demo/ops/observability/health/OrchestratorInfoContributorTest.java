@@ -22,9 +22,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.actuate.info.Info;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.kernel.contract.Agent;
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.spi.Agent;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
 import com.oli.orchestrator_demo.core.trip.TripPlanningOrchestrator;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.core.workflow.WorkflowProperties;

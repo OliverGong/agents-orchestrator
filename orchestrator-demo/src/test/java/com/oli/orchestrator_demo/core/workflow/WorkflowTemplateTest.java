@@ -19,7 +19,7 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
 
 class WorkflowTemplateTest {
 

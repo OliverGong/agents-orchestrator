@@ -32,10 +32,10 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
-import com.oli.orchestrator_demo.kernel.contract.RunInstanceSink;
+import com.oli.orchestrator_demo.kernel.contract.port.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.port.RunInstanceSink;
 import com.oli.orchestrator_demo.ops.instance.InstanceStore;
-import com.oli.orchestrator_demo.kernel.contract.RunInstance;
+import com.oli.orchestrator_demo.kernel.contract.model.RunInstance;
 import com.oli.orchestrator_demo.ops.observability.infra.NoopRunMetricsStore;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilitySsePublisher;

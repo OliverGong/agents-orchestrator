@@ -20,12 +20,12 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import com.oli.orchestrator_demo.ChatClientStubs;
-import com.oli.orchestrator_demo.kernel.contract.AgentDefaults;
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
-import com.oli.orchestrator_demo.kernel.contract.CalibrationRule;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
-import com.oli.orchestrator_demo.kernel.contract.TripRequest;
+import com.oli.orchestrator_demo.kernel.contract.config.AgentDefaults;
+import com.oli.orchestrator_demo.kernel.contract.config.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.port.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.config.CalibrationRule;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.TripRequest;
 
 class CalibrationAdvisorTest {
 

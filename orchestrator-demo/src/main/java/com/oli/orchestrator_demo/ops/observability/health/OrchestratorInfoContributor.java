@@ -16,8 +16,8 @@ import org.springframework.boot.actuate.info.Info;
 import org.springframework.boot.actuate.info.InfoContributor;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorSnapshot;
-import com.oli.orchestrator_demo.kernel.contract.RunStatusReader;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorSnapshot;
+import com.oli.orchestrator_demo.kernel.contract.port.RunStatusReader;
 
 @Component
 public class OrchestratorInfoContributor implements InfoContributor {

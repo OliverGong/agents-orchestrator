@@ -9,7 +9,9 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.kernel.contract;
+package com.oli.orchestrator_demo.kernel.contract.port;
+
+import com.oli.orchestrator_demo.kernel.contract.model.RunInstance;
 
 import java.time.Instant;
 

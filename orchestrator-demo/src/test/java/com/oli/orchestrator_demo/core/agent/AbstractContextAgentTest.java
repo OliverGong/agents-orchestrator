@@ -8,7 +8,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.core.agent;
-import com.oli.orchestrator_demo.kernel.contract.Agent;
+import com.oli.orchestrator_demo.kernel.contract.spi.Agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,10 +19,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
-import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
-import com.oli.orchestrator_demo.kernel.contract.ResearchResponse;
-import com.oli.orchestrator_demo.kernel.contract.TripRequest;
+import com.oli.orchestrator_demo.kernel.contract.spi.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.model.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.model.ResearchResponse;
+import com.oli.orchestrator_demo.kernel.contract.model.TripRequest;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityEventBus;
 import com.oli.orchestrator_demo.kernel.shared.context.RunContext;
