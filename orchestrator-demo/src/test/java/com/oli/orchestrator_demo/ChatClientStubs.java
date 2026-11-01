@@ -13,7 +13,13 @@
  */
 package com.oli.orchestrator_demo;
 
+import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import org.mockito.ArgumentCaptor;
@@ -27,10 +33,13 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
 import com.oli.orchestrator_demo.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.instance.InstanceStore;
+import com.oli.orchestrator_demo.instance.RunInstance;
 import com.oli.orchestrator_demo.observability.NoopRunMetricsStore;
 import com.oli.orchestrator_demo.observability.ObservabilityActor;
 import com.oli.orchestrator_demo.observability.ObservabilitySsePublisher;
 import com.oli.orchestrator_demo.observability.RunMetricsStore;
+import com.oli.orchestrator_demo.teamlog.NoopTeamLogStore;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -41,6 +50,49 @@ public final class ChatClientStubs {
    * read their (control-plane) configuration from.
    */
   public record StubbedModel(ChatModel model, AgentRuntimeStore store) {
+  }
+
+  /** In-memory {@link InstanceStore} fake for actor tests. */
+  public static final class CollectingInstanceStore implements InstanceStore {
+    private final Map<String, RunInstance> rows = new ConcurrentHashMap<>();
+
+    @Override
+    public void start(RunInstance instance) {
+      rows.put(instance.runId(), instance);
+    }
+
+    @Override
+    public void complete(String runId, Instant completedAt, Long durationMs) {
+      mutate(runId, i -> i.completed(completedAt, durationMs));
+    }
+
+    @Override
+    public void fail(String runId, Instant completedAt, String errorMessage) {
+      mutate(runId, i -> i.failed(completedAt, errorMessage));
+    }
+
+    @Override
+    public Optional<RunInstance> find(String runId) {
+      return Optional.ofNullable(rows.get(runId));
+    }
+
+    @Override
+    public List<RunInstance> query(InstanceQuery query) {
+      return rows.values().stream()
+          .filter(i -> InstanceStore.matches(query, i))
+          .sorted(Comparator.comparing(RunInstance::startedAt).reversed())
+          .limit(Math.max(1, query.limit()))
+          .toList();
+    }
+
+    @Override
+    public String name() {
+      return "collecting";
+    }
+
+    private void mutate(String runId, UnaryOperator<RunInstance> op) {
+      rows.computeIfPresent(runId, (id, current) -> op.apply(current));
+    }
   }
 
   private ChatClientStubs() {
@@ -61,12 +113,19 @@ public final class ChatClientStubs {
   /** An observability actor wired with a real (emitter-less) SSE publisher. */
   public static ObservabilityActor actor() {
     return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()),
-        new NoopRunMetricsStore());
+        new NoopRunMetricsStore(), new NoopTeamLogStore(), new CollectingInstanceStore());
   }
 
   /** An observability actor wired with the given (test) metrics store. */
   public static ObservabilityActor actor(RunMetricsStore metricsStore) {
-    return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()), metricsStore);
+    return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()),
+        metricsStore, new NoopTeamLogStore(), new CollectingInstanceStore());
+  }
+
+  /** An observability actor wired with the given metrics and instance stores. */
+  public static ObservabilityActor actor(RunMetricsStore metricsStore, InstanceStore instanceStore) {
+    return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()),
+        metricsStore, new NoopTeamLogStore(), instanceStore);
   }
 
   /**

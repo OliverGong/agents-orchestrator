@@ -46,7 +46,7 @@ class RunObservabilityControllerTest {
   @Test
   void exposesRunTimelineGroupedByWaves() throws Exception {
     String runId = "run-1";
-    observability.tell(AgentObservabilityEvent.runStarted(runId, "configured", "scn-tokyo", "CONCURRENT"));
+    observability.tell(AgentObservabilityEvent.runStarted(runId, "configured", "scn-tokyo", null, "CONCURRENT", "{}"));
     observability.tell(AgentObservabilityEvent.stageCompleted(runId, "research", "research", 0,
         List.of(), "CONCURRENT", "vt-research", 11, 1,
         new AgentObservabilityEvent.LmUsage(120, 45, 165, "qwen3:8b", 1),

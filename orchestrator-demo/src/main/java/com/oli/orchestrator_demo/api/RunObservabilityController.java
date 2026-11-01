@@ -61,13 +61,14 @@ public class RunObservabilityController {
         ? null
         : Duration.between(timeline.startedAt(), timeline.completedAt()).toMillis();
     return new RunSummary(timeline.runId(), timeline.templateName(), timeline.scenarioId(),
-        timeline.mode(), timeline.status().name(), timeline.startedAt(), timeline.completedAt(),
-        durationMs,
+        timeline.businessId(), timeline.mode(), timeline.status().name(), timeline.startedAt(),
+        timeline.completedAt(), durationMs,
         (int) events.stream().filter(event -> event.type().name().startsWith("STAGE")).count(),
         events.stream().filter(event -> event.type() == AgentObservabilityEvent.Type.STAGE_FAILED).count());
   }
 
-  private static RunDetails toDetails(RunTimeline timeline) {
+  /** Package-visible so the instance detail view reuses the same projection. */
+  static RunDetails toDetails(RunTimeline timeline) {
     // Tool-call and retry events are emitted during stage execution, i.e.
     // before the stage's own STAGE_* event; attribute them by (wave, stage, agent).
     Map<String, List<RunDetails.ToolCallView>> pendingToolCalls = new LinkedHashMap<>();
@@ -111,8 +112,8 @@ public class RunObservabilityController {
             List.copyOf(entry.getValue())))
         .toList();
     return new RunDetails(timeline.runId(), timeline.templateName(), timeline.scenarioId(),
-        timeline.mode(), timeline.status().name(), timeline.startedAt(), timeline.completedAt(),
-        timeline.finalContextJson(), waves);
+        timeline.businessId(), timeline.mode(), timeline.status().name(), timeline.startedAt(),
+        timeline.completedAt(), timeline.finalContextJson(), waves);
   }
 
   private static String attributionKey(AgentObservabilityEvent event) {
@@ -120,14 +121,14 @@ public class RunObservabilityController {
   }
 
   /** Compact run entry of the list endpoint. */
-  public record RunSummary(String runId, String templateName, String scenarioId, String mode,
-      String status, Instant startedAt, Instant completedAt, Long durationMs, int stageCount,
-      long failedStages) {
+  public record RunSummary(String runId, String templateName, String scenarioId, String businessId,
+      String mode, String status, Instant startedAt, Instant completedAt, Long durationMs,
+      int stageCount, long failedStages) {
   }
 
   /** Full timeline of one run, grouped into dependency waves. */
-  public record RunDetails(String runId, String templateName, String scenarioId, String mode,
-      String status, Instant startedAt, Instant completedAt, String finalContext,
+  public record RunDetails(String runId, String templateName, String scenarioId, String businessId,
+      String mode, String status, Instant startedAt, Instant completedAt, String finalContext,
       List<WaveView> waves) {
 
     /** One dependency wave; {@code parallel} is only true for concurrent waves. */

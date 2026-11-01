@@ -28,7 +28,7 @@ class ObservabilitySsePublisherTest {
   @Test
   void publishWithoutSubscribersIsANoOp() {
     assertThatCode(() -> publisher.publish(AgentObservabilityEvent.runStarted(
-        "run-1", "default-trip-planning", null, "SEQUENTIAL"))).doesNotThrowAnyException();
+        "run-1", "default-trip-planning", null, null, "SEQUENTIAL", "{}"))).doesNotThrowAnyException();
   }
 
   @Test

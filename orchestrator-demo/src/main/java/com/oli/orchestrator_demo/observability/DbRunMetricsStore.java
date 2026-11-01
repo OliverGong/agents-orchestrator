@@ -113,6 +113,23 @@ public class DbRunMetricsStore implements RunMetricsStore {
   }
 
   @Override
+  public List<RunStageMetrics> byRun(String runId) {
+    return jdbc.sql("""
+        SELECT run_id, scenario_id, stage, agent, model, wave_index, attempt, outcome,
+            duration_ms, prompt_tokens, completion_tokens, total_tokens, created_at
+        FROM obs_run_metrics WHERE run_id = ? ORDER BY created_at, id""")
+        .param(runId)
+        .query((rs, n) -> new RunStageMetrics(
+            rs.getString("run_id"), rs.getString("scenario_id"), rs.getString("stage"),
+            rs.getString("agent"), rs.getString("model"),
+            (Integer) rs.getObject("wave_index"), (Integer) rs.getObject("attempt"),
+            rs.getString("outcome"), (Long) rs.getObject("duration_ms"),
+            (Long) rs.getObject("prompt_tokens"), (Long) rs.getObject("completion_tokens"),
+            (Long) rs.getObject("total_tokens"), rs.getTimestamp("created_at").toInstant()))
+        .list();
+  }
+
+  @Override
   public String name() {
     return "database";
   }

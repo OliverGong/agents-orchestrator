@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Orchestrator — 多 Agent 编排控制台</title>
-<link rel="stylesheet" href="app.css?v=10">
+<link rel="stylesheet" href="app.css?v=11">
 </head>
 <body>
 <div class="shell">
@@ -24,6 +24,7 @@
       <button class="nav-item" data-page="mcp">MCP 服务器</button>
       <button class="nav-item" data-page="meta">元信息补录</button>
       <div class="nav-group">可观测</div>
+      <button class="nav-item" data-page="instances">实例追踪</button>
       <button class="nav-item" data-page="runs">运行回放</button>
       <button class="nav-item" data-page="logs">团队日志</button>
       <button class="nav-item" data-page="metrics">系统观测</button>
@@ -80,6 +81,7 @@
               <label>预算 (CNY)<input id="f-budget" type="number" min="1" step="0.01" value="15000" required></label>
             </div>
             <label>偏好（自由文本，可留空）<input id="f-preferences" type="text" value="temples and local food"></label>
+            <label>业务关联 ID（businessId，可留空）<input id="f-businessid" type="text" placeholder="调用方业务键，如 order-20261101-0001"></label>
             <button id="submit-btn" type="submit">开始规划</button>
           </form>
         </div>
@@ -289,6 +291,44 @@
       </div>
     </section>
 
+    <!-- ============ 页面: 实例追踪（可观测，v2.3 数据溯源闭环入口） ============ -->
+    <section id="page-instances" class="page-panel">
+      <div class="card">
+        <h2>运行实例注册表 <button id="instances-refresh" class="mini-btn" type="button">刷新</button></h2>
+        <p class="hint">数据溯源的起点：每个业务触发（<code>POST /api/trips/plan</code>）在请求进入时实例化一条
+            RUNNING 记录（唯一 runId + 调用方 businessId），终态由 ObservabilityActor 先落库再推送。
+            按 businessId / 场景 / 状态 / 关键字检索，点击行查看该次实例化的完整上下文。</p>
+        <div class="row">
+          <label>业务 ID<input id="instances-business" placeholder="businessId 精确匹配"></label>
+          <label>场景 ID<input id="instances-scenario" placeholder="scenarioId 精确匹配"></label>
+          <label>状态
+            <select id="instances-status">
+              <option value="">全部</option>
+              <option>RUNNING</option>
+              <option>COMPLETED</option>
+              <option>FAILED</option>
+            </select></label>
+          <label>时间窗口
+            <select id="instances-window">
+              <option value="1h">近 1 小时</option>
+              <option value="24h" selected>近 24 小时</option>
+              <option value="7d">近 7 天</option>
+              <option value="all">全部</option>
+            </select></label>
+          <label>关键字<input id="instances-q" placeholder="runId / businessId / 场景 / 错误"></label>
+          <button id="instances-apply" class="accent-btn" type="button">应用筛选</button>
+        </div>
+        <table class="data-table" id="instances-table">
+          <thead><tr>
+            <th>开始时间</th><th>Run ID</th><th>业务 ID</th><th>场景</th><th>模板</th><th>模式</th><th>状态</th><th>耗时</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="instances-summary" class="hint"></div>
+      </div>
+      <div id="instance-detail"></div>
+    </section>
+
     <!-- ============ 页面: 运行回放（可观测） ============ -->
     <section id="page-runs" class="page-panel">
       <div class="card">
@@ -395,6 +435,6 @@
   </div>
 </div>
 
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

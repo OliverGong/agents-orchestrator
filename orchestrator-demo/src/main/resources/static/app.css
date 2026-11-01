@@ -252,6 +252,13 @@ footer { color: var(--muted); text-align: center; font-size: 12px; padding: 18px
   border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px;
 }
 .mono { font-family: var(--mono); }
+/* v2.3: clickable correlation chips inside log/instance tables (runId →
+   instance detail, scenarioId → filtered log explorer). */
+.link-chip {
+  cursor: pointer; color: var(--accent); border-bottom: 1px dashed
+    color-mix(in srgb, var(--accent) 55%, transparent); padding-bottom: 1px;
+}
+.link-chip:hover { border-bottom-style: solid; }
 .retry-line { border-left: 2px solid var(--warn); }
 .inline-check { display: inline-flex !important; align-items: center; gap: 4px; margin: 0 10px 4px 0 !important; }
 .inline-check input { display: inline-block; width: auto !important; margin: 0 !important; }
