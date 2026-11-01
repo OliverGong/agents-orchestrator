@@ -6,6 +6,10 @@
  * token-free dry-run rehearsal rendered as DAG + wave/slot tables, and run
  * replay with timeline / DAG / swimlane views incl. parse-retry chains.
  * No build step, no framework.
+ *
+ * DEPRECATED since v3.0: superseded by the Vue 3 + TypeScript SPA in
+ * /console (served by its own nginx container). This file is kept as a
+ * zero-build fallback and scheduled for removal in v3.1.
  */
 'use strict';
 
