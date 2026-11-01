@@ -149,6 +149,11 @@ com.oli.orchestrator_demo
 │   ├── FileReleaseStore / DbReleaseStore # release-registry.json │ rl_release 表
 │   ├── ReleaseService           # 发布编排：场景 → meta 配置 → 打包 → 哈希 → 注册
 │   └── ReleaseController        # /api/v1/releases 列表 / 发布 / 包导出
+├── instance                     # 运行实例注册表（v2.3，见 13.1）
+│   ├── RunInstance              # 唯一 runId + businessId 的实例化记录（RUNNING → 终态）
+│   ├── InstanceStore            # 持久化接缝 + 共享 facet 匹配（查询语义单一定义）
+│   ├── FileInstanceStore / DbInstanceStore # JSONL run-instances.json │ obs_run_instance 表
+│   └── InstanceStoreConfig      # 跟随 orchestrator.control.store 装配
 ├── config                       # 配置
 │   ├── AgentConfiguration       # @EnableConfigurationProperties 激活（人格已迁控制平面）
 │   ├── ModelHttpClientConfig    # 模型后端 HTTP 超时（connect 5s / read 5min）
@@ -1067,3 +1072,71 @@ M2 元数据平面（MetaRegistry/MetaStore file+db/MetaController）、M3 团�
 （ReleaseStore file+db/ReleaseService/ReleaseController）、M5 联动
 （activeScenarioId 往返/activate 记录与删除重置/回放视图 scenarioId）——
 合计 **195 例全绿**（`./mvnw test`，DB 用例跑 H2 内存库）。
+
+## 13. v2.3：业务触发层、运行实例注册表与监控日志闭环
+
+v2.2 回答"观测数据如何落库"，v2.3 对照 iPaaS 白皮书的**数据溯源**要求闭合
+最后一环：从请求进入（data plan 层面的业务触发）起跟踪每次实例化过程，记录
+多 Agent / 多模型的具体调用信息，并以**请求唯一 ID + 业务 ID** 关联展示完整
+上下文。三块共享 v2.2 的既有模式：新存储平面镜像
+"Store 接缝 + 跟随 `orchestrator.control.store` 装配"，Actor 侧沿用 WAL
+写序，前端沿用导航-画布联动。
+
+### 13.1 实例注册表（instance 平面）
+
+- **生命周期**：`TripPlanningOrchestrator.planTrip(request, scenarioId,
+  businessId)` 在编排开始前构造 `RunInstance`（12 字段 record：runId/
+  businessId/scenarioId/templateName/mode/trigger/status/requestJson/
+  startedAt/completedAt/durationMs/errorMessage），经 Actor 以
+  `RUN_STARTED` 事件写 RUNNING 行；`RUN_COMPLETED`/`RUN_FAILED` 事件写终态
+  （complete 携带 `Duration.between(startedAt, timestamp).toMillis()`，fail
+  携带 errorMessage）。注册表写入位于 WAL 最前（先于 teamlog/metrics/折叠/
+  SSE），失败降级 WARN，不砸业务。
+- **存储接缝**：`InstanceStore` 接口 + 接口级静态 `matches()`（查询语义的
+  单一定义：since/businessId/scenarioId/status/自由文本五 facet，文件后端
+  与测试 fake 直接复用，DB 后端翻译为 SQL）。`FileInstanceStore`（JSONL
+  `config/run-instances.json`，锁内原子重写，容量上限 1000 条按插入序裁剪）
+  │ `DbInstanceStore`（`obs_run_instance` 表，run_id 主键 + business/
+  scenario/started 索引；trigger_type 列规避 PostgreSQL 保留字），跟随
+  `orchestrator.control.store` 装配。
+- **businessId 贯穿**：`AgentObservabilityEvent` 升至 19 字段（runStarted
+  新增 businessId 槽位），`RunTimeline`/`RunSummary`/`RunDetails`/日志归因
+  全链路携带；控制器 `POST /api/trips/plan?businessId=`（可空，调用方业务
+  关联键）。runId（UUID）与 businessId 一起构成"唯一 + 业务"双键关联。
+- **per-run 指标读取**：`RunMetricsStore.byRun(runId)` 新增接口方法
+  （db 实现按 created_at 排序回放 `obs_run_metrics` 行），为实例详情的
+  多 Agent/多模型明细供数。
+
+### 13.2 实例关联 REST（/api/v1/instances）
+
+- `GET /api/v1/instances`：businessId/scenarioId/status 精确过滤 +
+  `q` 自由文本（runId/businessId/场景/错误）+ `window` 时间窗速记
+  （1h/24h/7d/all）+ limit（默认 100，上限 500），最新在前。
+- `GET /api/v1/instances/{runId}`：聚合完整上下文——持久注册表行 +
+  可回放内存时间线（`RunObservabilityController.toDetails` 复用投影，
+  被淘汰后为 null）+ `obs_run_metrics` 每阶段行 + `team_log` 该 run 的
+  日志尾随（limit 200）；未知 runId 返回 404。
+
+### 13.3 控制台闭环（v2.3）
+
+- **业务触发入口**：场景运行表单新增「业务关联 ID」输入，提交时以查询
+  参数携带；「本次请求」回显与运行完成卡（新增「实例追踪 →」按钮，按
+  businessId 过滤并直达该次实例详情）体现 businessId。
+- **实例追踪页**（左侧「可观测」组首位，数据溯源入口）：五 facet 筛选 +
+  实例表 + 详情视图——触发载荷（结构化 + 原始 JSON）、多 Agent/多模型
+  调用明细表（wave/阶段/Agent/模型/结果/耗时/三段 tokens/尝试次数；
+  优先 `obs_run_metrics` 持久行，时间线仍在时回退聚合 usage）、黑板终态、
+  关联团队日志列表。
+- **双向互链**：实例详情 ↔ 运行回放（时间线/DAG/泳道）↔ 团队日志
+  （按 runId 预过滤）；日志页 runId 渲染为可点击 chip → 实例详情，
+  scenarioId chip → 按场景过滤日志；运行回放头部显示 businessId 并可
+  跳实例追踪。`gotoPage` 支持 `opts.businessId` 跨页携带。
+- 静态资源缓存戳 `app.js?v=16` / `app.css?v=11`。
+
+### 13.4 测试增量
+
+M1/M2 实例注册表与关联 REST（RunInstance 生命周期、File/Db store 的
+facet 检索与重启持久化、Actor 的实例写入与失败隔离、业务归因、
+InstanceController 列表/筛选/详情聚合/404）+ M3 控制台适配
+（controller 测试适配三参 planTrip）——合计 **209 例全绿**
+（`./mvnw test`，DB 用例跑 H2 内存库）。
