@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 
 import com.oli.orchestrator_demo.kernel.contract.Agent;
+import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -63,6 +64,11 @@ class AgentExecutionAspectTest {
   void logsDurationOfSuccessfulAgentExecution() {
     Agent<String, String> proxy = proxied(new Agent<>() {
       @Override
+      public AgentDescriptor descriptor() {
+        return null;
+      }
+
+      @Override
       public String name() {
         return "successful-agent";
       }
@@ -88,6 +94,11 @@ class AgentExecutionAspectTest {
   @Test
   void logsAndRethrowsAgentFailure() {
     Agent<String, String> proxy = proxied(new Agent<>() {
+      @Override
+      public AgentDescriptor descriptor() {
+        return null;
+      }
+
       @Override
       public String name() {
         return "failing-agent";
@@ -139,6 +150,11 @@ class AgentExecutionAspectTest {
     });
 
     Agent<String, String> proxy = proxied(new Agent<>() {
+      @Override
+      public AgentDescriptor descriptor() {
+        return null;
+      }
+
       @Override
       public String name() {
         return "metrics-agent";

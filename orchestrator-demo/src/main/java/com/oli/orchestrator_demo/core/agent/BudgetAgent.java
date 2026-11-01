@@ -15,8 +15,8 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Component;
 
 import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
-import com.oli.orchestrator_demo.governance.control.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.governance.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
 import com.oli.orchestrator_demo.core.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.kernel.contract.BudgetResponse;
 import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;

@@ -12,7 +12,7 @@
  */
 package com.oli.orchestrator_demo.ops.instance.infra;
 import com.oli.orchestrator_demo.ops.instance.InstanceStore;
-import com.oli.orchestrator_demo.ops.instance.RunInstance;
+import com.oli.orchestrator_demo.kernel.contract.RunInstance;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -34,6 +34,7 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 import com.oli.orchestrator_demo.kernel.contract.Agent;
+import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
 import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.kernel.contract.BudgetResponse;
 import com.oli.orchestrator_demo.kernel.contract.ItineraryResponse;
@@ -80,6 +81,11 @@ class TripPlanningOrchestratorTest {
       order.add(name);
       received.add(context);
       return action.apply(context);
+    }
+
+    @Override
+    public AgentDescriptor descriptor() {
+      return null;
     }
   }
 

@@ -26,6 +26,10 @@
  */
 package com.oli.orchestrator_demo.core.mcp;
 
+import com.oli.orchestrator_demo.kernel.contract.McpServerStatus;
+
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,10 +50,9 @@ import org.springframework.ai.mcp.SyncMcpToolCallback;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
-import com.oli.orchestrator_demo.governance.control.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.governance.control.ControlPlaneState;
-import com.oli.orchestrator_demo.governance.control.McpServerConfig;
+import com.oli.orchestrator_demo.kernel.contract.ControlPlaneReader;
+import com.oli.orchestrator_demo.kernel.contract.McpConnectionGateway;
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -66,7 +69,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
 @Component
-public class McpConnectionRegistry {
+public class McpConnectionRegistry implements McpConnectionGateway {
 
   private static final Logger log = LoggerFactory.getLogger(McpConnectionRegistry.class);
 
@@ -105,7 +108,7 @@ public class McpConnectionRegistry {
   private static final String DEFAULT_SSE_PATH = "/sse";
   private static final String DEFAULT_STREAMABLE_PATH = "/mcp";
 
-  private final AgentConfigRegistry registry;
+  private final ControlPlaneReader registry;
   private final ObservabilityActor observability;
   private final MeterRegistry meterRegistry;
   private final Connector connector;
@@ -117,12 +120,12 @@ public class McpConnectionRegistry {
 
   /** Production constructor: uses the built-in three-transport connector. */
   @org.springframework.beans.factory.annotation.Autowired
-  public McpConnectionRegistry(AgentConfigRegistry registry, ObservabilityActor observability,
+  public McpConnectionRegistry(ControlPlaneReader registry, ObservabilityActor observability,
       MeterRegistry meterRegistry) {
     this(registry, observability, meterRegistry, McpConnectionRegistry::defaultConnect);
   }
 
-  public McpConnectionRegistry(AgentConfigRegistry registry, ObservabilityActor observability,
+  public McpConnectionRegistry(ControlPlaneReader registry, ObservabilityActor observability,
       MeterRegistry meterRegistry, Connector connector) {
     this.registry = registry;
     this.observability = observability;
@@ -135,7 +138,7 @@ public class McpConnectionRegistry {
     // First pass runs immediately (async, so boot never waits on MCP servers);
     // the periodic tick retries FAILED bindings after their cooldown.
     scheduler.scheduleWithFixedDelay(this::reconcileSafely, 0, RETRY_INTERVAL_SECONDS, TimeUnit.SECONDS);
-    log.info("MCP connection registry started ({} recorded server(s))", registry.state().mcpServers().size());
+    log.info("MCP connection registry started ({} recorded server(s))", registry.mcpServers().size());
   }
 
   @PreDestroy
@@ -179,7 +182,7 @@ public class McpConnectionRegistry {
   public List<McpServerStatus> status() {
     reconcile();
     List<McpServerStatus> result = new ArrayList<>();
-    for (McpServerConfig config : registry.state().mcpServers()) {
+    for (McpServerConfig config : registry.mcpServers()) {
       ServerBinding binding = bindings.get(config.name());
       if (!config.enabled()) {
         result.add(new McpServerStatus(config.name(), config.transport(), config.location(), false,
@@ -203,7 +206,7 @@ public class McpConnectionRegistry {
    * binding and reconnects synchronously, bypassing the failure cooldown.
    */
   public McpServerStatus reconnect(String name) {
-    McpServerConfig config = registry.state().mcpServers().stream()
+    McpServerConfig config = registry.mcpServers().stream()
         .filter(server -> server.name().equals(name))
         .findFirst()
         .orElseThrow(() -> new IllegalArgumentException("Unknown MCP server '%s'".formatted(name)));
@@ -242,14 +245,13 @@ public class McpConnectionRegistry {
   }
 
   private void reconcile(boolean retryAllFailed) {
-    ControlPlaneState state = registry.state();
     List<ServerBinding> toOpen = new ArrayList<>();
     synchronized (this) {
-      long version = state.version();
+      long version = registry.version();
       boolean versionChanged = version != lastSeenVersion.get();
       if (versionChanged) {
         Map<String, McpServerConfig> desired = new LinkedHashMap<>();
-        state.mcpServers().forEach(server -> desired.put(server.name(), server));
+        registry.mcpServers().forEach(server -> desired.put(server.name(), server));
         // Close bindings whose server was removed, reconfigured or disabled.
         for (Iterator<Map.Entry<String, ServerBinding>> it = bindings.entrySet().iterator(); it.hasNext();) {
           Map.Entry<String, ServerBinding> entry = it.next();
@@ -263,7 +265,7 @@ public class McpConnectionRegistry {
         lastSeenVersion.set(version);
       }
       // New enabled servers get a binding (and an async connect attempt).
-      for (McpServerConfig config : state.mcpServers()) {
+      for (McpServerConfig config : registry.mcpServers()) {
         if (config.enabled() && !bindings.containsKey(config.name())) {
           ServerBinding binding = new ServerBinding(config);
           bindings.put(config.name(), binding);

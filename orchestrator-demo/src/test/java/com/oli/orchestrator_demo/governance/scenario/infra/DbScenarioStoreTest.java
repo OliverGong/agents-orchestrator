@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
-import com.oli.orchestrator_demo.governance.control.CalibrationRule;
+import com.oli.orchestrator_demo.kernel.contract.CalibrationRule;
 import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
 
 import tools.jackson.databind.json.JsonMapper;

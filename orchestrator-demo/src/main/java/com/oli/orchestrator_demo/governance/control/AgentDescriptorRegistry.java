@@ -30,24 +30,24 @@ import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.core.agent.AbstractContextAgent;
-import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
+import com.oli.orchestrator_demo.kernel.contract.Agent;
+import com.oli.orchestrator_demo.kernel.contract.ModelDefaultsReader;
 
 import jakarta.annotation.PostConstruct;
 
 @Component
 public class AgentDescriptorRegistry {
 
-  private final AgentModelProperties modelProperties;
+  private final ModelDefaultsReader modelDefaults;
   private final AgentConfigRegistry configRegistry;
   private final Map<String, AgentDescriptor> builtIns;
 
-  public AgentDescriptorRegistry(List<AbstractContextAgent<?>> agents, AgentModelProperties modelProperties,
+  public AgentDescriptorRegistry(List<Agent<?, ?>> agents, ModelDefaultsReader modelDefaults,
       AgentConfigRegistry configRegistry) {
-    this.modelProperties = modelProperties;
+    this.modelDefaults = modelDefaults;
     this.configRegistry = configRegistry;
     Map<String, AgentDescriptor> collected = new LinkedHashMap<>();
-    for (AbstractContextAgent<?> agent : agents) {
+    for (Agent<?, ?> agent : agents) {
       if (collected.putIfAbsent(agent.descriptor().name(), enrich(agent.descriptor())) != null) {
         throw new IllegalStateException("Duplicate agent descriptor for '%s'".formatted(agent.descriptor().name()));
       }
@@ -99,10 +99,10 @@ public class AgentDescriptorRegistry {
 
   /** Fills a client-supplied descriptor's blank model defaults from the built-in configuration. */
   AgentDescriptor enrich(AgentDescriptor update) {
-    AgentModelProperties.AgentSpec spec = modelProperties.agent(update.name());
+    ModelDefaultsReader.ModelDefaults defaults = modelDefaults.defaults(update.name());
     return new AgentDescriptor(update.name(), update.title(), update.description(),
         update.outputSlots(), update.inputSlots(), update.pendingSafeSlots(),
-        update.defaultModel() != null ? update.defaultModel() : spec.getModel(),
-        update.defaultTemperature() != null ? update.defaultTemperature() : spec.getTemperature());
+        update.defaultModel() != null ? update.defaultModel() : defaults.model(),
+        update.defaultTemperature() != null ? update.defaultTemperature() : defaults.temperature());
   }
 }

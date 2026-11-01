@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
+import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
 import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.governance.control.infra.FileControlPlaneStore;
 import com.oli.orchestrator_demo.governance.meta.infra.FileMetaStore;
@@ -61,7 +62,7 @@ class ReleaseServiceTest {
   @BeforeEach
   void setUp() {
     WorkflowTemplateHolder holder = new WorkflowTemplateHolder(new WorkflowProperties());
-    AgentConfigRegistry controlPlane = new AgentConfigRegistry(new AgentModelProperties(),
+    AgentConfigRegistry controlPlane = new AgentConfigRegistry(new ModelDefaultsBridge(new AgentModelProperties()),
         new WorkflowProperties(), holder,
         new FileControlPlaneStore(tempDir.resolve("control-plane.json"), JsonMapper.builder().build()));
     controlPlane.initialize();

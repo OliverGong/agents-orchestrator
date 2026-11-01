@@ -15,6 +15,7 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.ops.instance.infra;
+import com.oli.orchestrator_demo.kernel.contract.RunInstanceSink;
 import com.oli.orchestrator_demo.ops.instance.InstanceStore;
 
 import java.nio.file.Path;
@@ -40,5 +41,26 @@ public class InstanceStoreConfig {
     DbInstanceStore dbStore = new DbInstanceStore(jdbc.getObject());
     dbStore.initialize();
     return dbStore;
+  }
+
+  /** Bridges the write-side contract port onto the store for the observability actor. */
+  @Bean
+  public RunInstanceSink runInstanceSink(InstanceStore store) {
+    return new RunInstanceSink() {
+      @Override
+      public void start(com.oli.orchestrator_demo.kernel.contract.RunInstance instance) {
+        store.start(instance);
+      }
+
+      @Override
+      public void complete(String runId, java.time.Instant completedAt, Long durationMs) {
+        store.complete(runId, completedAt, durationMs);
+      }
+
+      @Override
+      public void fail(String runId, java.time.Instant completedAt, String errorMessage) {
+        store.fail(runId, completedAt, errorMessage);
+      }
+    };
   }
 }

@@ -17,6 +17,12 @@
  * @Version 2.0
  */
 package com.oli.orchestrator_demo.governance.control;
+
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
+
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
 
 import java.time.Instant;
@@ -31,7 +37,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
+import com.oli.orchestrator_demo.kernel.contract.ControlPlaneReader;
+import com.oli.orchestrator_demo.kernel.contract.ModelDefaultsReader;
+import com.oli.orchestrator_demo.kernel.contract.AgentDefaults;
+
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.core.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.core.workflow.StageSpec;
@@ -41,14 +50,14 @@ import com.oli.orchestrator_demo.core.workflow.WorkflowTemplate;
 import jakarta.annotation.PostConstruct;
 
 @Component
-public class AgentConfigRegistry implements AgentRuntimeStore {
+public class AgentConfigRegistry implements AgentRuntimeStore, ControlPlaneReader {
 
   private static final Logger log = LoggerFactory.getLogger(AgentConfigRegistry.class);
 
   /** MCP server names become tool-name prefixes, so they must stay identifier-safe. */
   private static final Pattern MCP_SERVER_NAME = Pattern.compile("[A-Za-z0-9_.-]+");
 
-  private final AgentModelProperties modelProperties;
+  private final ModelDefaultsReader modelDefaults;
   private final WorkflowProperties workflowProperties;
   private final WorkflowTemplateHolder templateHolder;
   private final Set<String> knownAgents;
@@ -65,16 +74,16 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
   /** Guarded by this; readers get immutable record snapshots. */
   private ControlPlaneState state;
 
-  public AgentConfigRegistry(AgentModelProperties modelProperties, WorkflowProperties workflowProperties,
+  public AgentConfigRegistry(ModelDefaultsReader modelDefaults, WorkflowProperties workflowProperties,
       WorkflowTemplateHolder templateHolder, ControlPlaneStore store) {
-    this.modelProperties = modelProperties;
+    this.modelDefaults = modelDefaults;
     this.workflowProperties = workflowProperties;
     this.templateHolder = templateHolder;
     // The demo roster is static: the same list seeds the state file, so it is
     // also the validation reference for workflow stage agents. Depending on
     // the orchestrator here would create a constructor cycle (agents -> store
     // -> registry -> orchestrator -> agents).
-    this.knownAgents = Set.copyOf(AgentDefaults.KNOWN_AGENTS);
+    this.knownAgents = Set.copyOf(AgentRuntimeConfig.KNOWN_AGENTS);
     this.store = store;
   }
 
@@ -92,8 +101,8 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
     }
     else {
       Map<String, AgentRuntimeConfig> agents = new LinkedHashMap<>();
-      for (String name : AgentDefaults.KNOWN_AGENTS) {
-        agents.put(name, AgentDefaults.defaultConfig(name, modelProperties));
+      for (String name : AgentRuntimeConfig.KNOWN_AGENTS) {
+        agents.put(name, AgentDefaults.defaultConfig(name, modelDefaults));
       }
       state = new ControlPlaneState(1, Instant.now(), agents,
           fromTemplate(workflowProperties.toTemplate()), List.of(), Map.of());
@@ -116,6 +125,16 @@ public class AgentConfigRegistry implements AgentRuntimeStore {
   /** The full control-plane snapshot (immutable record). */
   public ControlPlaneState state() {
     return state;
+  }
+
+  @Override
+  public long version() {
+    return state.version();
+  }
+
+  @Override
+  public List<McpServerConfig> mcpServers() {
+    return state.mcpServers();
   }
 
   /**

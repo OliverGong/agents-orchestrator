@@ -14,13 +14,14 @@
  *              {@code command} plus optional {@code args}/{@code env}. Fields
  *              unknown to older persisted state files are normalized to empty
  *              defaults by the compact constructor, so existing JSON loads
- *              unchanged.
+ *              unchanged. The connection itself is opened by the MCP module's
+ *              connection registry; this record is only the recorded intent.
  * @Author OliverGong
  * @Date Oct 30, 2026
  * @Version 1.1
  */
-package com.oli.orchestrator_demo.governance.control;
-import com.oli.orchestrator_demo.core.mcp.McpConnectionRegistry;
+package com.oli.orchestrator_demo.kernel.contract;
+
 
 import java.util.List;
 import java.util.Map;

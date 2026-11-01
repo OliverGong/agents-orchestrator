@@ -54,7 +54,7 @@ class ObservabilityActorRunLogTest {
 
   private ObservabilityActor actorWithLog(TeamLogStore logStore) {
     return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()),
-        new NoopRunMetricsStore(), logStore, new ChatClientStubs.CollectingInstanceStore());
+        new NoopRunMetricsStore(), logStore, ChatClientStubs.sink(new ChatClientStubs.CollectingInstanceStore()));
   }
 
   @Test

@@ -113,20 +113,16 @@ class ArchitectureConventionTest {
         assertTrue(violations.isEmpty(), "contract/ must not import in-process types: " + violations);
     }
 
-    /** R3 — the module graph (zone-qualified, e.g. core.agent) has no cycles,
-     *  modulo the documented waivers below (inversion plans in §15.6). */
+    /** R3 — the module graph (zone-qualified, e.g. core.agent) has no cycles.
+     *  All four historical waivers were inverted (ARCHITECTURE §15.6.2):
+     *  pure records sank into kernel/contract and narrow read/write ports
+     *  (ModelDefaultsReader, ControlPlaneReader, McpConnectionGateway,
+     *  RunInstanceSink, RunStatusReader) replaced the back-edges. */
     @Test
     void moduleDependencyGraphIsAcyclic() throws IOException {
-        // Waived cycles — see ARCHITECTURE §15.6 for the inversion plan.
-        // core.agent ⇄ governance.control: descriptor introspection vs config read-back.
-        // governance.control ⇄ core.mcp: registry reads control-plane state vs
-        //   status endpoint composition.
-        // ops.instance ⇄ ops.observability: replay read-side composition vs
-        //   run-instance writes.
-        // ops.observability ⇄ core.trip: health probes read live orchestrator
-        //   state vs the orchestrator publishing events/metrics.
-        Set<String> waived = Set.of("core.agent|governance.control", "core.mcp|governance.control",
-                "ops.instance|ops.observability", "core.trip|ops.observability");
+        // Zero waivers — new cycles must be resolved by inversion, not by
+        // extending this set (see ARCHITECTURE §15.6).
+        Set<String> waived = Set.of();
         Map<String, Set<String>> graph = new HashMap<>();
         for (Source s : sources()) {
             String from = moduleOf(s.pkg());

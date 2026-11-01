@@ -21,29 +21,28 @@ import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.core.trip.TripPlanningOrchestrator;
-import com.oli.orchestrator_demo.core.workflow.StageSpec;
-import com.oli.orchestrator_demo.core.workflow.WorkflowTemplate;
+import com.oli.orchestrator_demo.kernel.contract.OrchestratorSnapshot;
+import com.oli.orchestrator_demo.kernel.contract.RunStatusReader;
 
 @Component("orchestrator")
 public class OrchestratorHealthIndicator implements HealthIndicator {
 
-  private final TripPlanningOrchestrator orchestrator;
+  private final RunStatusReader orchestrator;
   private final ObservabilityActor observability;
 
-  public OrchestratorHealthIndicator(TripPlanningOrchestrator orchestrator, ObservabilityActor observability) {
+  public OrchestratorHealthIndicator(RunStatusReader orchestrator, ObservabilityActor observability) {
     this.orchestrator = orchestrator;
     this.observability = observability;
   }
 
   @Override
   public Health health() {
-    WorkflowTemplate template = orchestrator.template();
+    OrchestratorSnapshot snapshot = orchestrator.snapshot();
     return Health.up()
-        .withDetail("template", template.name())
-        .withDetail("mode", template.mode().name())
-        .withDetail("stages", template.stages().stream().map(StageSpec::name).toList())
-        .withDetail("agents", List.copyOf(orchestrator.agentNames()))
+        .withDetail("template", snapshot.templateName())
+        .withDetail("mode", snapshot.mode())
+        .withDetail("stages", snapshot.stages().stream().map(OrchestratorSnapshot.StageView::name).toList())
+        .withDetail("agents", snapshot.agentNames())
         .withDetail("retainedRuns", observability.retainedRuns())
         .build();
   }

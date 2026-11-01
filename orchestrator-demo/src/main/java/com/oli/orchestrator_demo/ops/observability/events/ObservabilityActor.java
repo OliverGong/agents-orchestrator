@@ -23,8 +23,8 @@
  *              run's {@code RUN_STARTED} event.
  *
  *              Since v2.3 the actor additionally drives the durable
- *              {@link com.oli.orchestrator_demo.ops.instance.InstanceStore
- *              instance registry} in the same write-ahead order: the business
+ *              instance registry through the {@link RunInstanceSink} port in
+ *              the same write-ahead order: the business
  *              trigger (request entry with its business id and payload)
  *              inserts the RUNNING instance row, and the terminal events move
  *              it to COMPLETED / FAILED — the trigger-to-outcome correlation
@@ -53,8 +53,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.ops.instance.InstanceStore;
-import com.oli.orchestrator_demo.ops.instance.RunInstance;
+import com.oli.orchestrator_demo.kernel.contract.RunInstanceSink;
+import com.oli.orchestrator_demo.kernel.contract.RunInstance;
 import com.oli.orchestrator_demo.governance.teamlog.infra.NoopTeamLogStore;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogEntry;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogStore;
@@ -79,7 +79,7 @@ public class ObservabilityActor {
   private final ObservabilitySsePublisher ssePublisher;
   private final RunMetricsStore metricsStore;
   private final TeamLogStore teamLogStore;
-  private final InstanceStore instanceStore;
+  private final RunInstanceSink instanceSink;
   private final Thread actorThread = Thread.ofVirtual().name("observability-actor").start(this::consume);
   private volatile boolean accepting = true;
 
@@ -89,11 +89,11 @@ public class ObservabilityActor {
 
   @org.springframework.beans.factory.annotation.Autowired
   public ObservabilityActor(ObservabilitySsePublisher ssePublisher, RunMetricsStore metricsStore,
-      TeamLogStore teamLogStore, InstanceStore instanceStore) {
+      TeamLogStore teamLogStore, RunInstanceSink instanceSink) {
     this.ssePublisher = ssePublisher;
     this.metricsStore = metricsStore;
     this.teamLogStore = teamLogStore;
-    this.instanceStore = instanceStore;
+    this.instanceSink = instanceSink;
     // Retry events are published from inside agent calls (no bean access);
     // the static bus routes them into the same mailbox as direct producers.
     ObservabilityEventBus.subscribe(this::tell);
@@ -207,7 +207,7 @@ public class ObservabilityActor {
    */
   private void recordInstanceStart(AgentObservabilityEvent event) {
     try {
-      instanceStore.start(new RunInstance(event.runId(), event.businessId(), event.scenarioId(),
+      instanceSink.start(new RunInstance(event.runId(), event.businessId(), event.scenarioId(),
           event.templateName(), event.mode(), RunInstance.TRIGGER_API, RunInstance.RUNNING,
           event.inputContextJson(), event.timestamp(), null, null, null));
     }
@@ -224,10 +224,10 @@ public class ObservabilityActor {
       }
       long durationMs = Duration.between(timeline.startedAt(), event.timestamp()).toMillis();
       if (event.type() == AgentObservabilityEvent.Type.RUN_COMPLETED) {
-        instanceStore.complete(event.runId(), event.timestamp(), durationMs);
+        instanceSink.complete(event.runId(), event.timestamp(), durationMs);
       }
       else {
-        instanceStore.fail(event.runId(), event.timestamp(), event.errorMessage());
+        instanceSink.fail(event.runId(), event.timestamp(), event.errorMessage());
       }
     }
     catch (RuntimeException ex) {

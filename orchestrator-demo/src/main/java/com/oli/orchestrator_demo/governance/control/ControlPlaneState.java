@@ -14,6 +14,10 @@
  * @Version 1.1
  */
 package com.oli.orchestrator_demo.governance.control;
+
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
 
 import java.time.Instant;

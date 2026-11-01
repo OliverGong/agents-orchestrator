@@ -26,13 +26,15 @@
  * @Version 2.0
  */
 package com.oli.orchestrator_demo.governance.control.infra;
+
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
 import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
-import com.oli.orchestrator_demo.governance.control.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.governance.control.CalibrationRule;
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.CalibrationRule;
 import com.oli.orchestrator_demo.governance.control.ControlPlaneCrypto;
 import com.oli.orchestrator_demo.governance.control.ControlPlaneState;
 import com.oli.orchestrator_demo.governance.control.ControlPlaneStore;
-import com.oli.orchestrator_demo.governance.control.McpServerConfig;
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
 import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
 
 import java.sql.Timestamp;

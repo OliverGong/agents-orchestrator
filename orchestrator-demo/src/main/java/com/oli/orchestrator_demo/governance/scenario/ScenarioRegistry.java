@@ -17,6 +17,8 @@
  * @Version 2.1
  */
 package com.oli.orchestrator_demo.governance.scenario;
+
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
 import com.oli.orchestrator_demo.kernel.contract.Agent;
 import com.oli.orchestrator_demo.core.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.core.workflow.StageSpec;
@@ -34,7 +36,7 @@ import org.springframework.stereotype.Component;
 
 import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.governance.control.ControlPlaneState;
-import com.oli.orchestrator_demo.governance.control.McpServerConfig;
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplate;
 
 import jakarta.annotation.PostConstruct;

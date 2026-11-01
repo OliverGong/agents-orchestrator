@@ -14,11 +14,12 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.control.web;
+
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
 import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
-import com.oli.orchestrator_demo.governance.control.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.governance.control.ControlPlaneState;
-import com.oli.orchestrator_demo.governance.control.McpServerConfig;
 import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
 
 import java.util.ArrayList;
@@ -39,8 +40,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 
-import com.oli.orchestrator_demo.core.mcp.McpConnectionRegistry;
-import com.oli.orchestrator_demo.core.mcp.McpServerStatus;
+import com.oli.orchestrator_demo.kernel.contract.McpConnectionGateway;
+import com.oli.orchestrator_demo.kernel.contract.McpServerStatus;
 import com.oli.orchestrator_demo.governance.teamlog.TeamLogRecorder;
 
 import tools.jackson.databind.JsonNode;
@@ -53,13 +54,13 @@ public class ControlPlaneController {
   private static final Logger log = LoggerFactory.getLogger(ControlPlaneController.class);
 
   private final AgentConfigRegistry registry;
-  private final McpConnectionRegistry mcpRegistry;
+  private final McpConnectionGateway mcpRegistry;
   private final TeamLogRecorder teamLog;
   private final Environment environment;
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
 
-  public ControlPlaneController(AgentConfigRegistry registry, McpConnectionRegistry mcpRegistry,
+  public ControlPlaneController(AgentConfigRegistry registry, McpConnectionGateway mcpRegistry,
       TeamLogRecorder teamLog, Environment environment, RestClient.Builder restClientBuilder,
       ObjectMapper objectMapper) {
     this.registry = registry;

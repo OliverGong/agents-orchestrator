@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
+import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
 import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.governance.control.ControlPlaneState;
 import com.oli.orchestrator_demo.governance.control.infra.FileControlPlaneStore;
@@ -57,7 +58,7 @@ class ScenarioRegistryTest {
 
   private AgentConfigRegistry freshControlPlane() {
     WorkflowTemplateHolder holder = new WorkflowTemplateHolder(new WorkflowProperties());
-    AgentConfigRegistry registry = new AgentConfigRegistry(new AgentModelProperties(), new WorkflowProperties(),
+    AgentConfigRegistry registry = new AgentConfigRegistry(new ModelDefaultsBridge(new AgentModelProperties()), new WorkflowProperties(),
         holder, new FileControlPlaneStore(controlFile, JsonMapper.builder().build()));
     registry.initialize();
     return registry;

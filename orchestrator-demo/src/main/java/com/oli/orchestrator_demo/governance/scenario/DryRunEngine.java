@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
 
 import com.oli.orchestrator_demo.governance.control.AgentConfigRegistry;
 import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
-import com.oli.orchestrator_demo.governance.control.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.governance.control.ControlPlaneState;
 import com.oli.orchestrator_demo.governance.control.WorkflowControlState;
 import com.oli.orchestrator_demo.core.workflow.ExecutionMode;

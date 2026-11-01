@@ -17,6 +17,8 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.ops.instance;
+
+import com.oli.orchestrator_demo.kernel.contract.RunInstance;
 import com.oli.orchestrator_demo.ops.instance.infra.DbInstanceStore;
 import com.oli.orchestrator_demo.ops.instance.infra.FileInstanceStore;
 

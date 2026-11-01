@@ -32,9 +32,10 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
-import com.oli.orchestrator_demo.governance.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.RunInstanceSink;
 import com.oli.orchestrator_demo.ops.instance.InstanceStore;
-import com.oli.orchestrator_demo.ops.instance.RunInstance;
+import com.oli.orchestrator_demo.kernel.contract.RunInstance;
 import com.oli.orchestrator_demo.ops.observability.infra.NoopRunMetricsStore;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilitySsePublisher;
@@ -110,22 +111,42 @@ public final class ChatClientStubs {
     return new StubbedModel(model, AgentRuntimeStore.fixed());
   }
 
+  /** Bridges a test instance store onto the write-side contract port. */
+  public static RunInstanceSink sink(InstanceStore store) {
+    return new RunInstanceSink() {
+      @Override
+      public void start(RunInstance instance) {
+        store.start(instance);
+      }
+
+      @Override
+      public void complete(String runId, Instant completedAt, Long durationMs) {
+        store.complete(runId, completedAt, durationMs);
+      }
+
+      @Override
+      public void fail(String runId, Instant completedAt, String errorMessage) {
+        store.fail(runId, completedAt, errorMessage);
+      }
+    };
+  }
+
   /** An observability actor wired with a real (emitter-less) SSE publisher. */
   public static ObservabilityActor actor() {
     return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()),
-        new NoopRunMetricsStore(), new NoopTeamLogStore(), new CollectingInstanceStore());
+        new NoopRunMetricsStore(), new NoopTeamLogStore(), sink(new CollectingInstanceStore()));
   }
 
   /** An observability actor wired with the given (test) metrics store. */
   public static ObservabilityActor actor(RunMetricsStore metricsStore) {
     return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()),
-        metricsStore, new NoopTeamLogStore(), new CollectingInstanceStore());
+        metricsStore, new NoopTeamLogStore(), sink(new CollectingInstanceStore()));
   }
 
   /** An observability actor wired with the given metrics and instance stores. */
   public static ObservabilityActor actor(RunMetricsStore metricsStore, InstanceStore instanceStore) {
     return new ObservabilityActor(new ObservabilitySsePublisher(JsonMapper.builder().build()),
-        metricsStore, new NoopTeamLogStore(), instanceStore);
+        metricsStore, new NoopTeamLogStore(), sink(instanceStore));
   }
 
   /**

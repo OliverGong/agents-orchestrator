@@ -13,6 +13,14 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.control;
+
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
+
+import com.oli.orchestrator_demo.kernel.contract.CalibrationRule;
+
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
 import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
 import com.oli.orchestrator_demo.governance.control.infra.DbControlPlaneStore;
 import com.oli.orchestrator_demo.governance.control.infra.FileControlPlaneStore;
@@ -37,6 +45,7 @@ import com.oli.orchestrator_demo.core.agent.ItineraryAgent;
 import com.oli.orchestrator_demo.core.agent.ResearchAgent;
 import com.oli.orchestrator_demo.core.agent.ReviewAgent;
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
+import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
 import com.oli.orchestrator_demo.core.workflow.ExecutionMode;
 import com.oli.orchestrator_demo.core.workflow.StageSpec;
@@ -64,7 +73,7 @@ class AgentConfigRegistryTest {
 
   private AgentConfigRegistry freshRegistry() throws IOException {
     holder = new WorkflowTemplateHolder(new WorkflowProperties());
-    AgentConfigRegistry registry = new AgentConfigRegistry(modelProperties, new WorkflowProperties(), holder,
+    AgentConfigRegistry registry = new AgentConfigRegistry(new ModelDefaultsBridge(modelProperties), new WorkflowProperties(), holder,
         new FileControlPlaneStore(configFile, JsonMapper.builder().build()));
     registry.initialize();
     return registry;
@@ -80,12 +89,12 @@ class AgentConfigRegistryTest {
     store.initialize();
 
     holder = new WorkflowTemplateHolder(new WorkflowProperties());
-    AgentConfigRegistry first = new AgentConfigRegistry(modelProperties, new WorkflowProperties(), holder, store);
+    AgentConfigRegistry first = new AgentConfigRegistry(new ModelDefaultsBridge(modelProperties), new WorkflowProperties(), holder, store);
     first.initialize();
     first.updateAgent("research", new AgentRuntimeConfig("research", "db persona", "m1", 0.5, List.of(), List.of()));
 
     // "Restart": a fresh registry over the same database reloads the state.
-    AgentConfigRegistry restarted = new AgentConfigRegistry(new AgentModelProperties(),
+    AgentConfigRegistry restarted = new AgentConfigRegistry(new ModelDefaultsBridge(new AgentModelProperties()),
         new WorkflowProperties(), holder, store);
     restarted.initialize();
     assertThat(restarted.state().version()).isEqualTo(2);
@@ -243,7 +252,7 @@ class AgentConfigRegistryTest {
         new ResearchAgent(model, AgentRuntimeStore.fixed(), null),
         new BudgetAgent(model, AgentRuntimeStore.fixed(), null),
         new ItineraryAgent(model, AgentRuntimeStore.fixed(), null),
-        new ReviewAgent(model, AgentRuntimeStore.fixed(), null)), modelProperties, null);
+        new ReviewAgent(model, AgentRuntimeStore.fixed(), null)), new ModelDefaultsBridge(modelProperties), null);
   }
 
   @Test

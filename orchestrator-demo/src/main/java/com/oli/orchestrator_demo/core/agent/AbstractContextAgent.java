@@ -44,8 +44,8 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 
 import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
-import com.oli.orchestrator_demo.governance.control.AgentRuntimeConfig;
-import com.oli.orchestrator_demo.governance.control.AgentRuntimeStore;
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
 import com.oli.orchestrator_demo.core.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;

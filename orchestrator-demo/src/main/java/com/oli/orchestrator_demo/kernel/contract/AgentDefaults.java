@@ -9,17 +9,12 @@
  * @Date Oct 30, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.governance.control;
+package com.oli.orchestrator_demo.kernel.contract;
 
 import java.util.List;
 import java.util.Map;
 
-import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
-
 public final class AgentDefaults {
-
-  /** Agents of the demo, in workflow declaration order. */
-  public static final List<String> KNOWN_AGENTS = List.of("research", "budget", "itinerary", "review");
 
   private static final Map<String, String> SYSTEM_PROMPTS = Map.of(
       "research", """
@@ -69,10 +64,10 @@ public final class AgentDefaults {
     return prompt;
   }
 
-  /** The default runtime configuration: built-in persona plus the model settings from `orchestrator.agents.*`. */
-  public static AgentRuntimeConfig defaultConfig(String name, AgentModelProperties properties) {
-    AgentModelProperties.AgentSpec spec = properties.agent(name);
-    return new AgentRuntimeConfig(name, systemPrompt(name), spec.getModel(), spec.getTemperature(),
+  /** The default runtime configuration: built-in persona plus the model defaults from the port. */
+  public static AgentRuntimeConfig defaultConfig(String name, ModelDefaultsReader reader) {
+    ModelDefaultsReader.ModelDefaults defaults = reader.defaults(name);
+    return new AgentRuntimeConfig(name, systemPrompt(name), defaults.model(), defaults.temperature(),
         List.of(), List.of());
   }
 }

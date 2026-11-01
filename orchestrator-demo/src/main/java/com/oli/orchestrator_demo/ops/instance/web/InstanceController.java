@@ -18,7 +18,7 @@
  */
 package com.oli.orchestrator_demo.ops.instance.web;
 import com.oli.orchestrator_demo.ops.instance.InstanceStore;
-import com.oli.orchestrator_demo.ops.instance.RunInstance;
+import com.oli.orchestrator_demo.kernel.contract.RunInstance;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

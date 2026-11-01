@@ -18,7 +18,10 @@
  * @Date Oct 30, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.governance.control;
+package com.oli.orchestrator_demo.kernel.contract;
+
+
+
 
 import java.util.List;
 
@@ -30,6 +33,9 @@ public record AgentRuntimeConfig(
   List<CalibrationRule> calibrationRules,
   List<String> mcpRefs
 ) {
+
+  /** Agents of the demo, in workflow declaration order. */
+  public static final List<String> KNOWN_AGENTS = List.of("research", "budget", "itinerary", "review");
 
   public AgentRuntimeConfig {
     systemPrompt = systemPrompt == null ? "" : systemPrompt;

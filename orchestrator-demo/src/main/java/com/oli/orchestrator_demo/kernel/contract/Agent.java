@@ -10,7 +10,6 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.kernel.contract;
-import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
 
 public interface Agent<I, O> {
 
@@ -19,4 +18,7 @@ public interface Agent<I, O> {
 
   /** Executes the agent's unit of work and returns its contribution. */
   O execute(I input);
+
+  /** The agent's self-declared contract, introspected by the control plane. */
+  AgentDescriptor descriptor();
 }

@@ -46,6 +46,8 @@ import org.springframework.stereotype.Service;
 
 import com.oli.orchestrator_demo.kernel.contract.Agent;
 import com.oli.orchestrator_demo.kernel.contract.OrchestratorContext;
+import com.oli.orchestrator_demo.kernel.contract.OrchestratorSnapshot;
+import com.oli.orchestrator_demo.kernel.contract.RunStatusReader;
 import com.oli.orchestrator_demo.kernel.contract.TripRequest;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.ops.observability.metrics.LmUsageCollector;
@@ -62,7 +64,7 @@ import io.micrometer.observation.ObservationRegistry;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
-public class TripPlanningOrchestrator {
+public class TripPlanningOrchestrator implements RunStatusReader {
 
   private static final Logger log = LoggerFactory.getLogger(TripPlanningOrchestrator.class);
 
@@ -108,6 +110,17 @@ public class TripPlanningOrchestrator {
   /** Names of the registered agents, in declaration order (for Actuator health/info). */
   public Set<String> agentNames() {
     return agents.keySet();
+  }
+
+  /** Immutable status view for the health/info probes (via the contract port). */
+  @Override
+  public OrchestratorSnapshot snapshot() {
+    WorkflowTemplate template = template();
+    return new OrchestratorSnapshot(template.name(), template.mode().name(),
+        template.stages().stream()
+            .map(stage -> new OrchestratorSnapshot.StageView(stage.name(), stage.agent(), stage.dependsOn()))
+            .toList(),
+        List.copyOf(agentNames()));
   }
 
   /**

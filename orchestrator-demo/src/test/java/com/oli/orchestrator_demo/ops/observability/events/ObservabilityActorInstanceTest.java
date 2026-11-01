@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 import com.oli.orchestrator_demo.ChatClientStubs;
 import com.oli.orchestrator_demo.ChatClientStubs.CollectingInstanceStore;
 import com.oli.orchestrator_demo.ops.instance.InstanceStore;
-import com.oli.orchestrator_demo.ops.instance.RunInstance;
+import com.oli.orchestrator_demo.kernel.contract.RunInstance;
 import com.oli.orchestrator_demo.ops.observability.events.RunTimeline.RunStatus;
 
 class ObservabilityActorInstanceTest {

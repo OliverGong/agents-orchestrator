@@ -11,7 +11,10 @@
  * @Version 1.0
  */
 package com.oli.orchestrator_demo.governance.control;
+
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeStore;
 import com.oli.orchestrator_demo.kernel.contract.AgentDescriptor;
+import com.oli.orchestrator_demo.kernel.contract.AgentRuntimeConfig;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,6 +33,7 @@ import com.oli.orchestrator_demo.core.agent.ItineraryAgent;
 import com.oli.orchestrator_demo.core.agent.ResearchAgent;
 import com.oli.orchestrator_demo.core.agent.ReviewAgent;
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
+import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
 
 class AgentDescriptorRegistryTest {
 
@@ -47,7 +51,7 @@ class AgentDescriptorRegistryTest {
         new ResearchAgent(model, AgentRuntimeStore.fixed(), null),
         new BudgetAgent(model, AgentRuntimeStore.fixed(), null),
         new ItineraryAgent(model, AgentRuntimeStore.fixed(), null),
-        new ReviewAgent(model, AgentRuntimeStore.fixed(), null)), modelProperties, null);
+        new ReviewAgent(model, AgentRuntimeStore.fixed(), null)), new ModelDefaultsBridge(modelProperties), null);
   }
 
   @Test
@@ -71,7 +75,7 @@ class AgentDescriptorRegistryTest {
     ChatModel model = Mockito.mock(ChatModel.class);
     assertThatThrownBy(() -> new AgentDescriptorRegistry(List.of(
         new ResearchAgent(model, AgentRuntimeStore.fixed(), null),
-        new ResearchAgent(model, AgentRuntimeStore.fixed(), null)), modelProperties, null))
+        new ResearchAgent(model, AgentRuntimeStore.fixed(), null)), new ModelDefaultsBridge(modelProperties), null))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("research");
   }
@@ -80,7 +84,7 @@ class AgentDescriptorRegistryTest {
   void theEffectiveViewPrefersPersistedOverrides() {
     AgentDescriptor override = new AgentDescriptor("budget", "Cost Controller", "",
         List.of("budgetResponse"), List.of("researchResponse"), List.of(), null, null);
-    Set<String> agents = Set.copyOf(AgentDefaults.KNOWN_AGENTS);
+    Set<String> agents = Set.copyOf(AgentRuntimeConfig.KNOWN_AGENTS);
 
     Map<String, AgentDescriptor> effective = registry.effectiveDescriptors(agents, Map.of("budget", override));
 

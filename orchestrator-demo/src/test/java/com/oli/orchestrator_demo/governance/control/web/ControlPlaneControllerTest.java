@@ -43,6 +43,7 @@ import com.oli.orchestrator_demo.core.agent.ItineraryAgent;
 import com.oli.orchestrator_demo.core.agent.ResearchAgent;
 import com.oli.orchestrator_demo.core.agent.ReviewAgent;
 import com.oli.orchestrator_demo.core.agent.config.AgentModelProperties;
+import com.oli.orchestrator_demo.core.agent.config.ModelDefaultsBridge;
 import com.oli.orchestrator_demo.core.mcp.McpConnectionRegistry;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;
 import com.oli.orchestrator_demo.core.workflow.WorkflowTemplateHolder;
@@ -65,7 +66,7 @@ class ControlPlaneControllerTest {
   @BeforeEach
   void setUp() throws IOException {
     WorkflowTemplateHolder holder = new WorkflowTemplateHolder(new WorkflowProperties());
-    registry = new AgentConfigRegistry(new AgentModelProperties(), new WorkflowProperties(), holder,
+    registry = new AgentConfigRegistry(new ModelDefaultsBridge(new AgentModelProperties()), new WorkflowProperties(), holder,
         new FileControlPlaneStore(tempDir.resolve("control-plane.json"), JsonMapper.builder().build()));
     registry.initialize();
     // The agent beans back the self-declared slot contracts.
@@ -73,7 +74,7 @@ class ControlPlaneControllerTest {
     registry.attachDescriptors(new AgentDescriptorRegistry(List.of(
         new ResearchAgent(model, registry, null), new BudgetAgent(model, registry, null),
         new ItineraryAgent(model, registry, null), new ReviewAgent(model, registry, null)),
-        new AgentModelProperties(), null));
+        new ModelDefaultsBridge(new AgentModelProperties()), null));
 
     Environment environment = Mockito.mock(Environment.class);
     // Not "ollama": the model listing then skips the HTTP lookup and uses the

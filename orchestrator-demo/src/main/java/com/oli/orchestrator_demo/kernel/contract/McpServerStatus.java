@@ -9,7 +9,8 @@
  * @Date Oct 30, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.core.mcp;
+package com.oli.orchestrator_demo.kernel.contract;
+
 
 import java.time.Instant;
 import java.util.List;

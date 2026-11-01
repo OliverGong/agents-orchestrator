@@ -18,6 +18,8 @@
  */
 package com.oli.orchestrator_demo.core.mcp;
 
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
+
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 
@@ -27,7 +29,7 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.definition.DefaultToolDefinition;
 
-import com.oli.orchestrator_demo.governance.control.McpServerConfig;
+import com.oli.orchestrator_demo.kernel.contract.McpServerConfig;
 import com.oli.orchestrator_demo.ops.observability.events.AgentObservabilityEvent;
 import com.oli.orchestrator_demo.ops.observability.events.ObservabilityActor;
 import com.oli.orchestrator_demo.kernel.shared.context.RunContext;

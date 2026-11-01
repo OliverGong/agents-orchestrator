@@ -10,33 +10,33 @@
  */
 package com.oli.orchestrator_demo.ops.observability.health;
 
-import java.util.List;
 import java.util.Map;
 
 import org.springframework.boot.actuate.info.Info;
 import org.springframework.boot.actuate.info.InfoContributor;
 import org.springframework.stereotype.Component;
 
-import com.oli.orchestrator_demo.core.trip.TripPlanningOrchestrator;
-import com.oli.orchestrator_demo.core.workflow.StageSpec;
+import com.oli.orchestrator_demo.kernel.contract.OrchestratorSnapshot;
+import com.oli.orchestrator_demo.kernel.contract.RunStatusReader;
 
 @Component
 public class OrchestratorInfoContributor implements InfoContributor {
 
-  private final TripPlanningOrchestrator orchestrator;
+  private final RunStatusReader orchestrator;
 
-  public OrchestratorInfoContributor(TripPlanningOrchestrator orchestrator) {
+  public OrchestratorInfoContributor(RunStatusReader orchestrator) {
     this.orchestrator = orchestrator;
   }
 
   @Override
   public void contribute(Info.Builder builder) {
+    OrchestratorSnapshot snapshot = orchestrator.snapshot();
     builder.withDetail("workflow", Map.of(
-        "template", orchestrator.template().name(),
-        "mode", orchestrator.template().mode().name(),
-        "stages", orchestrator.template().stages().stream()
+        "template", snapshot.templateName(),
+        "mode", snapshot.mode(),
+        "stages", snapshot.stages().stream()
             .map(stage -> stage.name() + " -> " + stage.agent() + stage.dependsOn())
             .toList(),
-        "agents", List.copyOf(orchestrator.agentNames())));
+        "agents", snapshot.agentNames()));
   }
 }

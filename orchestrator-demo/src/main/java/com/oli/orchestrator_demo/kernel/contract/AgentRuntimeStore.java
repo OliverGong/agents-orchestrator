@@ -10,7 +10,9 @@
  * @Date Oct 30, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.governance.control;
+package com.oli.orchestrator_demo.kernel.contract;
+
+
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -24,7 +26,7 @@ public interface AgentRuntimeStore {
   /** An immutable store seeded with the built-in defaults of the known agents. */
   static AgentRuntimeStore fixed() {
     Map<String, AgentRuntimeConfig> configs = new LinkedHashMap<>();
-    for (String name : AgentDefaults.KNOWN_AGENTS) {
+    for (String name : AgentRuntimeConfig.KNOWN_AGENTS) {
       configs.put(name, AgentRuntimeConfig.defaults(name));
     }
     return name -> {

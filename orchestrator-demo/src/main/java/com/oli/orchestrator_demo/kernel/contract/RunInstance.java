@@ -14,7 +14,8 @@
  * @Date Nov 1, 2026
  * @Version 1.0
  */
-package com.oli.orchestrator_demo.ops.instance;
+package com.oli.orchestrator_demo.kernel.contract;
+
 
 import java.time.Instant;
 
