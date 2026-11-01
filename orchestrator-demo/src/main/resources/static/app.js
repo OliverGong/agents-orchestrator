@@ -13,7 +13,11 @@ const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/* ---------------- sidebar pages & health dot ---------------- */
+/* ---------------- sidebar pages, lifecycle chain & health dot ----------------
+   v2.2: the sidebar and the canvas are linked both ways — every page
+   activation refreshes its panel AND the global context bar; cross-page
+   jumps carry the scenario context so the lifecycle closes:
+   dry-run → activate+run → replay → per-scenario metrics. */
 document.querySelectorAll('.nav-item').forEach((btn) => btn.addEventListener('click', () => {
   document.querySelectorAll('.nav-item, .page-panel').forEach((el) => el.classList.remove('active'));
   btn.classList.add('active');
@@ -27,7 +31,55 @@ document.querySelectorAll('.nav-item').forEach((btn) => btn.addEventListener('cl
   if (btn.dataset.page === 'runs') refreshRuns();
   if (btn.dataset.page === 'logs') refreshLogs();
   if (btn.dataset.page === 'metrics') refreshObservability();
+  refreshCtxBar();
 }));
+
+/** Scenario carried across page switches (the lifecycle chain context). */
+let ctxScenarioId = null;
+/** Pending LM-metrics scenario filter, consumed by the next refreshObservability. */
+let metricsScenarioFilter = '';
+
+function currentPage() {
+  const btn = document.querySelector('.nav-item.active');
+  return btn ? btn.dataset.page : '';
+}
+
+/** Programmatic page switch carrying the scenario context (nav ↔ canvas). */
+function gotoPage(page, opts = {}) {
+  if (opts.scenarioId !== undefined) ctxScenarioId = opts.scenarioId;
+  if (page === 'metrics' && opts.scenarioId) metricsScenarioFilter = opts.scenarioId;
+  const btn = document.querySelector(`.nav-item[data-page="${page}"]`);
+  if (btn) btn.click();
+}
+
+async function refreshCtxBar() {
+  // Live context: the scenario activated onto the control plane (durable
+  // scenario-plane state since v2.2, so it survives reloads and clients).
+  try {
+    const state = await getJson('/api/v1/scenarios');
+    scenarioCache = state.scenarios || [];
+    const active = scenarioCache.find((s) => s.id === state.activeScenarioId) || null;
+    const ctxBadge = $('#ctx-scenario');
+    ctxBadge.textContent = active ? `${active.name}（${active.id}）` : '控制平面默认';
+    ctxBadge.className = 'badge' + (active ? ' badge-ok' : '');
+    const runBadge = $('#active-scenario-badge');
+    if (runBadge) {
+      runBadge.textContent = active ? active.name : '控制平面默认';
+      runBadge.className = 'badge' + (active ? ' badge-ok' : '');
+    }
+  } catch { /* keep the previous frame on backend hiccups */ }
+  // Highlight the current step of the lifecycle chain.
+  const page = currentPage();
+  document.querySelectorAll('.ctx-step').forEach((b) =>
+    b.classList.toggle('on', b.dataset.step === page));
+}
+
+document.querySelectorAll('.ctx-step').forEach((btn) =>
+  btn.addEventListener('click', () => {
+    const step = btn.dataset.step;
+    if (step === 'metrics') gotoPage('metrics', { scenarioId: ctxScenarioId || '' });
+    else gotoPage(step);
+  }));
 
 async function refreshHealthDot() {
   const dot = $('#health-dot');
@@ -55,6 +107,8 @@ async function loadScenarioSelects() {
     if (!el) continue;
     el.innerHTML = scenarioCache.map((s) =>
       `<option value="${esc(s.id)}">${esc(s.name)}（${esc(s.id)}）</option>`).join('');
+    // Keep the carried lifecycle context selected across page switches.
+    if (ctxScenarioId && scenarioCache.some((s) => s.id === ctxScenarioId)) el.value = ctxScenarioId;
   }
 }
 
@@ -66,11 +120,10 @@ $('#activate-btn').addEventListener('click', async () => {
   btn.disabled = true; msg.textContent = '激活中…（工作流/Agent 覆盖热应用到控制平面）';
   try {
     const cp = await postJson(`/api/v1/scenarios/${encodeURIComponent(id)}/activate`, {});
+    ctxScenarioId = id;
     msg.textContent = `场景已激活：模板「${esc(cp.workflow.mode)}」已热切换（version ${cp.version}），下一次运行即按场景执行`;
     msg.className = 'hint ok';
-    const scn = scenarioCache.find((s) => s.id === id);
-    $('#active-scenario-badge').textContent = scn ? scn.name : id;
-    $('#active-scenario-badge').className = 'badge badge-ok';
+    await refreshCtxBar();
   } catch (e) {
     msg.textContent = '激活失败: ' + e.message; msg.className = 'hint';
   } finally { btn.disabled = false; }
@@ -181,6 +234,13 @@ function renderResults(ctx) {
   const itinerary = ctx.itineraryResponse;
   const review = ctx.reviewResponse;
   $('#results').innerHTML = `
+    <div class="card">
+      <h2>运行完成
+        <button id="goto-replay" class="action-btn" type="button">查看运行回放 →</button>
+        <button id="goto-lm-metrics" class="action-btn" type="button">场景指标 →</button></h2>
+      <p class="hint">本次运行已由 ObservabilityActor 先落库再推送（WAL 顺序）：回放可查时间线 / DAG / 泳道，
+          指标可查本场景各阶段的 LM 耗时与 token 消耗。</p>
+    </div>
     <div class="card agent-card"><h2>行程结论 — ReviewAgent
       <span class="badge ${review && review.isValid ? 'badge-ok' : 'badge-failed'}">
         ${review && review.isValid ? '校验通过' : '存在问题'}</span></h2>
@@ -220,6 +280,17 @@ function renderResults(ctx) {
         </div>
       </div>
     </div>`;
+  // Lifecycle closure: run → replay (newest run = the one just finished)
+  // and run → per-scenario metrics.
+  $('#goto-replay').addEventListener('click', async () => {
+    gotoPage('runs');
+    try {
+      const runs = await getJson('/api/trips/runs');
+      if (runs.length) await showRunDetail(runs[0].runId);
+    } catch { /* the runs panel still shows the list */ }
+  });
+  $('#goto-lm-metrics').addEventListener('click', () =>
+    gotoPage('metrics', { scenarioId: ctxScenarioId || '' }));
 }
 
 function showError(status, err) {
@@ -240,12 +311,13 @@ async function refreshRuns() {
     <tr data-run="${esc(r.runId)}">
       <td>${esc(fmtTime(r.startedAt))}</td>
       <td>${esc(r.templateName)}</td>
+      <td class="mono">${esc(r.scenarioId || '—')}</td>
       <td>${esc(r.mode)}</td>
       <td><span class="badge badge-${esc(r.status)}">${esc(r.status)}</span></td>
       <td class="num">${r.durationMs != null ? esc(r.durationMs) + ' ms' : '—'}</td>
       <td class="num">${esc(r.stageCount)}</td>
       <td class="num">${esc(r.failedStages)}</td>
-    </tr>`).join('') || '<tr><td colspan="7" class="hint">暂无运行记录，去「场景运行」发起一次请求。</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="8" class="hint">暂无运行记录，去「场景运行」发起一次请求。</td></tr>';
   tbody.querySelectorAll('tr[data-run]').forEach((tr) =>
     tr.addEventListener('click', () => showRunDetail(tr.dataset.run)));
 }
@@ -273,11 +345,18 @@ function drawRunDetail() {
   $('#run-detail').innerHTML = `
     <div class="card">
       <h2>运行 ${esc(d.runId.slice(0, 8))}…
-        <span class="badge badge-${esc(d.status)}">${esc(d.status)}</span>${toggle}</h2>
-      <p class="hint">模板 <b>${esc(d.templateName)}</b> · 模式 <b>${esc(d.mode)}</b> ·
+        <span class="badge badge-${esc(d.status)}">${esc(d.status)}</span>${toggle}
+        ${d.scenarioId ? `<button id="run-to-metrics" class="action-btn" type="button">场景指标 →</button>` : ''}
+      </h2>
+      <p class="hint">模板 <b>${esc(d.templateName)}</b> · 场景 <b class="mono">${esc(d.scenarioId || '控制平面默认')}</b> ·
+        模式 <b>${esc(d.mode)}</b> ·
         ${esc(fmtTime(d.startedAt))} → ${esc(fmtTime(d.completedAt))}</p>
       <div id="run-view-body"></div>
     </div>`;
+  if (d.scenarioId) {
+    $('#run-to-metrics').addEventListener('click', () =>
+      gotoPage('metrics', { scenarioId: d.scenarioId }));
+  }
   document.querySelectorAll('.view-toggle button').forEach((btn) =>
     btn.addEventListener('click', () => { runDetailView = btn.dataset.view; drawRunDetail(); }));
   const body = $('#run-view-body');
@@ -518,6 +597,7 @@ function jsonDetails(title, jsonStr) {
 
 /* ---------------- observability (metrics) page ---------------- */
 $('#obs-refresh').addEventListener('click', refreshObservability);
+$('#lm-scenario').addEventListener('change', refreshObservability);
 let obsTimer = null;
 $('#obs-auto').addEventListener('change', (ev) => {
   clearInterval(obsTimer);
@@ -573,9 +653,19 @@ async function refreshObservability() {
   $('#agent-table tbody').innerHTML = rows.join('')
     || '<tr><td colspan="6" class="hint">未获取到 agent 列表。</td></tr>';
 
-  /* durable per-scenario LM metrics (obs_run_metrics aggregation, 7d window) */
+  /* durable per-scenario LM metrics (obs_run_metrics aggregation, 7d window),
+     scoped by the optional scenario filter of the lifecycle chain */
   try {
-    const lm = await getJson('/api/v1/metrics/lm?window=7d');
+    const lmSel = $('#lm-scenario');
+    if (scenarioCache.length) {
+      const keep = lmSel.value || metricsScenarioFilter || '';
+      lmSel.innerHTML = '<option value="">全部场景</option>' + scenarioCache.map((s) =>
+        `<option value="${esc(s.id)}">${esc(s.name)}（${esc(s.id)}）</option>`).join('');
+      if (keep && scenarioCache.some((s) => s.id === keep)) lmSel.value = keep;
+      metricsScenarioFilter = '';
+    }
+    const scoped = lmSel.value ? `&scenarioId=${encodeURIComponent(lmSel.value)}` : '';
+    const lm = await getJson('/api/v1/metrics/lm?window=7d' + scoped);
     $('#lm-table tbody').innerHTML = lm.map((m) => `
       <tr><td>${esc(m.scenarioId ?? '—')}</td><td>${esc(m.stage)}</td><td>${esc(m.agent)}</td>
         <td>${esc(m.model ?? '—')}</td><td class="num">${m.stageCount}</td><td class="num">${m.failedCount}</td>
@@ -1044,12 +1134,25 @@ async function refreshScenarios() {
       <td class="num">${(s.mcpServerRefs || []).length || '—'}</td>
       <td><span class="badge ${s.active ? 'badge-ok' : ''}">${s.active ? '启用' : '停用'}</span></td>
       <td>
+        <button class="action-btn scn-dry" data-id="${esc(s.id)}" type="button">推演</button>
+        <button class="action-btn scn-activate" data-id="${esc(s.id)}" type="button">激活</button>
         <button class="mini-btn scn-edit" data-id="${esc(s.id)}" type="button">编辑</button>
         <button class="mini-btn scn-del" data-id="${esc(s.id)}" type="button">删除</button>
       </td>
     </tr>`).join('') || '<tr><td colspan="8" class="hint">暂无场景，点击「+ 新建场景」。</td></tr>';
   tbody.querySelectorAll('.scn-edit').forEach((btn) =>
     btn.addEventListener('click', () => openScenarioEditor(btn.dataset.id)));
+  tbody.querySelectorAll('.scn-dry').forEach((btn) =>
+    btn.addEventListener('click', () => gotoPage('dryrun', { scenarioId: btn.dataset.id })));
+  tbody.querySelectorAll('.scn-activate').forEach((btn) =>
+    btn.addEventListener('click', async () => {
+      if (!confirm(`激活场景 ${btn.dataset.id}？（工作流/Agent 覆盖热应用到控制平面）`)) return;
+      try {
+        await postJson(`/api/v1/scenarios/${encodeURIComponent(btn.dataset.id)}/activate`, {});
+        ctxScenarioId = btn.dataset.id;
+        gotoPage('run');
+      } catch (e) { alert('激活失败: ' + e.message); }
+    }));
   tbody.querySelectorAll('.scn-del').forEach((btn) =>
     btn.addEventListener('click', async () => {
       if (!confirm(`删除场景 ${btn.dataset.id}？`)) return;
@@ -1446,7 +1549,25 @@ function drawDryRunReport(report) {
       ${waveTable || '<div class="hint">无法展开波次（存在校验问题）。</div>'}
       <h3>黑板槽位流</h3>
       ${slotTable}
+      ${report.valid ? `
+      <div style="margin-top:14px">
+        <button id="dryrun-activate" class="accent-btn" type="button">下一步：激活并运行 →</button>
+        <span class="hint">推演通过后激活：工作流 / Agent 覆盖热应用到控制平面，随后进入运行页直接执行。</span>
+      </div>` : ''}
     </div>`;
+  const act = $('#dryrun-activate');
+  if (act) {
+    act.addEventListener('click', async () => {
+      act.disabled = true;
+      try {
+        await postJson(`/api/v1/scenarios/${encodeURIComponent(report.scenarioId)}/activate`, {});
+        gotoPage('run', { scenarioId: report.scenarioId });
+      } catch (e) {
+        alert('激活失败: ' + e.message);
+        act.disabled = false;
+      }
+    });
+  }
   renderDag('#dryrun-dag',
     report.waves.flatMap((w) => w.stages.map((s) => ({
       id: s.stageName, wave: w.waveIndex, label: s.stageName,
@@ -1529,6 +1650,7 @@ fetch('/actuator/info').then((r) => r.json()).then((info) => {
 
 /* ---------------- boot ---------------- */
 refreshHealthDot();
+refreshCtxBar();
 refreshRuns();
 refreshObservability();
 refreshControl();

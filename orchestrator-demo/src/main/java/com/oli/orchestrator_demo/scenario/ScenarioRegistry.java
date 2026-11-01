@@ -67,7 +67,7 @@ public class ScenarioRegistry {
           store.name(), state.version(), state.scenarios().size());
     }
     else {
-      state = new ScenarioState(1, Instant.now(), List.of(seedScenario()));
+      state = new ScenarioState(1, Instant.now(), List.of(seedScenario()), null);
       store.save(state);
       log.info("Scenario plane seeded to {} (1 demo scenario)", store.name());
     }
@@ -140,8 +140,21 @@ public class ScenarioRegistry {
     for (var entry : scenario.agentOverrides().entrySet()) {
       cp = controlPlane.updateAgent(entry.getKey(), entry.getValue().applyTo(cp.agents().get(entry.getKey())));
     }
-    log.info("Scenario plane: scenario '{}' activated onto the control plane", scenario.id());
+    // The activation is a scenario-plane state change too: record which
+    // scenario is live so the console context bar survives reloads/clients.
+    state = new ScenarioState(state.version() + 1, Instant.now(), state.scenarios(), id);
+    store.save(state);
+    log.info("Scenario plane: scenario '{}' activated onto the control plane (version {})",
+        scenario.id(), state.version());
     return cp;
+  }
+
+  /** The scenario currently activated onto the control plane (null = default). */
+  public synchronized Scenario activeScenario() {
+    return state.scenarios().stream()
+        .filter(s -> s.id().equals(state.activeScenarioId()))
+        .findFirst()
+        .orElse(null);
   }
 
   /** Token-free rehearsal of the scenario (no state change). */
@@ -151,7 +164,11 @@ public class ScenarioRegistry {
   }
 
   private ScenarioState bumpAndStore(List<Scenario> scenarios) {
-    state = new ScenarioState(state.version() + 1, Instant.now(), scenarios);
+    // Dropping the activated scenario from the plane resets the live context.
+    String activeId = scenarios.stream().anyMatch(s -> s.id().equals(state.activeScenarioId()))
+        ? state.activeScenarioId()
+        : null;
+    state = new ScenarioState(state.version() + 1, Instant.now(), scenarios, activeId);
     store.save(state);
     log.info("Scenario plane: {} scenario(s) persisted (version {})", scenarios.size(), state.version());
     return state;

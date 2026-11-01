@@ -60,8 +60,9 @@ public class RunObservabilityController {
     Long durationMs = timeline.completedAt() == null
         ? null
         : Duration.between(timeline.startedAt(), timeline.completedAt()).toMillis();
-    return new RunSummary(timeline.runId(), timeline.templateName(), timeline.mode(),
-        timeline.status().name(), timeline.startedAt(), timeline.completedAt(), durationMs,
+    return new RunSummary(timeline.runId(), timeline.templateName(), timeline.scenarioId(),
+        timeline.mode(), timeline.status().name(), timeline.startedAt(), timeline.completedAt(),
+        durationMs,
         (int) events.stream().filter(event -> event.type().name().startsWith("STAGE")).count(),
         events.stream().filter(event -> event.type() == AgentObservabilityEvent.Type.STAGE_FAILED).count());
   }
@@ -109,8 +110,8 @@ public class RunObservabilityController {
             "CONCURRENT".equals(timeline.mode()) && entry.getValue().size() > 1,
             List.copyOf(entry.getValue())))
         .toList();
-    return new RunDetails(timeline.runId(), timeline.templateName(), timeline.mode(),
-        timeline.status().name(), timeline.startedAt(), timeline.completedAt(),
+    return new RunDetails(timeline.runId(), timeline.templateName(), timeline.scenarioId(),
+        timeline.mode(), timeline.status().name(), timeline.startedAt(), timeline.completedAt(),
         timeline.finalContextJson(), waves);
   }
 
@@ -119,13 +120,15 @@ public class RunObservabilityController {
   }
 
   /** Compact run entry of the list endpoint. */
-  public record RunSummary(String runId, String templateName, String mode, String status,
-      Instant startedAt, Instant completedAt, Long durationMs, int stageCount, long failedStages) {
+  public record RunSummary(String runId, String templateName, String scenarioId, String mode,
+      String status, Instant startedAt, Instant completedAt, Long durationMs, int stageCount,
+      long failedStages) {
   }
 
   /** Full timeline of one run, grouped into dependency waves. */
-  public record RunDetails(String runId, String templateName, String mode, String status,
-      Instant startedAt, Instant completedAt, String finalContext, List<WaveView> waves) {
+  public record RunDetails(String runId, String templateName, String scenarioId, String mode,
+      String status, Instant startedAt, Instant completedAt, String finalContext,
+      List<WaveView> waves) {
 
     /** One dependency wave; {@code parallel} is only true for concurrent waves. */
     public record WaveView(int waveIndex, boolean parallel, List<StageView> stages) {

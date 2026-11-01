@@ -64,6 +64,7 @@ class RunObservabilityControllerTest {
     mockMvc.perform(get("/api/trips/runs/" + runId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.runId").value(runId))
+        .andExpect(jsonPath("$.scenarioId").value("scn-tokyo"))
         .andExpect(jsonPath("$.mode").value("CONCURRENT"))
         .andExpect(jsonPath("$.status").value("COMPLETED"))
         .andExpect(jsonPath("$.finalContext").value("{\"reviewResponse\":{}}"))
@@ -77,6 +78,7 @@ class RunObservabilityControllerTest {
     mockMvc.perform(get("/api/trips/runs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].runId").value(runId))
+        .andExpect(jsonPath("$[0].scenarioId").value("scn-tokyo"))
         .andExpect(jsonPath("$[0].stageCount").value(3))
         .andExpect(jsonPath("$[0].failedStages").value(0));
   }

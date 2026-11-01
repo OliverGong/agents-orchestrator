@@ -164,6 +164,14 @@ class ScenarioRegistryTest {
     // Non-overridden fields keep the live control plane persona (null keeps).
     assertThat(controlPlane.state().agents().get("research").systemPrompt()).isNotBlank();
     assertThat(controlPlane.state().version()).isGreaterThan(1);
+    // v2.2: the activation is tracked as durable scenario-plane state.
+    assertThat(registry.state().activeScenarioId()).isEqualTo("parallel-case");
+    assertThat(registry.activeScenario().id()).isEqualTo("parallel-case");
+
+    // Deleting the activated scenario resets the live context.
+    registry.delete("parallel-case");
+    assertThat(registry.state().activeScenarioId()).isNull();
+    assertThat(registry.activeScenario()).isNull();
   }
 
   @Test

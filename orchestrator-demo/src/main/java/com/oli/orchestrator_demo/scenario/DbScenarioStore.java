@@ -42,8 +42,10 @@ public class DbScenarioStore implements ScenarioStore {
       CREATE TABLE IF NOT EXISTS cp_scenario_meta (
         id INT PRIMARY KEY,
         version BIGINT NOT NULL,
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        active_scenario_id VARCHAR(64)
       )""",
+      "ALTER TABLE cp_scenario_meta ADD COLUMN IF NOT EXISTS active_scenario_id VARCHAR(64)",
       """
       CREATE TABLE IF NOT EXISTS cp_scenario (
         id VARCHAR(64) PRIMARY KEY,
@@ -106,8 +108,9 @@ public class DbScenarioStore implements ScenarioStore {
   public void save(ScenarioState state) {
     jdbc.sql("DELETE FROM cp_scenario").update();
     jdbc.sql("DELETE FROM cp_scenario_meta").update();
-    jdbc.sql("INSERT INTO cp_scenario_meta (id, version, updated_at) VALUES (1, ?, ?)")
-        .param(state.version()).param(Timestamp.from(state.updatedAt())).update();
+    jdbc.sql("INSERT INTO cp_scenario_meta (id, version, updated_at, active_scenario_id) VALUES (1, ?, ?, ?)")
+        .param(state.version()).param(Timestamp.from(state.updatedAt()))
+        .param(state.activeScenarioId()).update();
     int order = 0;
     for (Scenario scenario : state.scenarios()) {
       jdbc.sql("""
@@ -128,7 +131,7 @@ public class DbScenarioStore implements ScenarioStore {
 
   @Override
   public Optional<ScenarioState> load() {
-    return jdbc.sql("SELECT version, updated_at FROM cp_scenario_meta WHERE id = 1")
+    return jdbc.sql("SELECT version, updated_at, active_scenario_id FROM cp_scenario_meta WHERE id = 1")
         .query((rs, n) -> {
           List<Scenario> scenarios = jdbc.sql("""
               SELECT id, name, description, request_template, workflow_override, agent_overrides,
@@ -146,7 +149,8 @@ public class DbScenarioStore implements ScenarioStore {
                   srs.getBoolean("active"),
                   srs.getTimestamp("updated_at").toInstant()))
               .list();
-          return new ScenarioState(rs.getLong("version"), rs.getTimestamp("updated_at").toInstant(), scenarios);
+          return new ScenarioState(rs.getLong("version"), rs.getTimestamp("updated_at").toInstant(),
+              scenarios, rs.getString("active_scenario_id"));
         })
         .optional();
   }

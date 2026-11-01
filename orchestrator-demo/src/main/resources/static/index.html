@@ -40,6 +40,21 @@
 
   <div class="content">
   <main>
+    <!-- ============ 全局上下文条（生命周期闭合链） ============ -->
+    <div class="ctx-bar" id="ctx-bar">
+      <span class="ctx-label">当前上下文</span>
+      <span id="ctx-scenario" class="badge">控制平面默认</span>
+      <span class="ctx-chain">
+        <button class="ctx-step" data-step="dryrun" type="button">1 推演</button>
+        <span class="ctx-arrow">→</span>
+        <button class="ctx-step" data-step="run" type="button">2 激活 · 运行</button>
+        <span class="ctx-arrow">→</span>
+        <button class="ctx-step" data-step="runs" type="button">3 回放</button>
+        <span class="ctx-arrow">→</span>
+        <button class="ctx-step" data-step="metrics" type="button">4 场景指标</button>
+      </span>
+    </div>
+
     <!-- ============ 页面: 场景运行 ============ -->
     <section id="page-run" class="page-panel active">
       <div class="card" id="scenario-bar">
@@ -282,7 +297,7 @@
             点击行查看完整回放：时间线 / DAG 依赖图 / 泳道图三种视图，含解析重试链与工具调用明细。</p>
         <table class="data-table" id="runs-table">
           <thead><tr>
-            <th>开始时间</th><th>模板</th><th>模式</th><th>状态</th><th>耗时</th><th>阶段</th><th>失败</th>
+            <th>开始时间</th><th>模板</th><th>场景</th><th>模式</th><th>状态</th><th>耗时</th><th>阶段</th><th>失败</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -353,7 +368,8 @@
           </tr></thead>
           <tbody></tbody>
         </table>
-        <h3>LM 消耗（按场景/阶段聚合，近 7 天 · obs_run_metrics）</h3>
+        <h3>LM 消耗（按场景/阶段聚合，近 7 天 · obs_run_metrics）
+          <select id="lm-scenario" style="margin-left:8px"><option value="">全部场景</option></select></h3>
         <table class="data-table" id="lm-table">
           <thead><tr>
             <th>场景</th><th>阶段</th><th>Agent</th><th>模型</th><th>阶段次数</th><th>失败</th><th>重试</th>
@@ -379,6 +395,6 @@
   </div>
 </div>
 
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

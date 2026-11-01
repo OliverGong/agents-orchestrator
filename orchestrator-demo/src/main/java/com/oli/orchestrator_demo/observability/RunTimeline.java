@@ -19,6 +19,7 @@ import java.util.List;
 public record RunTimeline(
   String runId,
   String templateName,
+  String scenarioId,
   String mode,
   Instant startedAt,
   RunStatus status,
@@ -34,21 +35,24 @@ public record RunTimeline(
   }
 
   static RunTimeline started(AgentObservabilityEvent event) {
-    return new RunTimeline(event.runId(), event.templateName(), event.mode(), event.timestamp(),
-        RunStatus.RUNNING, null, null, List.of(event));
+    return new RunTimeline(event.runId(), event.templateName(), event.scenarioId(), event.mode(),
+        event.timestamp(), RunStatus.RUNNING, null, null, List.of(event));
   }
 
   RunTimeline withEvent(AgentObservabilityEvent event) {
     List<AgentObservabilityEvent> appended = new ArrayList<>(events);
     appended.add(event);
-    return new RunTimeline(runId, templateName, mode, startedAt, status, completedAt, finalContextJson, appended);
+    return new RunTimeline(runId, templateName, scenarioId, mode, startedAt, status, completedAt,
+        finalContextJson, appended);
   }
 
   RunTimeline completed(Instant at, String finalContextJson) {
-    return new RunTimeline(runId, templateName, mode, startedAt, RunStatus.COMPLETED, at, finalContextJson, events);
+    return new RunTimeline(runId, templateName, scenarioId, mode, startedAt, RunStatus.COMPLETED, at,
+        finalContextJson, events);
   }
 
   RunTimeline failed(Instant at) {
-    return new RunTimeline(runId, templateName, mode, startedAt, RunStatus.FAILED, at, finalContextJson, events);
+    return new RunTimeline(runId, templateName, scenarioId, mode, startedAt, RunStatus.FAILED, at,
+        finalContextJson, events);
   }
 }

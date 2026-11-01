@@ -62,12 +62,14 @@ class DbScenarioStoreTest {
         new WorkflowControlState.StageControlState("research", "research", List.of()),
         new WorkflowControlState.StageControlState("budget", "budget", List.of("research"))));
     ScenarioState state = new ScenarioState(7, Instant.now(),
-        List.of(fullScenario("with-override", override), fullScenario("without-override", null)));
+        List.of(fullScenario("with-override", override), fullScenario("without-override", null)),
+        "with-override");
     store.save(state);
 
     ScenarioState loaded = store.load().orElseThrow();
 
     assertThat(loaded.version()).isEqualTo(7);
+    assertThat(loaded.activeScenarioId()).isEqualTo("with-override");
     assertThat(loaded.scenarios()).hasSize(2);
     Scenario withOverride = loaded.scenarios().get(0);
     assertThat(withOverride.workflowOverride()).isEqualTo(override);
@@ -87,7 +89,7 @@ class DbScenarioStoreTest {
   void importFromImportsTheFileStateOnlyOnce() {
     FileScenarioStore fileStore = new FileScenarioStore(tempDir.resolve("scenarios.json"),
         JsonMapper.builder().build());
-    fileStore.save(new ScenarioState(3, Instant.now(), List.of(fullScenario("seeded", null))));
+    fileStore.save(new ScenarioState(3, Instant.now(), List.of(fullScenario("seeded", null)), null));
     assertThat(store.load()).isEmpty();
 
     store.importFrom(fileStore);
@@ -95,7 +97,7 @@ class DbScenarioStoreTest {
     assertThat(store.load().orElseThrow().version()).isEqualTo(3);
 
     // A second import is a no-op: the database is already populated.
-    fileStore.save(new ScenarioState(99, Instant.now(), List.of()));
+    fileStore.save(new ScenarioState(99, Instant.now(), List.of(), null));
     store.importFrom(fileStore);
     assertThat(store.load().orElseThrow().version()).isEqualTo(3);
   }
