@@ -28,6 +28,7 @@ document.querySelectorAll('.nav-item').forEach((btn) => btn.addEventListener('cl
   if (btn.dataset.page === 'scenarios') refreshScenarios();
   if (btn.dataset.page === 'agents' || btn.dataset.page === 'workflow' || btn.dataset.page === 'mcp') refreshControl();
   if (btn.dataset.page === 'meta') refreshMeta();
+  if (btn.dataset.page === 'instances') refreshInstances();
   if (btn.dataset.page === 'runs') refreshRuns();
   if (btn.dataset.page === 'logs') refreshLogs();
   if (btn.dataset.page === 'metrics') refreshObservability();
@@ -36,6 +37,8 @@ document.querySelectorAll('.nav-item').forEach((btn) => btn.addEventListener('cl
 
 /** Scenario carried across page switches (the lifecycle chain context). */
 let ctxScenarioId = null;
+/** Pending businessId filter, consumed by the next refreshInstances (v2.3). */
+let instancesBusinessFilter = '';
 /** Pending LM-metrics scenario filter, consumed by the next refreshObservability. */
 let metricsScenarioFilter = '';
 
@@ -47,6 +50,7 @@ function currentPage() {
 /** Programmatic page switch carrying the scenario context (nav ↔ canvas). */
 function gotoPage(page, opts = {}) {
   if (opts.scenarioId !== undefined) ctxScenarioId = opts.scenarioId;
+  if (page === 'instances' && opts.businessId !== undefined) instancesBusinessFilter = opts.businessId || '';
   if (page === 'metrics' && opts.scenarioId) metricsScenarioFilter = opts.scenarioId;
   const btn = document.querySelector(`.nav-item[data-page="${page}"]`);
   if (btn) btn.click();
@@ -141,13 +145,16 @@ $('#plan-form').addEventListener('submit', async (ev) => {
     budget: Number($('#f-budget').value),
     preferences: $('#f-preferences').value.trim(),
   };
+  // v2.3: the optional caller-side business correlation key rides on the
+  // query string and lands in the run-instance registry with the run id.
+  const businessId = $('#f-businessid').value.trim();
   setRunning(true);
   $('#error-card').hidden = true; $('#results').innerHTML = '';
-  showRequest(body);
+  showRequest(body, businessId);
   submitStart = Date.now();
   startProgressPolling();
   try {
-    const res = await fetch('/api/trips/plan', {
+    const res = await fetch('/api/trips/plan' + (businessId ? `?businessId=${encodeURIComponent(businessId)}` : ''), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -156,7 +163,7 @@ $('#plan-form').addEventListener('submit', async (ev) => {
       showError(res.status, err);
     } else {
       const context = await res.json();
-      renderResults(context);
+      renderResults(context, businessId);
     }
   } catch (e) {
     showError(0, { error: 'Network error', message: String(e) });
@@ -171,7 +178,7 @@ function setRunning(on) {
   $('#submit-btn').textContent = on ? '工作流执行中…' : '开始规划';
 }
 
-function showRequest(req) {
+function showRequest(req, businessId) {
   $('#echo-card').hidden = false;
   $('#echo-body').innerHTML = `
     <dl>
@@ -179,6 +186,7 @@ function showRequest(req) {
       <dt>天数</dt><dd>${esc(req.numberOfDays)} 天</dd>
       <dt>预算</dt><dd>CNY ${esc(req.budget)}</dd>
       <dt>偏好</dt><dd>${esc(req.preferences || '(无)')}</dd>
+      <dt>业务关联 ID</dt><dd class="mono">${esc(businessId || '(未填写)')}</dd>
     </dl>`;
 }
 
@@ -227,7 +235,7 @@ async function pollActiveRun() {
 }
 
 /* ---------------- result cards ---------------- */
-function renderResults(ctx) {
+function renderResults(ctx, businessId) {
   const r = ctx.request || {};
   const research = ctx.researchResponse;
   const budget = ctx.budgetResponse;
@@ -237,8 +245,10 @@ function renderResults(ctx) {
     <div class="card">
       <h2>运行完成
         <button id="goto-replay" class="action-btn" type="button">查看运行回放 →</button>
+        <button id="goto-instances" class="action-btn" type="button">实例追踪 →</button>
         <button id="goto-lm-metrics" class="action-btn" type="button">场景指标 →</button></h2>
       <p class="hint">本次运行已由 ObservabilityActor 先落库再推送（WAL 顺序）：回放可查时间线 / DAG / 泳道，
+          实例追踪可按${businessId ? '业务 ID <b class="mono">' + esc(businessId) + '</b>' : '本次请求'}溯源完整上下文，
           指标可查本场景各阶段的 LM 耗时与 token 消耗。</p>
     </div>
     <div class="card agent-card"><h2>行程结论 — ReviewAgent
@@ -280,7 +290,8 @@ function renderResults(ctx) {
         </div>
       </div>
     </div>`;
-  // Lifecycle closure: run → replay (newest run = the one just finished)
+  // Lifecycle closure: run → replay (newest run = the one just finished),
+  // run → the instance registry (filtered by the business key when given)
   // and run → per-scenario metrics.
   $('#goto-replay').addEventListener('click', async () => {
     gotoPage('runs');
@@ -288,6 +299,14 @@ function renderResults(ctx) {
       const runs = await getJson('/api/trips/runs');
       if (runs.length) await showRunDetail(runs[0].runId);
     } catch { /* the runs panel still shows the list */ }
+  });
+  $('#goto-instances').addEventListener('click', async () => {
+    gotoPage('instances', { businessId: businessId || '' });
+    try {
+      const rows = await getJson('/api/v1/instances?window=all&limit=1'
+        + (businessId ? '&businessId=' + encodeURIComponent(businessId) : ''));
+      if (rows.length) await showInstanceDetail(rows[0].runId);
+    } catch { /* the instances panel still shows the list */ }
   });
   $('#goto-lm-metrics').addEventListener('click', () =>
     gotoPage('metrics', { scenarioId: ctxScenarioId || '' }));
@@ -346,13 +365,19 @@ function drawRunDetail() {
     <div class="card">
       <h2>运行 ${esc(d.runId.slice(0, 8))}…
         <span class="badge badge-${esc(d.status)}">${esc(d.status)}</span>${toggle}
+        <button id="run-to-instance" class="action-btn" type="button">实例追踪 →</button>
         ${d.scenarioId ? `<button id="run-to-metrics" class="action-btn" type="button">场景指标 →</button>` : ''}
       </h2>
-      <p class="hint">模板 <b>${esc(d.templateName)}</b> · 场景 <b class="mono">${esc(d.scenarioId || '控制平面默认')}</b> ·
+      <p class="hint">模板 <b>${esc(d.templateName)}</b> · 场景 <b class="mono">${esc(d.scenarioId || '控制平面默认')}</b>
+        ${d.businessId ? `· 业务 ID <b class="mono">${esc(d.businessId)}</b>` : ''} ·
         模式 <b>${esc(d.mode)}</b> ·
         ${esc(fmtTime(d.startedAt))} → ${esc(fmtTime(d.completedAt))}</p>
       <div id="run-view-body"></div>
     </div>`;
+  $('#run-to-instance').addEventListener('click', async () => {
+    gotoPage('instances', { businessId: d.businessId || '' });
+    await showInstanceDetail(d.runId);
+  });
   if (d.scenarioId) {
     $('#run-to-metrics').addEventListener('click', () =>
       gotoPage('metrics', { scenarioId: d.scenarioId }));
@@ -1262,6 +1287,142 @@ async function saveScenarioEditor() {
   }
 }
 
+/* ---------------- instance tracking page (实例追踪, v2.3) ----------------
+   The entry point of the data-lineage closed loop: every business trigger
+   instantiates a durable row keyed by the unique run id and correlated by the
+   caller-side business id; the detail view assembles the registry row, the
+   replayable timeline, the durable per-stage multi-agent / multi-model LM
+   rows and the team-log trail, all linked by runId + businessId. */
+$('#instances-refresh').addEventListener('click', refreshInstances);
+$('#instances-apply').addEventListener('click', refreshInstances);
+
+async function refreshInstances() {
+  // A jump from another page may carry a businessId filter (e.g. the result
+  // card of a run started with one); it is consumed once here.
+  if (instancesBusinessFilter !== '') $('#instances-business').value = instancesBusinessFilter;
+  instancesBusinessFilter = '';
+  const params = new URLSearchParams();
+  const businessId = $('#instances-business').value.trim();
+  const scenarioId = $('#instances-scenario').value.trim();
+  const status = $('#instances-status').value;
+  const q = $('#instances-q').value.trim();
+  if (businessId) params.set('businessId', businessId);
+  if (scenarioId) params.set('scenarioId', scenarioId);
+  if (status) params.set('status', status);
+  if (q) params.set('q', q);
+  params.set('window', $('#instances-window').value);
+  params.set('limit', '200');
+  let rows = [];
+  try { rows = await getJson('/api/v1/instances?' + params.toString()); } catch { rows = []; }
+  const tbody = $('#instances-table tbody');
+  tbody.innerHTML = rows.map((i) => `
+    <tr class="instance-row" data-run="${esc(i.runId)}">
+      <td class="mono">${esc(fmtDateTime(i.startedAt))}</td>
+      <td class="mono" title="${esc(i.runId)}">${esc(i.runId.slice(0, 8))}…</td>
+      <td class="mono">${i.businessId ? esc(i.businessId) : '<span class="hint">—</span>'}</td>
+      <td class="mono">${esc(i.scenarioId || '默认')}</td>
+      <td>${esc(i.templateName)}</td>
+      <td>${esc(i.mode)}</td>
+      <td><span class="badge badge-${esc(i.status)}">${esc(i.status)}</span></td>
+      <td class="num">${i.durationMs != null ? esc(i.durationMs) + ' ms' : '<span class="hint">进行中</span>'}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="hint">当前筛选条件下暂无实例；发起一次业务请求后，其实例化过程将从这里可溯源。</td></tr>';
+  $('#instances-summary').textContent = `共 ${rows.length} 条实例（最新在前）`;
+  document.querySelectorAll('.instance-row').forEach((tr) =>
+    tr.addEventListener('click', () => showInstanceDetail(tr.dataset.run)));
+}
+
+async function showInstanceDetail(runId) {
+  let d;
+  try { d = await getJson(`/api/v1/instances/${encodeURIComponent(runId)}`); }
+  catch (e) { $('#instance-detail').innerHTML = `<div class="card"><p class="error-message">实例详情加载失败: ${esc(e.message)}</p></div>`; return; }
+  const inst = d.instance;
+  let request = null;
+  try { request = JSON.parse(inst.requestJson); } catch { /* keep raw */ }
+
+  /* Multi-agent / multi-model call details: prefer the durable per-stage rows
+     (obs_run_metrics, survive restarts); fall back to the in-memory timeline
+     usage while the run is still retained. */
+  let stageRows = '';
+  if (d.stages.length) {
+    stageRows = d.stages.map((s) => `
+      <tr>
+        <td class="mono">${esc(s.waveIndex ?? '—')}</td><td>${esc(s.stage)}</td><td>${esc(s.agent)}</td>
+        <td>${esc(s.model || '默认')}</td>
+        <td><span class="badge ${s.outcome === 'STAGE_COMPLETED' ? 'badge-ok' : 'badge-failed'}">${esc(s.outcome)}</span></td>
+        <td class="num">${s.durationMs != null ? esc(s.durationMs) + ' ms' : '—'}</td>
+        <td class="num">${s.promptTokens ?? '—'}</td><td class="num">${s.completionTokens ?? '—'}</td>
+        <td class="num"><b>${s.totalTokens ?? '—'}</b></td><td class="num">${esc(s.attempt ?? 1)}</td>
+        <td class="mono">${esc(fmtDateTime(s.createdAt))}</td>
+      </tr>`).join('');
+  } else if (d.run) {
+    stageRows = d.run.waves.flatMap((w) => w.stages).map((s) => `
+      <tr>
+        <td class="mono">${esc(w.waveIndex)}</td><td>${esc(s.stageName)}</td><td>${esc(s.agentName)}</td>
+        <td>${esc(s.usage && s.usage.model || '默认')}</td>
+        <td><span class="badge ${s.outcome === 'STAGE_COMPLETED' ? 'badge-ok' : 'badge-failed'}">${esc(s.outcome)}</span></td>
+        <td class="num">${s.durationMs != null ? esc(s.durationMs) + ' ms' : '—'}</td>
+        <td class="num">${s.usage ? s.usage.promptTokens : '—'}</td><td class="num">${s.usage ? s.usage.completionTokens : '—'}</td>
+        <td class="num"><b>${s.usage ? s.usage.totalTokens : '—'}</b></td><td class="num">${esc(s.usage ? s.usage.retries + 1 : 1)}</td>
+        <td class="mono">${esc(fmtDateTime(s.completedAt))}</td>
+      </tr>`).join('');
+  }
+
+  let finalCtx = null;
+  try { finalCtx = d.run ? JSON.parse(d.run.finalContext) : null; } catch { /* keep raw */ }
+
+  $('#instance-detail').innerHTML = `
+    <div class="card">
+      <h2>实例 ${esc(inst.runId.slice(0, 8))}…
+        <span class="badge badge-${esc(inst.status)}">${esc(inst.status)}</span>
+        ${inst.businessId ? `<span class="badge">业务 ${esc(inst.businessId)}</span>` : ''}
+        <button id="inst-to-run" class="action-btn" type="button">运行回放 →</button>
+        <button id="inst-to-logs" class="action-btn" type="button">团队日志 →</button></h2>
+      <p class="hint">唯一请求 ID <b class="mono">${esc(inst.runId)}</b>
+        ${inst.businessId ? `· 业务关联 ID <b class="mono">${esc(inst.businessId)}</b>` : '· 无业务关联 ID'}</p>
+      <div class="request-echo"><dl>
+        <dt>场景</dt><dd class="mono">${esc(inst.scenarioId || '控制平面默认')}</dd>
+        <dt>模板 / 模式</dt><dd>${esc(inst.templateName)} · ${esc(inst.mode)}</dd>
+        <dt>触发方式</dt><dd>${esc(inst.trigger)}</dd>
+        <dt>开始 → 完成</dt><dd>${esc(fmtDateTime(inst.startedAt))} → ${esc(fmtDateTime(inst.completedAt))}</dd>
+        <dt>耗时</dt><dd>${inst.durationMs != null ? esc(inst.durationMs) + ' ms' : '进行中'}</dd>
+        ${inst.errorMessage ? `<dt>错误</dt><dd style="color:var(--err)">${esc(inst.errorMessage)}</dd>` : ''}
+      </dl></div>
+      <h3>请求上下文（业务触发载荷）</h3>
+      ${request ? `<div class="request-echo"><dl>
+          <dt>目的地</dt><dd>${esc(request.destination)}</dd>
+          <dt>天数</dt><dd>${esc(request.numberOfDays)} 天</dd>
+          <dt>预算</dt><dd>CNY ${esc(request.budget)}</dd>
+          <dt>偏好</dt><dd>${esc(request.preferences || '(无)')}</dd>
+        </dl></div>
+        ${jsonDetails('原始请求 JSON', inst.requestJson)}` : `<pre class="json">${esc(inst.requestJson)}</pre>`}
+      <h3>多 Agent / 多模型调用明细</h3>
+      ${stageRows ? `<table class="data-table">
+        <thead><tr><th>Wave</th><th>阶段</th><th>Agent</th><th>模型</th><th>结果</th><th>耗时</th>
+          <th>Prompt</th><th>Completion</th><th>总 tokens</th><th>尝试</th><th>时间</th></tr></thead>
+        <tbody>${stageRows}</tbody></table>`
+        : '<div class="hint">暂无阶段调用明细（阶段尚未完成或指标后端不可达；运行回放中仍可见实时时间线）。</div>'}
+      ${finalCtx ? `<h3>黑板终态（最终上下文）</h3><pre class="json">${esc(JSON.stringify(finalCtx, null, 2))}</pre>` : ''}
+      <h3>关联团队日志（${d.logs.length} 条）</h3>
+      ${d.logs.length ? `<table class="data-table">
+        <thead><tr><th>时间</th><th>级别</th><th>动作</th><th>消息</th></tr></thead>
+        <tbody>${d.logs.map((l) => `
+          <tr><td class="mono">${esc(fmtDateTime(l.ts))}</td>
+            <td><span class="badge ${l.level === 'ERROR' ? 'badge-failed' : (l.level === 'WARN' ? 'badge-running' : 'badge-ok')}">${esc(l.level)}</span></td>
+            <td class="mono">${esc(l.action)}</td><td>${esc(l.message)}</td></tr>`).join('')}</tbody></table>`
+        : '<div class="hint">该运行没有留存的团队日志（可能早于日志保留窗口）。</div>'}
+    </div>`;
+  $('#inst-to-run').addEventListener('click', async () => {
+    gotoPage('runs');
+    await showRunDetail(inst.runId);
+  });
+  $('#inst-to-logs').addEventListener('click', () => {
+    gotoPage('logs');
+    $('#logs-runid').value = inst.runId;
+    $('#logs-window').value = 'all';
+    refreshLogs();
+  });
+}
+
 /* ---------------- team log explorer page (团队日志) ---------------- */
 $('#logs-refresh').addEventListener('click', refreshLogs);
 $('#logs-apply').addEventListener('click', refreshLogs);
@@ -1297,14 +1458,33 @@ async function refreshLogs() {
       <td><span class="badge">${esc(e.category)}</span></td>
       <td><span class="badge ${levelBadge(e.level)}">${esc(e.level)}</span></td>
       <td class="mono">${esc(e.source)}</td>
-      <td class="mono">${e.runId ? esc(e.runId.slice(0, 8)) : '—'}</td>
-      <td class="mono">${esc(e.scenarioId || '—')}</td>
+      <td class="mono">${e.runId
+        ? `<span class="link-chip log-run-link" data-run="${esc(e.runId)}" title="打开该运行的实例追踪">${esc(e.runId.slice(0, 8))}…</span>`
+        : '—'}</td>
+      <td class="mono">${e.scenarioId
+        ? `<span class="link-chip log-scenario-link" data-scenario="${esc(e.scenarioId)}" title="按该场景过滤日志">${esc(e.scenarioId)}</span>`
+        : '—'}</td>
       <td class="mono">${esc(e.action)}</td>
       <td>${esc(e.message)}</td>
     </tr>`).join('') || '<tr><td colspan="8" class="hint">当前筛选条件下暂无日志。</td></tr>';
   $('#logs-summary').textContent = `共 ${logEntries.length} 条（最新在前，最多 300 条）`;
   document.querySelectorAll('.log-row').forEach((row) =>
     row.addEventListener('click', () => showLogDetail(logEntries[Number(row.dataset.idx)])));
+  // Closed-loop interlinks: run id → the instance detail; scenario id →
+  // filter the log explorer by that scenario. Both stop the row propagation
+  // so the raw detail view still opens for clicks outside the chips.
+  document.querySelectorAll('.log-run-link').forEach((el) =>
+    el.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      gotoPage('instances');
+      await showInstanceDetail(el.dataset.run);
+    }));
+  document.querySelectorAll('.log-scenario-link').forEach((el) =>
+    el.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      $('#logs-scenario').value = el.dataset.scenario;
+      refreshLogs();
+    }));
 }
 
 function showLogDetail(entry) {
