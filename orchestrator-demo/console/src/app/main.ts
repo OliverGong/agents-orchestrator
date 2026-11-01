@@ -3,7 +3,7 @@ import { createPinia } from 'pinia'
 import naive from 'naive-ui'
 import App from './App.vue'
 import router from './router'
-import './styles/base.css'
+import '../shared/styles/base.css'
 
 // Register every n-* component globally: view templates use Naive UI tags
 // without local imports, and the message/dialog providers must exist for
