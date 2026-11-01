@@ -205,5 +205,7 @@ GitHub Actions / GitLab CI：
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) —— 完整架构说明：包结构、核心抽象、执行模式、控制平面、
   可观测性、测试体系与版本演进（§9 v1 起含 Docker / 控制平面细节）
+- [docs/DIRECTORY-ARCHITECTURE.md](./docs/DIRECTORY-ARCHITECTURE.md) —— 目录结构架构设计：
+  3~5 抽象法则、四 zone 分层模型、依赖规则与豁免、演进指南
 - [HELP.md](./HELP.md) —— Spring Boot 参考文档入口
 - [docker/](./docker/) —— Tempo / Prometheus / Grafana 配置与仪表盘定义
